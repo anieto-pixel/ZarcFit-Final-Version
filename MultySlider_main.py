@@ -236,35 +236,40 @@ class OutputFileWidget(QWidget):
         super().__init__()
 
         self.output_file = None
+        
+        # Create button for creating a file
+        self.newfile_button = QPushButton("New File")
+        self.newfile_button.clicked.connect(lambda: FileSelector.create_new_file(self))
 
         # Create button for selecting a file
         self.select_button = QPushButton("Select .csv File")
         # Connect button's clicked signal to open_file_dialog without invoking it immediately
         self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
 
-        # Create button for creating a file
-        self.newfile_button = QPushButton("New .csv File")
-        self.newfile_button.clicked.connect(lambda: FileSelector.create_new_file(self))
-
-        #####################
-        ## Appearance stuff
-        #################
-
         # Label to display the selected file
         self.file_label = QLabel("No file selected")
         self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-        # Horizontal layout for button and label
-        file_names_layout = QHBoxLayout()
-        file_names_layout.addWidget(self.select_button)
-        file_names_layout.addWidget(self.file_label)
-        file_names_layout.addWidget(self.newfile_button)
-        file_names_layout.setContentsMargins(5, 5, 5, 5)
-        file_names_layout.setSpacing(10)
+        #####################
+        ## Appearance stuff
+        #################
+        
+        # Horizontal layout for buttons and labels
+        output_layout = QHBoxLayout()
+        
+        # Set the newfile_button to be smaller
+        self.newfile_button.setFixedSize(100, 30)  # Adjust size as needed
+        output_layout.addWidget(self.newfile_button)
+        #output_layout.addStretch(3)  # Add stretch to take 3/4 of the space
+        
+        output_layout.addWidget(self.select_button)
+        output_layout.addWidget(self.file_label)
+        
+        output_layout.setContentsMargins(5, 5, 5, 5)
+        output_layout.setSpacing(1)
 
         # Set the layout of the widget
-        self.setLayout(file_names_layout)
-
+        self.setLayout(output_layout)
 
 
 class MainWidget(QWidget):
