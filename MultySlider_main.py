@@ -146,6 +146,26 @@ class ErrorWindow:
         msg.setWindowTitle(title)
         msg.setText(message)
         msg.exec_()
+        
+        
+class FileWriter:
+    """
+    Helper class responsible for writing data to a file.
+    """
+    @staticmethod
+    def write_to_file(file_path, content):
+        """
+        Writes the provided content to the given file.
+
+        Parameters:
+        - file_path: The path to the file where the content should be written.
+        - content: The content to be written to the file.
+        """
+        try:
+            with open(file_path, "a") as f:  # Open file in append mode
+                f.write(f"{content}\n")
+        except Exception as e:
+            ErrorWindow.show_error_message(f"Could not write to file: {e}")
 
 
 class OutputFileWidget(QWidget):
@@ -155,13 +175,12 @@ class OutputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-
         self.output_file = None
 
         # Create button for selecting a file
         self.select_button = QPushButton("Select .csv File")
         self.select_button.clicked.connect(self.open_file_dialog)
-        
+
         #####################
         ## Appearance stuff
         #################
@@ -179,7 +198,7 @@ class OutputFileWidget(QWidget):
 
         # Set the layout of the widget
         self.setLayout(file_names_layout)
-        
+
     def validate(self, file_path):
         """
         Validates the selected file:
@@ -187,7 +206,7 @@ class OutputFileWidget(QWidget):
         """
         if not file_path.lower().endswith(".csv"):
             raise ValueError("The selected file is not a valid CSV file.")
-        else: 
+        else:
             return True
 
     def open_file_dialog(self):
@@ -196,83 +215,105 @@ class OutputFileWidget(QWidget):
         """
         # Open a file selection dialog
         file, _ = QFileDialog.getOpenFileName(self, "Select Output File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
-        
+
         if file:  # If a file is selected
             # Validate the file
             try:
                 if self.validate(file):  # Pass the selected file, not self.output_file
                     self.file_label.setText(file)
-                    self.output_file = file  # Store the selected file path           
-            
+                    self.output_file = file  # Store the selected file path
+
             except ValueError as e:
                 # Use the ErrorWindow class to show an error message if the file is invalid
                 ErrorWindow.show_error_message(str(e))
         else:
             self.file_label.setText("No file selected")
 
-   
-
-###########################
-#Main
-#####################################
 
 class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
-        
+
         ##################
-        #files
+        # Files
         ####################
-        
-        output_file_widget = OutputFileWidget()
-            
+        self.patatito = "pattito"  # Variable to write to file
+
+        self.output_file_widget = OutputFileWidget()
+
         ##################
-        #sliders
+        # Sliders
         ####################
-        #slider wedgets
-        frequency=l_inf=NSlidersWidget(1,0,100, "orange")
-        l_inf=NSlidersWidget(1,0,100, "black")
-        r_inf=NSlidersWidget(1,0,100, "black")
-        r_h=NSlidersWidget(3,0,100, "red")
-        r_m=NSlidersWidget(3,0,100, "green")
-        r_l=NSlidersWidget(3,0,100, "blue")
-        r_extra =NSlidersWidget(4,0,100, "black")
-        
-        #Horizontal layout for sliders
-        self.list_of_sliders=[frequency, l_inf, r_inf,
-                         r_h, r_m, r_l, r_extra
-                         ]        
-        sliders_layout=QHBoxLayout()
+        # Slider widgets
+        frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
+        l_inf = NSlidersWidget(1, 0, 100, "black")
+        r_inf = NSlidersWidget(1, 0, 100, "black")
+        r_h = NSlidersWidget(3, 0, 100, "red")
+        r_m = NSlidersWidget(3, 0, 100, "green")
+        r_l = NSlidersWidget(3, 0, 100, "blue")
+        r_extra = NSlidersWidget(4, 0, 100, "black")
+
+        # Horizontal layout for sliders
+        self.list_of_sliders = [frequency, l_inf, r_inf,
+                                r_h, r_m, r_l, r_extra]
+        sliders_layout = QHBoxLayout()
         for s in self.list_of_sliders:
             sliders_layout.addWidget(s)
-        
+
         ##################
-        #graphs
+        # Graphs
         #################### 
-        
-        #Calculators
+        # Calculators
         self.calculator = GraphCalculator(r_extra)
         for slider in r_extra.list_of_sliders:
             slider.valueChanged().connect(self.calculator.update_graph)
 
-        self.big_graph=GraphWidget(self.calculator)
-        self.small_graph=GraphWidget(self.calculator)
-        #Horizontal layout for graphs:
-        graph_layout=QHBoxLayout()
+        self.big_graph = GraphWidget(self.calculator)
+        self.small_graph = GraphWidget(self.calculator)
+        # Horizontal layout for graphs:
+        graph_layout = QHBoxLayout()
         graph_layout.addWidget(self.big_graph)
         graph_layout.addWidget(self.small_graph)
-        
-        
+
         ##################
-        #main layout
+        # Save Button
         ####################
-        main_layout=QVBoxLayout()
-        main_layout.addWidget(output_file_widget)
-        #main_layout.addLayout(file_names_layout)
+        self.save_button = QPushButton("Save patatito")
+        self.save_button.clicked.connect(self.save_to_file)
+
+        ##################
+        # Main Layout
+        ####################
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.output_file_widget)
         main_layout.addLayout(graph_layout)
         main_layout.addLayout(sliders_layout)
- 
+        main_layout.addWidget(self.save_button)  # Add the save button
+
         self.setLayout(main_layout)
+
+    def save_to_file(self):
+        """
+        Save the 'patatito' variable to the selected output file using FileWriter.
+        """
+        output_file = self.output_file_widget.output_file
+        if output_file:
+            FileWriter.write_to_file(output_file, self.patatito)  # Use FileWriter to handle the file writing
+            self.show_successful_write_feedback()  # Show the feedback for successful writing
+        else:
+            ErrorWindow.show_error_message("No output file selected.")
+
+    def show_successful_write_feedback(self):
+        """
+        Briefly changes the background color of the save button to a subdued green to indicate success.
+        """
+        # Set button background to a subdued green color
+        original_color = self.save_button.styleSheet()  # Store the original style
+        self.save_button.setStyleSheet("background-color: #4CAF50; color: white;")
+        
+        # Reset the button's background after 200 milliseconds
+        QTimer.singleShot(200, lambda: self.save_button.setStyleSheet(original_color))
+
 
 
     
