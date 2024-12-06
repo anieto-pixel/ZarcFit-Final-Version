@@ -10,8 +10,6 @@ import os
 import numpy as np
 
 #patatito is testing git
-#patatito is testing again
-#my branch is in no way up to date buddy
 #########################################################################       
 #############################################################################        
 #Graphs Stuff
