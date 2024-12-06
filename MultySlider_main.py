@@ -155,14 +155,16 @@ class OutputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        #####################
-        ## Appearance stuff
-        #################
+
         self.output_file = None
 
         # Create button for selecting a file
         self.select_button = QPushButton("Select .csv File")
         self.select_button.clicked.connect(self.open_file_dialog)
+        
+        #####################
+        ## Appearance stuff
+        #################
 
         # Label to display the selected file
         self.file_label = QLabel("No file selected")
@@ -228,6 +230,7 @@ class MainWidget(QWidget):
         #sliders
         ####################
         #slider wedgets
+        frequency=l_inf=NSlidersWidget(1,0,100, "orange")
         l_inf=NSlidersWidget(1,0,100, "black")
         r_inf=NSlidersWidget(1,0,100, "black")
         r_h=NSlidersWidget(3,0,100, "red")
@@ -236,7 +239,7 @@ class MainWidget(QWidget):
         r_extra =NSlidersWidget(4,0,100, "black")
         
         #Horizontal layout for sliders
-        self.list_of_sliders=[l_inf, r_inf,
+        self.list_of_sliders=[frequency, l_inf, r_inf,
                          r_h, r_m, r_l, r_extra
                          ]        
         sliders_layout=QHBoxLayout()
