@@ -72,10 +72,6 @@ class GraphWidget(pg.PlotWidget):
         self.clear()  # Clear previous plot
         self.plot(x, y)
   
-########################################################################
-#################################################################################
-#Gidget types
-#################################################################################
 ################################################################
 #Sliders
 ################################
@@ -134,6 +130,38 @@ class NSlidersWidget(QWidget):
 ######################################
 
 
+###############################################
+#Buttons Sidebar
+####################################################
+
+class ButtonsWidgetRow(QWidget):
+    def __init__(self):
+        super().__init__()
+    
+        #save buttons(eventually buttons, or sets of themed buttons, will have their class)
+        self.f1_button = QPushButton("F1")
+        self.f2_button = QPushButton("F2")
+        self.f3_button = QPushButton("F3")
+        self.save_button = QPushButton("Save plot")
+        self.f5_button = QPushButton("F5")
+        self.f6_button = QPushButton("F6")
+        self.f7_button = QPushButton("F7")
+        self.f8_button = QPushButton("F8")
+        self.f9_button = QPushButton("F9")
+        
+        self.list_of_buttons=[self.f1_button, self.f2_button, self.f3_button,
+                         self.save_button,self.f5_button,self.f6_button,
+                         self.f7_button,self.f8_button,self.f9_button,
+                         ]
+        buttons_column_layout= QVBoxLayout()
+        for b in self.list_of_buttons:
+            buttons_column_layout.addWidget(b)
+
+        # Set the layout of the widget
+        self.setLayout(buttons_column_layout)
+  
+
+
 
 class MainWidget(QWidget):
     def __init__(self):
@@ -145,6 +173,13 @@ class MainWidget(QWidget):
         self.patatito = "pattito"  # Variable to write to file
 
         self.output_file_widget = OutputFileWidget()
+
+        ##################
+        # Button Widget
+        ####################
+        self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
+        buttons_layout = QVBoxLayout()
+        buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
 
         ##################
         # Sliders
@@ -180,11 +215,10 @@ class MainWidget(QWidget):
         graph_layout.addWidget(self.big_graph)
         graph_layout.addWidget(self.small_graph)
 
-        ##################
-        # Save Button
-        ####################
-        self.save_button = QPushButton("Save patatito")
-        self.save_button.clicked.connect(self.save_to_file)
+        ###bottom half of the screen
+        bottom_half_layout = QHBoxLayout()
+        bottom_half_layout.addLayout(sliders_layout)
+        bottom_half_layout.addLayout(buttons_layout)  # Add the button layout here
 
         ##################
         # Main Layout
@@ -192,42 +226,15 @@ class MainWidget(QWidget):
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.output_file_widget)
         main_layout.addLayout(graph_layout)
-        main_layout.addLayout(sliders_layout)
-        main_layout.addWidget(self.save_button)  # Add the save button
+        main_layout.addLayout(bottom_half_layout)
 
         self.setLayout(main_layout)
-
-    def save_to_file(self):
-        """
-        Save the 'patatito' variable to the selected output file using FileWriter.
-        """
-        output_file = self.output_file_widget.output_file
-        if output_file:
-            FileWriter.write_to_file(output_file, self.patatito)  # Use FileWriter to handle the file writing
-            self.show_successful_write_feedback()  # Show the feedback for successful writing
-        else:
-            ErrorWindow.show_error_message("No output file selected.")
-
-    def show_successful_write_feedback(self):
-        """
-        Briefly changes the background color of the save button to a subdued green to indicate success.
-        """
-        # Set button background to a subdued green color
-        original_color = self.save_button.styleSheet()  # Store the original style
-        self.save_button.setStyleSheet("background-color: #4CAF50; color: white;")
-        
-        # Reset the button's background after 200 milliseconds
-        QTimer.singleShot(200, lambda: self.save_button.setStyleSheet(original_color))
-
-
 
     
 # Main code to start the application
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
     window = MainWidget()
-    
     
     window.setWindowTitle("Slider with Ticks and Labels")
     window.setGeometry(100, 100, 800, 900)  # Set window size and position
