@@ -168,6 +168,66 @@ class FileWriter:
             ErrorWindow.show_error_message(f"Could not write to file: {e}")
 
 
+class FileSelector:
+    """
+    Class responsible for handling file selection and validation.
+    """
+    @staticmethod
+    def create_new_file(parent):
+        """
+        Opens a dialog for creating a new CSV file and creates the file if it doesn't exist.
+        """
+        # Open a Save File dialog to create a new file
+        file, _ = QFileDialog.getSaveFileName(parent, "Create New CSV File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+        
+        if file:  # If a file path is selected
+            # Ensure the file has a .csv extension
+            if not file.lower().endswith(".csv"):
+                file += ".csv"
+
+            # Create the file if it doesn't exist
+            if not os.path.exists(file):
+                try:
+                    with open(file, 'w', newline='') as f:
+                        pass  # Creating an empty CSV file
+                    parent.file_label.setText(file)
+                    parent.output_file = file  # Set the file path to the parent widget
+                except IOError as e:
+                    # Handle error during file creation
+                    ErrorWindow.show_error_message(f"Failed to create file: {str(e)}")
+            else:
+                parent.file_label.setText("File already exists")
+        else:
+            parent.file_label.setText("No file selected")
+    
+    @staticmethod
+    def open_file_dialog(parent):
+        """
+        Opens a dialog for selecting a file and updates the label with the selected file's path.
+        """
+        # Open a file selection dialog
+        file, _ = QFileDialog.getOpenFileName(parent, "Select Output File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+    
+        if file:  # If a file is selected
+            # Validate the file
+            try:
+                if FileSelector.validate(file):  # Pass the selected file, not self.output_file
+                    parent.file_label.setText(file)
+                    parent.output_file = file  # Store the selected file path
+    
+            except ValueError as e:
+                # Use the ErrorWindow class to show an error message if the file is invalid
+                ErrorWindow.show_error_message(str(e))
+        else:
+            parent.file_label.setText("No file selected")
+
+    @staticmethod
+    def validate(file_path):
+        if not file_path.lower().endswith(".csv"):
+            raise ValueError("The selected file is not a valid CSV file.")
+        return True
+
+
 class OutputFileWidget(QWidget):
     """
     Class for selecting files and displaying the selected file.
@@ -179,7 +239,12 @@ class OutputFileWidget(QWidget):
 
         # Create button for selecting a file
         self.select_button = QPushButton("Select .csv File")
-        self.select_button.clicked.connect(self.open_file_dialog)
+        # Connect button's clicked signal to open_file_dialog without invoking it immediately
+        self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
+
+        # Create button for creating a file
+        self.newfile_button = QPushButton("New .csv File")
+        self.newfile_button.clicked.connect(lambda: FileSelector.create_new_file(self))
 
         #####################
         ## Appearance stuff
@@ -193,41 +258,13 @@ class OutputFileWidget(QWidget):
         file_names_layout = QHBoxLayout()
         file_names_layout.addWidget(self.select_button)
         file_names_layout.addWidget(self.file_label)
+        file_names_layout.addWidget(self.newfile_button)
         file_names_layout.setContentsMargins(5, 5, 5, 5)
         file_names_layout.setSpacing(10)
 
         # Set the layout of the widget
         self.setLayout(file_names_layout)
 
-    def validate(self, file_path):
-        """
-        Validates the selected file:
-        - It must be a .csv file.
-        """
-        if not file_path.lower().endswith(".csv"):
-            raise ValueError("The selected file is not a valid CSV file.")
-        else:
-            return True
-
-    def open_file_dialog(self):
-        """
-        Opens a dialog for selecting a file and updates the label with the selected file's path.
-        """
-        # Open a file selection dialog
-        file, _ = QFileDialog.getOpenFileName(self, "Select Output File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
-
-        if file:  # If a file is selected
-            # Validate the file
-            try:
-                if self.validate(file):  # Pass the selected file, not self.output_file
-                    self.file_label.setText(file)
-                    self.output_file = file  # Store the selected file path
-
-            except ValueError as e:
-                # Use the ErrorWindow class to show an error message if the file is invalid
-                ErrorWindow.show_error_message(str(e))
-        else:
-            self.file_label.setText("No file selected")
 
 
 class MainWidget(QWidget):
