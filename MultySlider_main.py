@@ -84,47 +84,39 @@ Class for pack of n vertical sliders
 class NSlidersWidget(QWidget):
     def __init__(self, n, min_value, max_value, colour):
         super().__init__()
-        
-        #creates list of n wrapped sliders
-        self.list_of_sliders=[]
-        for x in range(n):
-            slider=SliderWithTicks(min_value, max_value, colour)
-            self.list_of_sliders.append(slider)
-        
 
-        """
-        To delete
-        # Creates the label for the added value of the slidersand conects lthe sliders to the value
-        """
+        # Creates list of n wrapped sliders
+        self.list_of_sliders = []
+        for x in range(n):
+            slider = SliderWithTicks(min_value, max_value, colour)
+            self.list_of_sliders.append(slider)
+
+        # Connect sliders to update total value
         self.value_label_total = QLabel(f"Total: {self.calculate_total()}")
         for slider in self.list_of_sliders:
             slider.valueChanged().connect(self.update_labels)
-        
-        
-        #Layouts
-        main_layout=QHBoxLayout()
+
+        # Layout
+        main_layout = QHBoxLayout()
+
+        # Add spacer item to push sliders apart if needed
+        #main_layout.addSpacerItem(QSpacerItem(10, 0))  # Adjust as needed for horizontal spacing
         for s in self.list_of_sliders:
             main_layout.addWidget(s)
-        #main_layout.addWidget(self.value_label_total)
-        
-        main_layout.setContentsMargins(20, 40, 20, 20)  # Add top, left, right, and bottom margins
-            
+        main_layout.addSpacerItem(QSpacerItem(10, 0))  # Add space after sliders
+
+        # Set margins to the layout
+        main_layout.setContentsMargins(0, 10, 10, 0)  # Set top, left, right, and bottom margins
+                                                        #(for horizontal distribution: left , top, right, bottom)
+
         self.setLayout(main_layout)
-        
-    """
-    To delete. Calculates the sum of all slider values.
-    """
+
     def calculate_total(self):
         return sum(slider.get_value() for slider in self.list_of_sliders)
 
-
     def update_labels(self):
-        """
-        Updates the total value label to reflect the current slider values.
-        """
         total = self.calculate_total()
-        self.value_label_total.setText(f"Total: {total}")              
-
+        self.value_label_total.setText(f"Total: {total}")
 #######################################
 #Files
 ######################################
@@ -156,9 +148,12 @@ class ButtonsWidgetRow(QWidget):
         buttons_column_layout= QVBoxLayout()
         for b in self.list_of_buttons:
             buttons_column_layout.addWidget(b)
+            
+        #buttons_column_layout.setSpacing(5) 
 
         # Set the layout of the widget
         self.setLayout(buttons_column_layout)
+        self.setMaximumWidth(100)
   
 
 
@@ -185,7 +180,9 @@ class MainWidget(QWidget):
         # Sliders
         ####################
         # Slider widgets
-        frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
+        sliders_layout = QHBoxLayout()
+        
+        frequency = NSlidersWidget(1, 0, 100, "orange")
         l_inf = NSlidersWidget(1, 0, 100, "black")
         r_inf = NSlidersWidget(1, 0, 100, "black")
         r_h = NSlidersWidget(3, 0, 100, "red")
@@ -199,6 +196,8 @@ class MainWidget(QWidget):
         sliders_layout = QHBoxLayout()
         for s in self.list_of_sliders:
             sliders_layout.addWidget(s)
+            
+        #sliders_layout.setSpacing(2) 
 
         ##################
         # Graphs
@@ -209,23 +208,35 @@ class MainWidget(QWidget):
             slider.valueChanged().connect(self.calculator.update_graph)
 
         self.big_graph = GraphWidget(self.calculator)
-        self.small_graph = GraphWidget(self.calculator)
-        # Horizontal layout for graphs:
-        graph_layout = QHBoxLayout()
-        graph_layout.addWidget(self.big_graph)
-        graph_layout.addWidget(self.small_graph)
+        self.small_graph_1 = GraphWidget(self.calculator)
+        self.small_graph_2 = GraphWidget(self.calculator)
+        
+        # Layout for the two stacked graqphs to the left
+        right_graphs_layout=QVBoxLayout()
+        right_graphs_layout.addWidget(self.small_graph_1)
+        right_graphs_layout.addWidget(self.small_graph_2)
+        
+        #layout for all graphs
+        all_graphs_layout = QHBoxLayout()
+        all_graphs_layout.addWidget(self.big_graph)
+        all_graphs_layout.addLayout(right_graphs_layout)
 
         ###bottom half of the screen
         bottom_half_layout = QHBoxLayout()
         bottom_half_layout.addLayout(sliders_layout)
-        bottom_half_layout.addLayout(buttons_layout)  # Add the button layout here
+        bottom_half_layout.addLayout(buttons_layout)
+        bottom_half_layout.setContentsMargins(10, 0, 0, 10)
+        
+#        bottom_half_layout.addLayout(sliders_layout, 24)
+#        bottom_half_layout.addLayout(buttons_layout, 1)
+
 
         ##################
         # Main Layout
         ####################
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.output_file_widget)
-        main_layout.addLayout(graph_layout)
+        main_layout.addLayout(all_graphs_layout)
         main_layout.addLayout(bottom_half_layout)
 
         self.setLayout(main_layout)

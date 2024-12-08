@@ -32,6 +32,8 @@ class SliderWithTicks(QWidget,):
                 border-radius: 10px;
             }}
         """)
+        
+        self.setMinimumWidth(75) 
 
         # Set up the label
         self.value_label = QLabel(f"Slider: {self.s.value()}", self)
