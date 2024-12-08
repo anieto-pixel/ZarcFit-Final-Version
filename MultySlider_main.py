@@ -103,7 +103,6 @@ class NSlidersWidget(QWidget):
         #main_layout.addSpacerItem(QSpacerItem(10, 0))  # Adjust as needed for horizontal spacing
         for s in self.list_of_sliders:
             main_layout.addWidget(s)
-        main_layout.addSpacerItem(QSpacerItem(10, 0))  # Add space after sliders
 
         # Set margins to the layout
         main_layout.setContentsMargins(0, 10, 10, 0)  # Set top, left, right, and bottom margins
@@ -226,9 +225,7 @@ class MainWidget(QWidget):
         bottom_half_layout.addLayout(sliders_layout)
         bottom_half_layout.addLayout(buttons_layout)
         bottom_half_layout.setContentsMargins(10, 0, 0, 10)
-        
-#        bottom_half_layout.addLayout(sliders_layout, 24)
-#        bottom_half_layout.addLayout(buttons_layout, 1)
+        bottom_half_layout.setSizeConstraint(QLayout.SetDefaultConstraint)
 
 
         ##################
