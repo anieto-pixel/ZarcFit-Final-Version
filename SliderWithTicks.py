@@ -32,6 +32,8 @@ class SliderWithTicks(QWidget,):
                 border-radius: 10px;
             }}
         """)
+        
+        self.setMinimumWidth(75) 
 
         # Set up the label
         self.value_label = QLabel(f"Slider: {self.s.value()}", self)
@@ -117,7 +119,18 @@ if __name__ == "__main__":
     # Create and show an instance of SliderWithTicks
     slider_widget = SliderWithTicks(0, 100, "blue")
     slider_widget.resize(200, 300)
+    
+    min_size = slider_widget.minimumSize()  # Returns a QSize object
+    min_width, min_height = min_size.width(), min_size.height()
+    print(f"Minimum size: {min_width}px x {min_height}px")
+    
+    max_size = slider_widget.maximumSize()  # Returns a QSize object
+    max_width, max_height = max_size.width(), max_size.height()
+    print(f"Maximum size: {max_width}px x {max_height}px")
+    
     slider_widget.show()
+    
+    
 
     # Run the application
     sys.exit(app.exec_())
