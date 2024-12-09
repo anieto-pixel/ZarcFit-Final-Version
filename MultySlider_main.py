@@ -95,7 +95,7 @@ class MainWidget(QWidget):
         super().__init__()
 
         ##################
-        # Files
+        # Files bar
         ####################
         self.patatito = "pattito"  # Variable to write to file
 
@@ -112,7 +112,7 @@ class MainWidget(QWidget):
         # Sliders
         ####################
         # Slider widgets
-        frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
+        #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
         l_inf = NSlidersWidget(1, 0, 100, "black")
         r_inf = NSlidersWidget(1, 0, 100, "black")
         r_h = NSlidersWidget(3, 0, 100, "red")
@@ -121,7 +121,7 @@ class MainWidget(QWidget):
         r_extra = NSlidersWidget(4, 0, 100, "black")
 
         # Horizontal layout for sliders
-        self.list_of_sliders = [frequency, l_inf, r_inf,
+        self.list_of_sliders = [ l_inf, r_inf,
                                 r_h, r_m, r_l, r_extra]
         sliders_layout = QHBoxLayout()
         for s in self.list_of_sliders:
@@ -150,6 +150,10 @@ class MainWidget(QWidget):
         all_graphs_layout.addWidget(self.big_graph)
         all_graphs_layout.addLayout(right_graphs_layout)
 
+        ###########################
+        #bttom half layout
+        ##########################
+
         ###bottom half of the screen
         bottom_half_layout = QHBoxLayout()
         bottom_half_layout.addLayout(sliders_layout)
@@ -159,11 +163,29 @@ class MainWidget(QWidget):
         # Main Layout
         ####################
         main_layout = QVBoxLayout()
+        # Create a QSplitter to make graph_layout and bottom_half_layout adjustable
+        splitter = QSplitter(Qt.Vertical)
+
+        # Add both layouts to the splitter
+        splitter.addWidget(self.create_widget_from_layout(all_graphs_layout))
+        splitter.addWidget(self.create_widget_from_layout(bottom_half_layout))
+
+        # Set the initial size for each layout (optional)
+        splitter.setSizes([500, 300])  # Change the values to whatever ratio you want
+        
+        # Add output file widget and the splitter to the main layout
         main_layout.addWidget(self.output_file_widget)
-        main_layout.addLayout(all_graphs_layout)
-        main_layout.addLayout(bottom_half_layout)
+        main_layout.addWidget(splitter)
 
         self.setLayout(main_layout)
+
+    def create_widget_from_layout(self, layout):
+        """
+        Helper method to create a QWidget from a layout so that it can be added to the QSplitter.
+        """
+        widget = QWidget()
+        widget.setLayout(layout)
+        return widget
 
     
 # Main code to start the application
