@@ -4,7 +4,7 @@ Created on Fri Dec  6 11:27:04 2024
 
 @author: agarcian
 """
-
+import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import QPainter, QFont, QColor 
@@ -23,15 +23,18 @@ class SliderWithTicks(QWidget,):
         self.s.setTickPosition(QSlider.TicksBothSides)  # Display ticks on both sides
         self.s.setTickInterval(round((max_value-min_value)/10))  # Set interval for ticks
         
-        #customize slider appeareance
         self.s.setStyleSheet(f"""
-            QSlider::handle:vertical {{
-                background: {colour};
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-            }}
-        """)
+             QSlider::handle:vertical {{
+                 background: {colour};
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 10px;
+                }}
+             QSlider::add-page:vertical {{
+                 background: #d3d3d3;
+                 border-radius: 5px;
+                 }}
+             """)
         
         self.setMinimumWidth(75) 
 
@@ -106,18 +109,26 @@ class SliderWithTicks(QWidget,):
             painter.drawText(text_rect, Qt.AlignCenter, str(i))
 
 
-########################################
-#manual test method
-######################################
-if __name__ == "__main__":
-    import sys
-    from PyQt5.QtWidgets import QApplication
+class SliderForFrequency(QWidget):
+    def __init__(self):
+        super().__init__()
+        
+        
+    #https://stackoverflow.com/questions/17361885/range-slider-in-qt-two-handles-in-a-qslider 
+    #https://stackoverflow.com/questions/47342158/porting-range-slider-widget-to-pyqt5
 
+
+
+########################################
+#manual test method parent
+######################################
+"""
+if __name__ == "__main__":
     # Create a QApplication instance
     app = QApplication(sys.argv)
 
     # Create and show an instance of SliderWithTicks
-    slider_widget = SliderWithTicks(0, 100, "blue")
+    slider_widget = SliderWithTicks(0, 100, "red")
     slider_widget.resize(200, 300)
     
     min_size = slider_widget.minimumSize()  # Returns a QSize object
@@ -134,3 +145,20 @@ if __name__ == "__main__":
 
     # Run the application
     sys.exit(app.exec_())
+   """
+   
+   ########################################
+   #manual test method child
+   ######################################
+if __name__ == "__main__":
+
+       # Create a QApplication instance
+       app = QApplication(sys.argv)
+
+       # Create and show an instance of SliderWithTicks
+       slider_widget = SliderForFrequency()
+       slider_widget.resize(200, 300)
+       slider_widget.show()
+       # Run the application
+       sys.exit(app.exec_())
+  
