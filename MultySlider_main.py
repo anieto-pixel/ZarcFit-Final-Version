@@ -135,12 +135,20 @@ class MainWidget(QWidget):
         for slider in r_extra.list_of_sliders:
             slider.valueChanged().connect(self.calculator.update_graph)
 
+        #graphs layouts
         self.big_graph = GraphWidget(self.calculator)
-        self.small_graph = GraphWidget(self.calculator)
-        # Horizontal layout for graphs:
-        graph_layout = QHBoxLayout()
-        graph_layout.addWidget(self.big_graph)
-        graph_layout.addWidget(self.small_graph)
+        self.small_graph_1 = GraphWidget(self.calculator)
+        self.small_graph_2 = GraphWidget(self.calculator)
+        
+        # Layout for the two stacked graqphs to the left
+        right_graphs_layout=QVBoxLayout()
+        right_graphs_layout.addWidget(self.small_graph_1)
+        right_graphs_layout.addWidget(self.small_graph_2)
+        
+        #layout for all graphs
+        all_graphs_layout = QHBoxLayout()
+        all_graphs_layout.addWidget(self.big_graph)
+        all_graphs_layout.addLayout(right_graphs_layout)
 
         ###bottom half of the screen
         bottom_half_layout = QHBoxLayout()
@@ -152,7 +160,7 @@ class MainWidget(QWidget):
         ####################
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.output_file_widget)
-        main_layout.addLayout(graph_layout)
+        main_layout.addLayout(all_graphs_layout)
         main_layout.addLayout(bottom_half_layout)
 
         self.setLayout(main_layout)
