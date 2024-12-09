@@ -117,7 +117,7 @@ class SliderForFrequency(QWidget):
     #https://stackoverflow.com/questions/17361885/range-slider-in-qt-two-handles-in-a-qslider 
     #https://stackoverflow.com/questions/47342158/porting-range-slider-widget-to-pyqt5
 
-
+    #https://pypi.org/project/QtRangeSlider/
 
 ########################################
 #manual test method parent
