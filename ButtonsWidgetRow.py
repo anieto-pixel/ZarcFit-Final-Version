@@ -40,8 +40,8 @@ class ButtonsWidgetRow(QWidget):
 
         # Set the layout of the widget
         self.setLayout(buttons_column_layout)
-        self.setMaximumWidth(100)
-        self.setMinimumSize(80,30*len(self.list_of_buttons))# width, hight
+        self.setMaximumWidth(120)
+        self.setMinimumSize(90,30*len(self.list_of_buttons))# width, hight
         
         
 if __name__ == "__main__":

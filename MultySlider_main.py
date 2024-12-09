@@ -10,8 +10,11 @@ import os
 import numpy as np
 
 #my own classes
-from SliderWithTicks import SliderWithTicks
 from OutputFileWidget import OutputFileWidget
+from SliderWithTicks import SliderWithTicks
+from NSlidersWidget import NSlidersWidget
+from ButtonsWidgetRow import ButtonsWidgetRow
+
 
 #########################################################################       
 #############################################################################        
@@ -75,55 +78,7 @@ class GraphWidget(pg.PlotWidget):
 ################################################################
 #Sliders
 ################################
-
-#NSlidersWidget####################################################################
-
-"""
-Class for pack of n vertical sliders
-"""
-class NSlidersWidget(QWidget):
-    def __init__(self, n, min_value, max_value, colour):
-        super().__init__()
-        
-        #creates list of n wrapped sliders
-        self.list_of_sliders=[]
-        for x in range(n):
-            slider=SliderWithTicks(min_value, max_value, colour)
-            self.list_of_sliders.append(slider)
-        
-
-        """
-        To delete
-        # Creates the label for the added value of the slidersand conects lthe sliders to the value
-        """
-        self.value_label_total = QLabel(f"Total: {self.calculate_total()}")
-        for slider in self.list_of_sliders:
-            slider.valueChanged().connect(self.update_labels)
-        
-        
-        #Layouts
-        main_layout=QHBoxLayout()
-        for s in self.list_of_sliders:
-            main_layout.addWidget(s)
-        #main_layout.addWidget(self.value_label_total)
-        
-        main_layout.setContentsMargins(20, 40, 20, 20)  # Add top, left, right, and bottom margins
-            
-        self.setLayout(main_layout)
-        
-    """
-    To delete. Calculates the sum of all slider values.
-    """
-    def calculate_total(self):
-        return sum(slider.get_value() for slider in self.list_of_sliders)
-
-
-    def update_labels(self):
-        """
-        Updates the total value label to reflect the current slider values.
-        """
-        total = self.calculate_total()
-        self.value_label_total.setText(f"Total: {total}")              
+      
 
 #######################################
 #Files
@@ -133,34 +88,6 @@ class NSlidersWidget(QWidget):
 ###############################################
 #Buttons Sidebar
 ####################################################
-
-class ButtonsWidgetRow(QWidget):
-    def __init__(self):
-        super().__init__()
-    
-        #save buttons(eventually buttons, or sets of themed buttons, will have their class)
-        self.f1_button = QPushButton("F1")
-        self.f2_button = QPushButton("F2")
-        self.f3_button = QPushButton("F3")
-        self.save_button = QPushButton("Save plot")
-        self.f5_button = QPushButton("F5")
-        self.f6_button = QPushButton("F6")
-        self.f7_button = QPushButton("F7")
-        self.f8_button = QPushButton("F8")
-        self.f9_button = QPushButton("F9")
-        
-        self.list_of_buttons=[self.f1_button, self.f2_button, self.f3_button,
-                         self.save_button,self.f5_button,self.f6_button,
-                         self.f7_button,self.f8_button,self.f9_button,
-                         ]
-        buttons_column_layout= QVBoxLayout()
-        for b in self.list_of_buttons:
-            buttons_column_layout.addWidget(b)
-
-        # Set the layout of the widget
-        self.setLayout(buttons_column_layout)
-  
-
 
 
 class MainWidget(QWidget):
