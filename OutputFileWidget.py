@@ -59,12 +59,12 @@ class FileSelector:
         Opens a dialog for creating a new CSV file and creates the file if it doesn't exist.
         """
         # Open a Save File dialog to create a new file
-        file, _ = QFileDialog.getSaveFileName(parent, f"Create New {desired_type} File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+        file, _ = QFileDialog.getSaveFileName(parent, f"Create New {parent.desired_type} File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
         
         if file:  # If a file path is selected
             # Ensure the file has a .csv extension
-            if not file.lower().endswith(".csv"):
-                file += ".csv"
+            if not file.lower().endswith(parent.desired_type):
+                file += parent.desired_type
 
             # Create the file if it doesn't exist
             if not os.path.exists(file):
@@ -87,12 +87,12 @@ class FileSelector:
         Opens a dialog for selecting a file and updates the label with the selected file's path.
         """
         # Open a file selection dialog
-        file, _ = QFileDialog.getOpenFileName(parent, "Select Output File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+        file, _ = QFileDialog.getOpenFileName(parent, "Select File", os.getcwd(), parent.search_parameters)
     
         if file:  # If a file is selected
             # Validate the file
             try:
-                if FileSelector.validate(file, desired_type):  # Pass the selected file, not self.output_file
+                if FileSelector.validate(file, parent.desired_type):  # Pass the selected file, not self.output_file
                     parent.file_label.setText(file)
                     parent.output_file = file  # Store the selected file path
     
@@ -116,9 +116,9 @@ class OutputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.output_file = None
-        
         self.desired_type=".csv"
+        self.search_parameters= "CSV Files (*.csv);;All Files (*)"
+        self.output_file = None
         
         # Create button for creating a file
         self.newfile_button = QPushButton("New File")
@@ -130,7 +130,7 @@ class OutputFileWidget(QWidget):
         self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
 
         # Label to display the selected file
-        self.file_label = QLabel("No file selected")
+        self.file_label = QLabel("No output file selected")
         self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         #####################
@@ -159,7 +159,9 @@ class InputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.input_file = None
+        self.desired_type=".z"
+        self.search_parameters= "Z Files (*.z);;All Files (*)"
+        self.output_file = None
     
         self.select_button = QPushButton("Input Folder")
         # Connect button's clicked signal to open_file_dialog without invoking it immediately
@@ -169,11 +171,31 @@ class InputFileWidget(QWidget):
         self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         
         
+        
+        intput_layout = QHBoxLayout()
+        intput_layout.addWidget(self.select_button)
+        intput_layout.addWidget(self.file_label)
+        
+        intput_layout.setContentsMargins(5, 5, 5, 5)
+        intput_layout.setSpacing(1)
+
+        # Set the layout of the widget
+        self.setLayout(intput_layout)
+        
+        
+        
 
 
 # To run the test in a standalone application
 if __name__ == "__main__":
     app = QApplication([])
-    widget = OutputFileWidget()
+    layout = QHBoxLayout()
+    widget_1 = InputFileWidget()
+    widget_2 = OutputFileWidget()
+    layout.addWidget(widget_1)
+    layout.addWidget(widget_2)
+    
+    widget = QWidget()
+    widget.setLayout(layout)
     widget.show()
     app.exec_()
