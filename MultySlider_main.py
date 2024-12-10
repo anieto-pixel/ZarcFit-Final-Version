@@ -11,6 +11,7 @@ import numpy as np
 
 #my own classes
 from OutputFileWidget import OutputFileWidget
+from InputFileWidget import InputFileWidget
 from SliderWithTicks import SliderWithTicks
 from NSlidersWidget import NSlidersWidget
 from ButtonsWidgetRow import ButtonsWidgetRow
@@ -95,6 +96,28 @@ class GraphWidget(pg.PlotWidget):
 ###################################
 
 class MainWidget(QWidget):
+    
+    def create_widget_from_layout(self, layout):
+        """
+        Helper method to create a QWidget from a layout so that it can be added to the QSplitter.
+        """
+        widget = QWidget()
+        widget.setLayout(layout)
+        return widget
+    
+    def create_top_bar_widget(self):
+        
+        layout = QHBoxLayout()
+        layout.addWidget(self.input_file_widget)
+        layout.addStretch()  #keeps both widgets separate in the layout
+        layout.addWidget(self.output_file_widget)
+        
+        widget = QWidget()
+        widget.setLayout(layout)
+        
+        return widget
+    
+    
     def __init__(self):
         super().__init__()
 
@@ -105,6 +128,7 @@ class MainWidget(QWidget):
 
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
+        self.top_bar_widget= self.create_top_bar_widget()
 
         ##################
         # Button Widget
@@ -179,18 +203,11 @@ class MainWidget(QWidget):
         splitter.setSizes([500, 300])  # Change the values to whatever ratio you want
         
         # Add output file widget and the splitter to the main layout
-        main_layout.addWidget(self.output_file_widget)
+        main_layout.addWidget(self.top_bar_widget)
         main_layout.addWidget(splitter)
 
         self.setLayout(main_layout)
 
-    def create_widget_from_layout(self, layout):
-        """
-        Helper method to create a QWidget from a layout so that it can be added to the QSplitter.
-        """
-        widget = QWidget()
-        widget.setLayout(layout)
-        return widget
 
     
 # Main code to start the application
