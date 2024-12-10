@@ -123,20 +123,21 @@ class MainWidget(QWidget):
         return graphs_layout
     
     def create_sliders_layout(self):
+        default_slider_range = (0, 100)
         
-        l_inf = NSlidersWidget(1, 0, 100, "black")
-        r_inf = NSlidersWidget(1, 0, 100, "black")
-        r_h = NSlidersWidget(3, 0, 100, "red")
-        r_m = NSlidersWidget(3, 0, 100, "green")
-        r_l = NSlidersWidget(3, 0, 100, "blue")
-        r_extra = NSlidersWidget(4, 0, 100, "black")
-
-        # Horizontal layout for sliders
-        self.list_of_sliders = [ l_inf, r_inf,
-                                r_h, r_m, r_l, r_extra]
+        slider_specs = [
+            (1, "black"), (1, "black"), (3, "red"),
+            (3, "green"), (3, "blue"), (4, "black")
+        ]
+        self.list_of_sliders = [
+            NSlidersWidget(num, *default_slider_range, color)
+            for num, color in slider_specs
+        ]
+    
         sliders_layout = QHBoxLayout()
-        for s in self.list_of_sliders:
-            sliders_layout.addWidget(s)
+        for slider in self.list_of_sliders:
+            sliders_layout.addWidget(slider)
+        return sliders_layout
             
         return sliders_layout
     
@@ -154,6 +155,7 @@ class MainWidget(QWidget):
     
     
     def __init__(self):
+        
         super().__init__()
 
         self.patatito = "pattito"  # Dummy Variable to write to file
