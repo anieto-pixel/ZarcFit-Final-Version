@@ -59,7 +59,7 @@ class FileSelector:
         Opens a dialog for creating a new CSV file and creates the file if it doesn't exist.
         """
         # Open a Save File dialog to create a new file
-        file, _ = QFileDialog.getSaveFileName(parent, "Create New CSV File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+        file, _ = QFileDialog.getSaveFileName(parent, f"Create New {desired_type} File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
         
         if file:  # If a file path is selected
             # Ensure the file has a .csv extension
@@ -92,7 +92,7 @@ class FileSelector:
         if file:  # If a file is selected
             # Validate the file
             try:
-                if FileSelector.validate(file):  # Pass the selected file, not self.output_file
+                if FileSelector.validate(file, desired_type):  # Pass the selected file, not self.output_file
                     parent.file_label.setText(file)
                     parent.output_file = file  # Store the selected file path
     
@@ -103,9 +103,9 @@ class FileSelector:
             parent.file_label.setText("No file selected")
 
     @staticmethod
-    def validate(file_path):
-        if not file_path.lower().endswith(".csv"):
-            raise ValueError("The selected file is not a valid CSV file.")
+    def validate(file_path, desired_type):
+        if not file_path.lower().endswith(desired_type):
+            raise ValueError("The selected file is of an invalid type.")
         return True
 
 
@@ -117,6 +117,8 @@ class OutputFileWidget(QWidget):
         super().__init__()
 
         self.output_file = None
+        
+        self.desired_type=".csv"
         
         # Create button for creating a file
         self.newfile_button = QPushButton("New File")
@@ -151,6 +153,21 @@ class OutputFileWidget(QWidget):
 
         # Set the layout of the widget
         self.setLayout(output_layout)
+        
+        
+class InputFileWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.input_file = None
+    
+        self.select_button = QPushButton("Input Folder")
+        # Connect button's clicked signal to open_file_dialog without invoking it immediately
+        self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
+
+        self.file_label = QLabel("No input folder selected")
+        self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        
         
 
 

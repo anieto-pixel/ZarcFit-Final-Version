@@ -90,6 +90,10 @@ class GraphWidget(pg.PlotWidget):
 ####################################################
 
 
+###################################
+#Files
+###################################
+
 class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
@@ -97,8 +101,9 @@ class MainWidget(QWidget):
         ##################
         # Files bar
         ####################
-        self.patatito = "pattito"  # Variable to write to file
+        self.patatito = "pattito"  # Dummy Variable to write to file
 
+        self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
 
         ##################

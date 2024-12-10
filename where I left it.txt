@@ -6,6 +6,6 @@ Lo siguiente es:
 -hacer que imprimir a file funcione otra vez
 
 -reorganizer main que da miedo verlo
--Crear un slider de frecuencia con dos cabezas y colocarlo junto a los graficos
 
-Cuando haga eso, lo siguiente sera hacer que la barra de input file funcione
+-Cuando haga eso, lo siguiente sera hacer que la barra de input file funcione
+-Crear un slider de frecuencia con dos cabezas y colocarlo junto a los graficos
