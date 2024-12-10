@@ -105,43 +105,7 @@ class MainWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
-    def create_top_bar_widget(self):
-        
-        layout = QHBoxLayout()
-        layout.addWidget(self.input_file_widget)
-        layout.addStretch()  #keeps both widgets separate in the layout
-        layout.addWidget(self.output_file_widget)
-        
-        widget = QWidget()
-        widget.setLayout(layout)
-        
-        return widget
-    
-    
-    def __init__(self):
-        super().__init__()
-
-        ##################
-        # Files bar
-        ####################
-        self.patatito = "pattito"  # Dummy Variable to write to file
-
-        self.input_file_widget = InputFileWidget()
-        self.output_file_widget = OutputFileWidget()
-        self.top_bar_widget= self.create_top_bar_widget()
-
-        ##################
-        # Button Widget
-        ####################
-        self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
-        buttons_layout = QVBoxLayout()
-        buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
-
-        ##################
-        # Sliders
-        ####################
-        # Slider widgets
-        #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
+    def create_sliders_layout(self):
         l_inf = NSlidersWidget(1, 0, 100, "black")
         r_inf = NSlidersWidget(1, 0, 100, "black")
         r_h = NSlidersWidget(3, 0, 100, "red")
@@ -155,13 +119,55 @@ class MainWidget(QWidget):
         sliders_layout = QHBoxLayout()
         for s in self.list_of_sliders:
             sliders_layout.addWidget(s)
+            
+        return sliders_layout
+    
+    def create_top_bar_layout(self):
+        
+        layout = QHBoxLayout()
+        layout.addWidget(self.input_file_widget)
+        layout.addStretch()  #keeps both widgets separate in the layout
+        layout.addWidget(self.output_file_widget)
+        
+        #widget = QWidget()
+        #widget.setLayout(layout)
+        
+        return layout
+    
+    
+    def __init__(self):
+        super().__init__()
+
+        ##################
+        # Files bar
+        ####################
+        self.patatito = "pattito"  # Dummy Variable to write to file
+
+        self.input_file_widget = InputFileWidget()
+        self.output_file_widget = OutputFileWidget()
+        top_bar_layout= self.create_top_bar_layout()
+
+        ##################
+        # Buttons Widget
+        ####################
+        self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
+        buttons_layout = QVBoxLayout()
+        buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
+
+        ##################
+        # Sliders
+        ####################
+        # Slider widgets
+        #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
+        self.list_of_sliders=[]
+        sliders_layout=self.create_sliders_layout()
 
         ##################
         # Graphs
         #################### 
         # Calculators
-        self.calculator = GraphCalculator(r_extra)
-        for slider in r_extra.list_of_sliders:
+        self.calculator = GraphCalculator(self.list_of_sliders[5])
+        for slider in self.list_of_sliders[5].list_of_sliders:
             slider.valueChanged().connect(self.calculator.update_graph)
 
         #graphs layouts
@@ -203,7 +209,7 @@ class MainWidget(QWidget):
         splitter.setSizes([500, 300])  # Change the values to whatever ratio you want
         
         # Add output file widget and the splitter to the main layout
-        main_layout.addWidget(self.top_bar_widget)
+        main_layout.addLayout(top_bar_layout)
         main_layout.addWidget(splitter)
 
         self.setLayout(main_layout)
