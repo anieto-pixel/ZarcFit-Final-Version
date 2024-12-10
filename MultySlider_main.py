@@ -76,20 +76,6 @@ class GraphWidget(pg.PlotWidget):
         self.clear()  # Clear previous plot
         self.plot(x, y)
   
-################################################################
-#Sliders
-################################
-      
-
-#######################################
-#Files
-######################################
-
-
-###############################################
-#Buttons Sidebar
-####################################################
-
 
 ###################################
 #Files
@@ -153,29 +139,28 @@ class MainWidget(QWidget):
     def __init__(self):
         
         super().__init__()
+        self.input_content="patatito"
 
         #Would initializing help me with my issues?
 
-        self.patatito = "pattito"  # Dummy Variable to write to file
+        #self.patatito = "pattito"  # Dummy Variable to write to file
         self.calculator=None
+        self.list_of_sliders=[]
 
         #top bar deals with input and output files
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
+        
+        self.input_file_widget.file_selected.connect(self.update_patatito)
+        
         self.top_bar_widget= self.create_files_options_widget()
 
-        
         # Buttons Widget
-        self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
-        #buttons_layout = QVBoxLayout()
-        #buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
-
+        self.buttons_widget = ButtonsWidgetRow()  
 
         # Slider widgets
         #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
-        self.list_of_sliders=[]
         self.sliders_widget=self.create_sliders_widget()
-
 
         # Calculators
         self.calculator = GraphCalculator(self.list_of_sliders[5])
@@ -211,6 +196,16 @@ class MainWidget(QWidget):
         main_layout.addWidget(splitter)
 
         self.setLayout(main_layout)
+        
+    def update_patatito(self, file_path):
+        try:
+            with open(file_path, 'r') as file:
+                contents = file.read()
+            self.patatito = contents  # Update patatito with the file contents
+            print(f"File contents loaded into patatito:\n{self.patatito}")  # Optional: to check the result
+        except Exception as e:
+            print(f"Error reading file: {e}")
+            self.patatito = "Error loading file."  # Fallback text
 
 
     

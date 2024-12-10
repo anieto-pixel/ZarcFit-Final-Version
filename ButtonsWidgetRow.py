@@ -58,14 +58,6 @@ if __name__ == "__main__":
         print(f"Minimum size: {min_width}px x {min_height}px")
         
         
-        
-   #     min_size = widget.minimumSize()  # Returns a QSize object
-    #    min_width, min_height = min_size.width(), min_size.height()
-     ##  max_size = widget.maximumSize()  # Returns a QSize object
-       # max_width, max_height = max_size.width(), max_size.height()
-        #print(f"Maximum size: {max_width}px x {max_height}px")
-        
-        
         widget.setWindowTitle("Test ButtonsWidgetRow")
         widget.show()
         

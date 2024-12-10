@@ -7,9 +7,12 @@ Created on Tue Dec 10 11:50:00 2024
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-import os
-     
+import os 
+
 class InputFileWidget(QWidget):
+    # Signal to notify when a file is selected
+    file_selected = pyqtSignal(str)
+
     def __init__(self):
         super().__init__()
 
@@ -65,6 +68,9 @@ class InputFileWidget(QWidget):
             self.file_label.setText(f"{current_file}")
             self.previous_button.setEnabled(self.current_index > 0)
             self.next_button.setEnabled(self.current_index < len(self.z_files) - 1)
+
+            # Emit the file path whenever the file changes
+            self.file_selected.emit(os.path.join(self.folder_path, current_file))
 
     def show_previous_file(self):
         if self.current_index > 0:
