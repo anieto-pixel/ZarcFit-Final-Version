@@ -105,7 +105,7 @@ class MainWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
-    def create_graphs_layout(self):
+    def create_graphs_widget(self):
         self.big_graph = GraphWidget(self.calculator)
         self.small_graph_1 = GraphWidget(self.calculator)
         self.small_graph_2 = GraphWidget(self.calculator)
@@ -120,9 +120,9 @@ class MainWidget(QWidget):
         graphs_layout.addWidget(self.big_graph)
         graphs_layout.addLayout(right_graphs_layout)
         
-        return graphs_layout
+        return self.create_widget_from_layout(graphs_layout)
     
-    def create_sliders_layout(self):
+    def create_sliders_widget(self):
         default_slider_range = (0, 100)
         
         slider_specs = [
@@ -134,49 +134,47 @@ class MainWidget(QWidget):
             for num, color in slider_specs
         ]
     
-        sliders_layout = QHBoxLayout()
+        layout = QHBoxLayout()
         for slider in self.list_of_sliders:
-            sliders_layout.addWidget(slider)
-        return sliders_layout
+            layout.addWidget(slider)
             
-        return sliders_layout
+        return self.create_widget_from_layout(layout)
     
-    def create_top_bar_layout(self):
+    def create_files_options_widget(self):
         
         layout = QHBoxLayout()
         layout.addWidget(self.input_file_widget)
         layout.addStretch()  #keeps both widgets separate in the layout
         layout.addWidget(self.output_file_widget)
         
-        #widget = QWidget()
-        #widget.setLayout(layout)
-        
-        return layout
+        return self.create_widget_from_layout(layout)
     
     
     def __init__(self):
         
         super().__init__()
 
+        #Would initializing help me with my issues?
+
         self.patatito = "pattito"  # Dummy Variable to write to file
+        self.calculator=None
 
         #top bar deals with input and output files
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
-        top_bar_layout= self.create_top_bar_layout()
-
+        self.top_bar_widget= self.create_files_options_widget()
 
         
         # Buttons Widget
         self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
-        buttons_layout = QVBoxLayout()
-        buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
+        #buttons_layout = QVBoxLayout()
+        #buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
 
 
         # Slider widgets
         #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
         self.list_of_sliders=[]
-        sliders_layout=self.create_sliders_layout()
+        self.sliders_widget=self.create_sliders_widget()
 
 
         # Calculators
@@ -185,14 +183,14 @@ class MainWidget(QWidget):
             slider.valueChanged().connect(self.calculator.update_graph)
 
         # Graphs
-        graphs_layout=self.create_graphs_layout()
+        graphs_widget=self.create_graphs_widget()
 
         ###########################
         #bttom half layout
         ##########################
         bottom_half_layout = QHBoxLayout()
-        bottom_half_layout.addLayout(sliders_layout)
-        bottom_half_layout.addLayout(buttons_layout)  # Add the button layout here
+        bottom_half_layout.addWidget(self.sliders_widget)
+        bottom_half_layout.addWidget(self.buttons_widget)  # Add the button layout here
 
         ##################
         # Main Layout
@@ -202,14 +200,14 @@ class MainWidget(QWidget):
         splitter = QSplitter(Qt.Vertical)
 
         # Add both layouts to the splitter
-        splitter.addWidget(self.create_widget_from_layout(graphs_layout))
+        splitter.addWidget(graphs_widget)
         splitter.addWidget(self.create_widget_from_layout(bottom_half_layout))
 
         # Set the initial size for each layout (optional)
         splitter.setSizes([500, 300])  # Change the values to whatever ratio you want
         
         # Add output file widget and the splitter to the main layout
-        main_layout.addLayout(top_bar_layout)
+        main_layout.addWidget(self.top_bar_widget)
         main_layout.addWidget(splitter)
 
         self.setLayout(main_layout)
