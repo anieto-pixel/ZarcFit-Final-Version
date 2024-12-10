@@ -1,3 +1,19 @@
+Necesito diseniar una arquitectura que funcione
+Actualmente tengo las cajas de comportamiento externo
+    -caja de manejo de files
+    
+    -caja de sliders y botones
+    
+    
+    -caja de graficos
+    
+    
+    caja principal
+
+
+
+
+--------------------------------------------------------------
 el boton d eimprimir al output file estaba funcionando, pero la encapsulacione ra terrible. lo borre para itnentar crear ua encapsulacion mas conveniente. Thengo que vovler  ahacerlo. 
 Tengo que diseniar como va a se rla encapsulacion de las funciones d elos botones. Quizas puedo dejar eso apra luego, ya que al menos durante el tiempo en que la opciond e escribir  file funciono pude comprobar que la selecciond output file funciona bien
 

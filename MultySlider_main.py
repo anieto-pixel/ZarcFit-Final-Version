@@ -151,7 +151,7 @@ class MainWidget(QWidget):
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
         
-        self.input_file_widget.file_selected.connect(self.update_patatito)
+        self.input_file_widget.file_contents_updated.connect(self.update_filecontent)
         
         self.top_bar_widget= self.create_files_options_widget()
 
@@ -197,7 +197,7 @@ class MainWidget(QWidget):
 
         self.setLayout(main_layout)
         
-    def update_patatito(self, file_path):
+    def update_filecontent(self, file_path):
         try:
             with open(file_path, 'r') as file:
                 contents = file.read()

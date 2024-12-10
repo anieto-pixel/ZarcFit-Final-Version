@@ -10,8 +10,8 @@ from PyQt5.QtCore import *
 import os 
 
 class InputFileWidget(QWidget):
-    # Signal to notify when a file is selected
-    file_selected = pyqtSignal(str)
+    # Signal to notify when the file contents are updated
+    file_contents_updated = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -69,8 +69,8 @@ class InputFileWidget(QWidget):
             self.previous_button.setEnabled(self.current_index > 0)
             self.next_button.setEnabled(self.current_index < len(self.z_files) - 1)
 
-            # Emit the file path whenever the file changes
-            self.file_selected.emit(os.path.join(self.folder_path, current_file))
+            # Emit the contents of the file when it's updated
+            self.update_patatito(os.path.join(self.folder_path, current_file))
 
     def show_previous_file(self):
         if self.current_index > 0:
@@ -81,6 +81,15 @@ class InputFileWidget(QWidget):
         if self.current_index < len(self.z_files) - 1:
             self.current_index += 1
             self.update_file_display()
+
+    def update_patatito(self, file_path):
+        try:
+            with open(file_path, 'r') as file:
+                contents = file.read()
+            self.file_contents_updated.emit(contents)  # Emit the file contents
+        except Exception as e:
+            print(f"Error reading file: {e}")
+            self.file_contents_updated.emit("Error loading file.")  # Fallback message
 
 if __name__ == "__main__":
     app = QApplication([])
