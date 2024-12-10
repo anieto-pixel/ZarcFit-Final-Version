@@ -155,46 +155,103 @@ class OutputFileWidget(QWidget):
         self.setLayout(output_layout)
         
         
+##################################################
+##################################################
+#Input files
+##################################################
+##################################################
+
+        
 class InputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.desired_type=".z"
-        self.search_parameters= "Z Files (*.z);;All Files (*)"
-        self.output_file = None
-    
-        self.select_button = QPushButton("Input Folder")
-        # Connect button's clicked signal to open_file_dialog without invoking it immediately
-        self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
+        self.folder_path = None
+        self.z_files = []
+        self.current_index = -1
 
-        self.file_label = QLabel("No input folder selected")
-        self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        
-        
-        
-        intput_layout = QHBoxLayout()
-        intput_layout.addWidget(self.select_button)
-        intput_layout.addWidget(self.file_label)
-        
-        intput_layout.setContentsMargins(5, 5, 5, 5)
-        intput_layout.setSpacing(1)
+        self.select_folder_button = QPushButton("Select Input Folder")
+        self.select_folder_button.clicked.connect(self.select_folder)
 
-        # Set the layout of the widget
-        self.setLayout(intput_layout)
-        
-        
-        
+        self.previous_button = QPushButton("<")
+        self.previous_button.clicked.connect(self.show_previous_file)
+        self.previous_button.setEnabled(False)
+
+        self.next_button = QPushButton(">")
+        self.next_button.clicked.connect(self.show_next_file)
+        self.next_button.setEnabled(False)
+
+        self.file_label = QLabel("No file selected")
+        self.file_label.setAlignment(Qt.AlignCenter)
+
+        layout = QHBoxLayout()
+       # button_layout = QHBoxLayout()
+
+       # button_layout.addWidget(self.previous_button)
+       # button_layout.addWidget(self.next_button)
+
+        layout.addWidget(self.select_folder_button)
+        layout.addWidget(self.previous_button)
+        layout.addWidget(self.file_label)
+        layout.addWidget(self.next_button)
+        #layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+
+    def select_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder")
+        if folder:
+            self.folder_path = folder
+            self.load_z_files()
+
+    def load_z_files(self):
+        if self.folder_path:
+            self.z_files = [f for f in os.listdir(self.folder_path) if f.lower().endswith(".z")]
+            if self.z_files:
+                self.current_index = 0
+                self.update_file_display()
+                self.previous_button.setEnabled(False)
+                self.next_button.setEnabled(len(self.z_files) > 1)
+            else:
+                self.file_label.setText("No .z files found in the selected folder.")
+                self.previous_button.setEnabled(False)
+                self.next_button.setEnabled(False)
+
+    def update_file_display(self):
+        if 0 <= self.current_index < len(self.z_files):
+            current_file = self.z_files[self.current_index]
+            self.file_label.setText(f"{current_file}")
+            self.previous_button.setEnabled(self.current_index > 0)
+            self.next_button.setEnabled(self.current_index < len(self.z_files) - 1)
+
+    def show_previous_file(self):
+        if self.current_index > 0:
+            self.current_index -= 1
+            self.update_file_display()
+
+    def show_next_file(self):
+        if self.current_index < len(self.z_files) - 1:
+            self.current_index += 1
+            self.update_file_display()
+
+
+
+
+
 
 
 # To run the test in a standalone application
 if __name__ == "__main__":
     app = QApplication([])
+
     layout = QHBoxLayout()
     widget_1 = InputFileWidget()
     widget_2 = OutputFileWidget()
-    layout.addWidget(widget_1)
-    layout.addWidget(widget_2)
-    
+
+    layout.addWidget(widget_1)  # Add widget_1 to the left
+    layout.addStretch()         # Add a stretchable space to push the next widget to the right
+    layout.addWidget(widget_2)  # Add widget_2 to the right
+
     widget = QWidget()
     widget.setLayout(layout)
     widget.show()
