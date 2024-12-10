@@ -105,7 +105,25 @@ class MainWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
+    def create_graphs_layout(self):
+        self.big_graph = GraphWidget(self.calculator)
+        self.small_graph_1 = GraphWidget(self.calculator)
+        self.small_graph_2 = GraphWidget(self.calculator)
+        
+        # Layout for the two stacked graqphs to the left
+        right_graphs_layout=QVBoxLayout()
+        right_graphs_layout.addWidget(self.small_graph_1)
+        right_graphs_layout.addWidget(self.small_graph_2)
+        
+        #layout for all graphs
+        graphs_layout = QHBoxLayout()
+        graphs_layout.addWidget(self.big_graph)
+        graphs_layout.addLayout(right_graphs_layout)
+        
+        return graphs_layout
+    
     def create_sliders_layout(self):
+        
         l_inf = NSlidersWidget(1, 0, 100, "black")
         r_inf = NSlidersWidget(1, 0, 100, "black")
         r_h = NSlidersWidget(3, 0, 100, "red")
@@ -138,58 +156,38 @@ class MainWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        ##################
-        # Files bar
-        ####################
         self.patatito = "pattito"  # Dummy Variable to write to file
 
+        #top bar deals with input and output files
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
         top_bar_layout= self.create_top_bar_layout()
 
-        ##################
+
+        
         # Buttons Widget
-        ####################
         self.buttons_widget = ButtonsWidgetRow()  # Create the buttons widget
         buttons_layout = QVBoxLayout()
         buttons_layout.addWidget(self.buttons_widget)  # Add the buttons_widget to the layout
 
-        ##################
-        # Sliders
-        ####################
+
         # Slider widgets
         #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
         self.list_of_sliders=[]
         sliders_layout=self.create_sliders_layout()
 
-        ##################
-        # Graphs
-        #################### 
+
         # Calculators
         self.calculator = GraphCalculator(self.list_of_sliders[5])
         for slider in self.list_of_sliders[5].list_of_sliders:
             slider.valueChanged().connect(self.calculator.update_graph)
 
-        #graphs layouts
-        self.big_graph = GraphWidget(self.calculator)
-        self.small_graph_1 = GraphWidget(self.calculator)
-        self.small_graph_2 = GraphWidget(self.calculator)
-        
-        # Layout for the two stacked graqphs to the left
-        right_graphs_layout=QVBoxLayout()
-        right_graphs_layout.addWidget(self.small_graph_1)
-        right_graphs_layout.addWidget(self.small_graph_2)
-        
-        #layout for all graphs
-        all_graphs_layout = QHBoxLayout()
-        all_graphs_layout.addWidget(self.big_graph)
-        all_graphs_layout.addLayout(right_graphs_layout)
+        # Graphs
+        graphs_layout=self.create_graphs_layout()
 
         ###########################
         #bttom half layout
         ##########################
-
-        ###bottom half of the screen
         bottom_half_layout = QHBoxLayout()
         bottom_half_layout.addLayout(sliders_layout)
         bottom_half_layout.addLayout(buttons_layout)  # Add the button layout here
@@ -202,7 +200,7 @@ class MainWidget(QWidget):
         splitter = QSplitter(Qt.Vertical)
 
         # Add both layouts to the splitter
-        splitter.addWidget(self.create_widget_from_layout(all_graphs_layout))
+        splitter.addWidget(self.create_widget_from_layout(graphs_layout))
         splitter.addWidget(self.create_widget_from_layout(bottom_half_layout))
 
         # Set the initial size for each layout (optional)
