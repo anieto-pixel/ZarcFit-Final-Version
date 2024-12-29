@@ -1,10 +1,6 @@
-# -*- coding: utf-8 -*-
-
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-
 import os
-
 
 """
 Created on Fri Dec  6 13:07:51 2024
@@ -17,18 +13,14 @@ class ErrorWindow:
     def show_error_message(message, title="Error"):
         """
         Displays an error message in a dialog box.
-        
-        Parameters:
-        - message: The error message to display.
-        - title: The title of the message box (default is "Error").
         """
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Critical)
         msg.setWindowTitle(title)
         msg.setText(message)
         msg.exec_()
-        
-        
+
+
 class FileWriter:
     """
     Helper class responsible for writing data to a file.
@@ -37,10 +29,6 @@ class FileWriter:
     def write_to_file(file_path, content):
         """
         Writes the provided content to the given file.
-
-        Parameters:
-        - file_path: The path to the file where the content should be written.
-        - content: The content to be written to the file.
         """
         try:
             with open(file_path, "a") as f:  # Open file in append mode
@@ -54,53 +42,44 @@ class FileSelector:
     Class responsible for handling file selection and validation.
     """
     @staticmethod
-    def create_new_file(parent):
+    def create_new_file(desired_type, set_file_callback, set_message_callback):
         """
         Opens a dialog for creating a new CSV file and creates the file if it doesn't exist.
         """
-        # Open a Save File dialog to create a new file
-        file, _ = QFileDialog.getSaveFileName(parent, f"Create New {parent.desired_type} File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
-        
-        if file:  # If a file path is selected
-            # Ensure the file has a .csv extension
-            if not file.lower().endswith(parent.desired_type):
-                file += parent.desired_type
+        file, _ = QFileDialog.getSaveFileName(None, f"Create New {desired_type} File",
+                                              os.getcwd(), "CSV Files (*.csv);;All Files (*)")
 
-            # Create the file if it doesn't exist
+        if file:
+            if not file.lower().endswith(desired_type):
+                file += desired_type
+
             if not os.path.exists(file):
                 try:
                     with open(file, 'w', newline='') as f:
                         pass  # Creating an empty CSV file
-                    parent.file_label.setText(file)
-                    parent.output_file = file  # Set the file path to the parent widget
+                    set_file_callback(file)
                 except IOError as e:
-                    # Handle error during file creation
                     ErrorWindow.show_error_message(f"Failed to create file: {str(e)}")
             else:
-                parent.file_label.setText("File already exists")
+                set_message_callback("File already exists")
         else:
-            parent.file_label.setText("No file selected")
-    
+            set_message_callback("No file selected")
+
     @staticmethod
-    def open_file_dialog(parent):
+    def open_file_dialog(search_parameters, validate_callback, set_file_callback, set_message_callback):
         """
         Opens a dialog for selecting a file and updates the label with the selected file's path.
         """
-        # Open a file selection dialog
-        file, _ = QFileDialog.getOpenFileName(parent, "Select File", os.getcwd(), parent.search_parameters)
-    
-        if file:  # If a file is selected
-            # Validate the file
+        file, _ = QFileDialog.getOpenFileName(None, "Select File", os.getcwd(), search_parameters)
+
+        if file:
             try:
-                if FileSelector.validate(file, parent.desired_type):  # Pass the selected file, not self.output_file
-                    parent.file_label.setText(file)
-                    parent.output_file = file  # Store the selected file path
-    
+                if validate_callback(file):
+                    set_file_callback(file)
             except ValueError as e:
-                # Use the ErrorWindow class to show an error message if the file is invalid
                 ErrorWindow.show_error_message(str(e))
         else:
-            parent.file_label.setText("No file selected")
+            set_message_callback("No file selected")
 
     @staticmethod
     def validate(file_path, desired_type):
@@ -116,52 +95,66 @@ class OutputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.desired_type=".csv"
-        self.search_parameters= "CSV Files (*.csv);;All Files (*)"
-        self.output_file = None
+        #Atributes
+        self.__desired_type = ".csv"
+        self.__search_parameters = "CSV Files (*.csv);;All Files (*)"
+        self.__output_file = None
+
+        #Create and connect buttons
+        self.__newfile_button = QPushButton("New File")
+        self.__newfile_button.clicked.connect(self.__handle_create_new_file)
+
+        self.__select_button = QPushButton("Select .csv File")
+        self.__select_button.clicked.connect(self.__handle_open_file_dialog)
+
+        #Create label
+        self.__file_label = QLabel("No output file selected")
+        self.__file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+
+        self._initialize_ui()
         
-        # Create button for creating a file
-        self.newfile_button = QPushButton("New File")
-        self.newfile_button.clicked.connect(lambda: FileSelector.create_new_file(self))
-
-        # Create button for selecting a file
-        self.select_button = QPushButton("Select .csv File")
-        # Connect button's clicked signal to open_file_dialog without invoking it immediately
-        self.select_button.clicked.connect(lambda: FileSelector.open_file_dialog(self))
-
-        # Label to display the selected file
-        self.file_label = QLabel("No output file selected")
-        self.file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
-        #####################
-        ## Appearance stuff
-        #################
+    def _initialize_ui(self):
         
-        # Horizontal layout for buttons and labels
         output_layout = QHBoxLayout()
-        
-        # Set the newfile_button to be smaller
-        self.newfile_button.setFixedSize(100, 30)  # Adjust size as needed
-        output_layout.addWidget(self.newfile_button)
-        #output_layout.addStretch(3)  # Add stretch to take 3/4 of the space
-        
-        output_layout.addWidget(self.select_button)
-        output_layout.addWidget(self.file_label)
-        
+        self.__newfile_button.setFixedSize(100, 30)
+        output_layout.addWidget(self.__newfile_button)
+        output_layout.addWidget(self.__select_button)
+        output_layout.addWidget(self.__file_label)
+
         output_layout.setContentsMargins(5, 5, 5, 5)
         output_layout.setSpacing(1)
-
-        # Set the layout of the widget
         self.setLayout(output_layout)
-        
-        
-##################################################
-##################################################
-#Input files
-##################################################
-##################################################
 
+    def __handle_create_new_file(self):
+        FileSelector.create_new_file(
+            self.__desired_type,
+            self.__set_file_label,
+            self.__set_file_message
+        )
 
+    def __handle_open_file_dialog(self):
+        FileSelector.open_file_dialog(
+            self.__search_parameters,
+            lambda file: FileSelector.validate(file, self.__desired_type),
+            self.__set_file_label,
+            self.__set_file_message
+        )
+
+    def __set_file_label(self, file_path):
+        self.__output_file = file_path
+        self.__file_label.setText(os.path.basename(file_path))
+
+    def __set_file_message(self, message):
+        self.__file_label.setText(message)
+
+    def get_output_file(self):
+        """Public getter for the selected output file path."""
+        return self.__output_file
+    
+    def write_to_file(self, content):
+        """Public method to write content in output file."""
+        FileWriter.write_to_file(self.__output_file, content)
 
 
 # To run the test in a standalone application

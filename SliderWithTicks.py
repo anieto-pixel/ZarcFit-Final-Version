@@ -13,150 +13,126 @@ from PyQt5.QtGui import QPainter, QFont, QColor
 """
 Class contains a QWidget with a graduated slider with range min_value, max_value, and colour
 """
-class SliderWithTicks(QWidget,):
+class SliderWithTicks(QWidget):
     def __init__(self,min_value, max_value, colour):
         super().__init__()
 
-        # Set up the slider
-        self.s = QSlider(Qt.Vertical, self)
-        self.s.setRange(min_value, max_value)  # Min and Max values
-        self.s.setTickPosition(QSlider.TicksBothSides)  # Display ticks on both sides
-        self.s.setTickInterval(round((max_value-min_value)/10))  # Set interval for ticks
+        # Private attributes
+        self._min_value= min_value
+        self._max_value= max_value
+        self._slider = QSlider(Qt.Vertical, self)
+        self._value_label = QLabel(f"Slider: {self._slider.value()}", self)
+        self._layout = QVBoxLayout()
         
-        self.s.setStyleSheet(f"""
-             QSlider::handle:vertical {{
-                 background: {colour};
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 10px;
-                }}
-             QSlider::add-page:vertical {{
-                 background: #d3d3d3;
-                 border-radius: 5px;
-                 }}
-             """)
+        #Connect Slider and Label
+        self._slider.valueChanged.connect(self._update_label)
         
-        self.setMinimumWidth(75) 
+        #Setup slidet's characteristics
+        self._setup_slider(colour)
+        
+        #Setup widget's layout
+        self._setup_layout()
+        
+    def _setup_layout(self):
+        """
+        Configure the layout and add widgets.
+        """
+        self._layout.addWidget(self._slider)
+        self._layout.addWidget(self._value_label)
+        self.setLayout(self._layout)
+        
+        
+    def _setup_slider(self, colour):
+        """
+        Configure the slider's properties.
+        """
+        
+        self._slider.setRange(self._min_value, self._max_value)
+        self._slider.setTickPosition(QSlider.TicksBothSides)
+        self._slider.setTickInterval(round((self._max_value - self._min_value) / 10))
 
-        # Set up the label
-        self.value_label = QLabel(f"Slider: {self.s.value()}", self)
+        self._slider.setStyleSheet(f"""
+            QSlider::handle:vertical {{
+                background: {colour};
+                width: 20px;
+                height: 20px;
+                border-radius: 10px;
+            }}
+            QSlider::add-page:vertical {{
+                background: #d3d3d3;
+                border-radius: 5px;
+            }}
+        """)
 
-        # Layout for slider and label
-        self.layout = QVBoxLayout()
-        self.layout.addWidget(self.s)
-        self.layout.addWidget(self.value_label)
-        self.setLayout(self.layout)
-
-        # Connect slider to label update
-        self.s.valueChanged.connect(self.update_label)
+        self.setMinimumWidth(75)
         
         
+    def _update_label(self):
+        """
+        Update the label when the slider value changes.
+        """
+        self._value_label.setText(f"Slider: {self._slider.value()}")
+
     def get_value(self):
         """
         Returns the current value of the slider.
         """
-        return self.s.value()
-    
-    def valueChanged(self):
+        return self._slider.value()
+
+    def value_changed(self):
         """
         Exposes the slider's valueChanged signal for external use.
         """
-        return self.s.valueChanged
+        return self._slider.valueChanged
 
-    def update_label(self):
-        """
-        Update the label when slider value changes.
-        """
-        self.value_label.setText(f"Slider: {self.s.value()}")
-    
     def paintEvent(self, event):
         """
         Custom painting for drawing tick labels.
         """
         super().paintEvent(event)
-    
-        # Create a painter object to draw on the widget
+
+        #Create a painter object to paint on the Widget
         painter = QPainter(self)
-        painter.setFont(QFont("Arial", 6))  # Set font for tick labels
-        painter.setPen(QColor(0, 0, 0))  # Set text color to black
-    
-        # Get slider range
-        min_value = self.s.minimum()
-        max_value = self.s.maximum()
-    
-        # Get tick interval
-        tick_interval = self.s.tickInterval()
-    
-        # Get the height of the slider widget
-        height = self.s.height()
-    
-        # Add top offset to account for padding
-        top_offset = 5  # Adjust this value based on observed misalignment
-        bottom_offset = 5  # Adjust this as well if needed
-    
-        # Calculate effective height, excluding offsets
+        painter.setFont(QFont("Arial", 6))
+        painter.setPen(QColor(0, 0, 0))
+
+        #gets min, max and tick interval values from slider
+
+        tick_interval = self._slider.tickInterval()
+
+        height = self._slider.height()
+        top_offset = 5
+        bottom_offset = 5
         effective_height = height - top_offset - bottom_offset
-    
-        # Iterate over the range and draw numbers
-        for i in range(min_value, max_value + 1, tick_interval):
-            # Adjust the vertical position to account for offsets
+
+        for i in range(self._min_value, self._max_value + 1, tick_interval):
             tick_pos = (
-                height - bottom_offset - (effective_height * (i - min_value)) // (max_value - min_value)
+                height - bottom_offset - (effective_height * (i - self._min_value)) // (self._max_value - self._min_value)
             )
-    
-            # Draw the number as text next to the tick mark
-            text_rect = QRect(30, tick_pos, 50, 20)  # Position text to the right
+            text_rect = QRect(30, tick_pos, 50, 20)
             painter.drawText(text_rect, Qt.AlignCenter, str(i))
 
 
-class SliderForFrequency(QWidget):
-    def __init__(self):
-        super().__init__()
-        
+
+#class SliderForFrequency(QWidget):
         
     #https://stackoverflow.com/questions/17361885/range-slider-in-qt-two-handles-in-a-qslider 
     #https://stackoverflow.com/questions/47342158/porting-range-slider-widget-to-pyqt5
 
     #https://pypi.org/project/QtRangeSlider/
 
-########################################
-#manual test method parent
-######################################
-"""
-if __name__ == "__main__":
-    # Create a QApplication instance
-    app = QApplication(sys.argv)
-
-    # Create and show an instance of SliderWithTicks
-    slider_widget = SliderWithTicks(0, 100, "red")
-    slider_widget.resize(200, 300)
-    
-    min_size = slider_widget.minimumSize()  # Returns a QSize object
-    min_width, min_height = min_size.width(), min_size.height()
-    print(f"Minimum size: {min_width}px x {min_height}px")
-    
-    max_size = slider_widget.maximumSize()  # Returns a QSize object
-    max_width, max_height = max_size.width(), max_size.height()
-    print(f"Maximum size: {max_width}px x {max_height}px")
-    
-    slider_widget.show()
-    
-    
-
-    # Run the application
-    sys.exit(app.exec_())
-   """
    
    ########################################
    #manual test method child
    ######################################
+   
 if __name__ == "__main__":
 
        # Create a QApplication instance
        app = QApplication(sys.argv)
 
        # Create and show an instance of SliderWithTicks
-       slider_widget = SliderForFrequency()
+       slider_widget = SliderWithTicks(0,10,"red")
        slider_widget.resize(200, 300)
        slider_widget.show()
        # Run the application

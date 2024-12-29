@@ -9,33 +9,56 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import os 
 
+
 class InputFileWidget(QWidget):
-    # Signal to notify when the file contents are updated
+    """
+    A widget that allows the user to select a folder, navigate through `.z` files,
+    and display the content of the selected file.
+
+    Signals:
+        - file_contents_updated (str): Emitted when the content of the currently 
+          displayed file is updated. The signal carries the file's contents as a string.
+    """
+
     file_contents_updated = pyqtSignal(str)
 
     def __init__(self):
+        """
+        Initialize the widget by setting up the UI and preparing internal attributes.
+        """
         super().__init__()
 
-        self.folder_path = None
-        self.z_files = []
-        self.current_index = -1
+        # Private attributes
+        self._folder_path = None
+        self._z_files = []
+        self._current_index = -1
 
+        # Initialize Buttons 
         self.select_folder_button = QPushButton("Select Input Folder")
-        self.select_folder_button.clicked.connect(self.select_folder)
+        self.select_folder_button.clicked.connect(self._select_folder)
 
         self.previous_button = QPushButton("<")
-        self.previous_button.clicked.connect(self.show_previous_file)
+        self.previous_button.clicked.connect(self._show_previous_file)
         self.previous_button.setEnabled(False)
 
         self.next_button = QPushButton(">")
-        self.next_button.clicked.connect(self.show_next_file)
+        self.next_button.clicked.connect(self._show_next_file)
         self.next_button.setEnabled(False)
 
+        #Creates label
         self.file_label = QLabel("No file selected")
         self.file_label.setAlignment(Qt.AlignCenter)
+        
+        #Arrange  layout
+        self._initialize_ui()
 
+###Private methods
+
+    def _initialize_ui(self):
+        """
+        Sets up the layouts for the widget.
+        """
         layout = QHBoxLayout()
-
         layout.addWidget(self.select_folder_button)
         layout.addWidget(self.previous_button)
         layout.addWidget(self.file_label)
@@ -43,46 +66,74 @@ class InputFileWidget(QWidget):
 
         self.setLayout(layout)
 
-    def select_folder(self):
+
+    def _select_folder(self):
+        """
+        Opens a dialog for the user to select a folder. If a folder is selected,
+        loads all `.z` files from the folder and initializes navigation.
+        """
         folder = QFileDialog.getExistingDirectory(self, "Select Folder")
         if folder:
-            self.folder_path = folder
-            self.load_z_files()
+            self._folder_path = folder
+            self._load_z_files()
 
-    def load_z_files(self):
-        if self.folder_path:
-            self.z_files = [f for f in os.listdir(self.folder_path) if f.lower().endswith(".z")]
-            if self.z_files:
-                self.current_index = 0
-                self.update_file_display()
+
+    def _load_z_files(self):
+        """
+        Loads all `.z` files from the currently selected folder.
+        """
+        
+        if self._folder_path:
+            self._z_files = [f for f in os.listdir(self._folder_path) if f.lower().endswith(".z")]
+            
+            if self._z_files:
+                self._current_index = 0
+                self._update_file_display()
                 self.previous_button.setEnabled(False)
-                self.next_button.setEnabled(len(self.z_files) > 1)
+                self.next_button.setEnabled(len(self._z_files) > 1)
+            
             else:
                 self.file_label.setText("No .z files found in the selected folder.")
                 self.previous_button.setEnabled(False)
                 self.next_button.setEnabled(False)
 
-    def update_file_display(self):
-        if 0 <= self.current_index < len(self.z_files):
-            current_file = self.z_files[self.current_index]
+    def _update_file_display(self):
+        """
+        Updates the file display label and navigation button states.
+        Emits the contents of the currently selected file.
+        """
+        
+        if 0 <= self._current_index < len(self._z_files):
+            current_file = self._z_files[self._current_index]
             self.file_label.setText(f"{current_file}")
-            self.previous_button.setEnabled(self.current_index > 0)
-            self.next_button.setEnabled(self.current_index < len(self.z_files) - 1)
+            self.previous_button.setEnabled(self._current_index > 0)
+            self.next_button.setEnabled(self._current_index < len(self._z_files) - 1)
 
             # Emit the contents of the file when it's updated
-            self.update_patatito(os.path.join(self.folder_path, current_file))
+            self._extract_content(os.path.join(self._folder_path, current_file))
 
-    def show_previous_file(self):
-        if self.current_index > 0:
-            self.current_index -= 1
-            self.update_file_display()
+    def _show_previous_file(self):
+        
+        """
+        Moves to the previous file in the list and updates the display.
+        """
+        if self._current_index > 0:
+            self._current_index -= 1
+            self._update_file_display()
 
-    def show_next_file(self):
-        if self.current_index < len(self.z_files) - 1:
-            self.current_index += 1
-            self.update_file_display()
+    def _show_next_file(self):
+        """
+        Moves to the next file in the list and updates the display.
+        """
+        if self._current_index < len(self._z_files) - 1:
+            self._current_index += 1
+            self._update_file_display()
 
-    def update_patatito(self, file_path):
+    def _extract_content(self, file_path):
+        """
+        Reads the content of the given file and emits it via the `file_contents_updated` signal.
+
+        """
         try:
             with open(file_path, 'r') as file:
                 contents = file.read()
@@ -90,6 +141,25 @@ class InputFileWidget(QWidget):
         except Exception as e:
             print(f"Error reading file: {e}")
             self.file_contents_updated.emit("Error loading file.")  # Fallback message
+
+
+####Public Methods
+
+    def get_folder_path(self):
+        """
+        Returns the path of the folder currently selected by the user.
+        """
+        return self._folder_path
+
+    def get_current_file_path(self):
+        """
+        Returns the full path of the currently displayed `.z` file.
+
+        """
+        if 0 <= self._current_index < len(self._z_files):
+            return os.path.join(self._folder_path, self._z_files[self._current_index])
+        return None
+
 
 if __name__ == "__main__":
     app = QApplication([])

@@ -1,0 +1,3 @@
+https://stackoverflow.com/questions/7456807/should-i-use-name-mangling-in-python
+
+https://dirtsimple.org/2004/12/python-is-not-java.html

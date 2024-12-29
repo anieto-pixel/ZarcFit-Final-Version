@@ -75,6 +75,32 @@ class GraphWidget(pg.PlotWidget):
         x, y = self.calculator.compute_graph_data()
         self.clear()  # Clear previous plot
         self.plot(x, y)
+
+    
+class ColeGraphWidget(pg.PlotWidget):
+    """
+    Displays the graph based on computed data from GraphCalculator.
+    """
+    def __init__(self, calculator):
+        super().__init__()
+        self.calculator = calculator
+        self.setTitle("Quadratic Equation: y = ax^2 + bx + c")
+        self.setLabel('left', 'y')
+        self.setLabel('bottom', 'x')
+
+        # Connect calculator's data_changed signal to refresh_graph
+        self.calculator.data_changed.connect(self.refresh_graph)
+        
+        # Initial graph display
+        self.refresh_graph()
+
+    def refresh_graph(self):
+        """
+        Updates the graph display with the latest computed data.
+        """
+        x, y = self.calculator.compute_graph_data()
+        self.clear()  # Clear previous plot
+        self.plot(x, y)
   
 
 ###################################
