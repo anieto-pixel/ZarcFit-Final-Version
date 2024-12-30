@@ -71,7 +71,10 @@ class SliderWithTicks(QWidget):
         """
         Update the label when the slider value changes.
         """
-        self._value_label.setText(f"Slider: {self._slider.value()}")
+        #self._value_label.setText(f"Slider: {self._slider.value()}")
+        self._value_label.setText(f"Slider: {self.get_value()}")
+        #Convinient but causes dependency issues between methods
+        #reconsider later
 
     def get_value(self):
         """
@@ -100,8 +103,6 @@ class SliderWithTicks(QWidget):
         min_value = self._slider.minimum()
         max_value = self._slider.maximum()
         tick_interval = self._slider.tickInterval()
-        
-        print(f"min_value:{min_value} max_value:{max_value}, tick_interval:{tick_interval}")
 
         height = self._slider.height()
         top_offset = 5
