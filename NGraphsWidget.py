@@ -36,17 +36,17 @@ class ParentGraph(pg.PlotWidget):
 
         #MM
         #figure out a better set of initialization values
-        self.freq = np.array([1, 10, 100, 1000, 10000])  
-        self.Z_real = np.array([100, 80, 60, 40, 20]) 
-        self.Z_imag = np.array([-50, -40, -30, -20, -10]) 
+        self._freq = np.array([1, 10, 100, 1000, 10000])  
+        self._Z_real = np.array([100, 80, 60, 40, 20]) 
+        self._Z_imag = np.array([-50, -40, -30, -20, -10]) 
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
         
         # Initial graph display
-        self.refresh_graph(self.freq, self.Z_real, self.Z_imag)
+        self.refresh_graph(self._freq, self._Z_real, self._Z_imag)
 
-    def refresh_graph(self,freq,x ,y):
+    def refresh_graph(self,freq,Z_real ,Z_imag):
         pass
         
     ##MM if I do not reset the frequency slider for any new file, I need to
@@ -55,12 +55,23 @@ class ParentGraph(pg.PlotWidget):
         """
         Filters the data to display only points within the specified frequency range.
         """
-        mask = (self.freq >= f_min) & (self.freq <= f_max)
-        filtered_freq = self.freq[mask]
-        filtered_Z_real = self.Z_real[mask]
-        filtered_Z_imag = self.Z_imag[mask]
+        mask = (self._freq >= f_min) & (self._freq <= f_max)
+        filtered_freq = self._freq[mask]
+        filtered_Z_real = self._Z_real[mask]
+        filtered_Z_imag = self._Z_imag[mask]
         
         self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
+
+    def setter_parameters(self,freq,Z_real ,Z_imag):
+        
+        #MM
+        #I dont think i will need to refresha fter this, but keep an eye just in case
+
+        self._freq=freq
+        self._Z_real=Z_real
+        self._Z_imag= Z_imag
+     
+
 
 
 class PhaseGraph(ParentGraph):
