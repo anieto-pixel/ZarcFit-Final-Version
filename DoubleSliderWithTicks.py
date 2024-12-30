@@ -4,9 +4,8 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import QPainter, QFont, QColor 
 from SliderWithTicks import SliderWithTicks
 
-
 """
-Subclass of SliderWIthTicks that accepts doubles instead of integers
+Subclass of SliderWithTicks that accepts doubles instead of integers
 """
 class DoubleSliderWithTicks(SliderWithTicks):
     
@@ -48,7 +47,6 @@ class DoubleSliderWithTicks(SliderWithTicks):
          Update the label when the slider value changes.
          """
          self._value_label.setText(f"{self.get_value():.3f}")
-  
     
     def get_value(self):
         """
@@ -61,7 +59,7 @@ class DoubleSliderWithTicks(SliderWithTicks):
         return str(i/self._scale_factor)
     
 """
-Subclass of SliderWIthTicks that accepts the double exponent of powers of N
+Subclass of DoubleSliderWithTicks that accepts the double exponent of powers of N
 """
 class EPowerSliderWithTicks(DoubleSliderWithTicks):
         
@@ -71,23 +69,15 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         super().__init__(min_value, max_value, colour)
         
     def _update_label(self):
-        """
-        Update the label when the slider value changes.
-        """
         self._value_label.setText(f"{self.get_value():.1e}")
         #return f"{self.get_value():.3e}"
         
     def get_value(self):
-        """
-        Returns the current value of the slider.
-        USE THIS METHOD. DO NOT ACCES SLIDER DIRECTLY
-        """
         n=self._slider.value()/self._scale_factor
         return self._base_power**n
         
     def _string_by_tick(self, i):
-        
-        return f"1E+{int(i/self._scale_factor)}"
+        return f"1E{int(i/self._scale_factor)}"
 
     
     
@@ -100,7 +90,9 @@ if __name__ == "__main__":
 
     # Create and show an instance of SliderWithTicks with float range
     #slider_widget = DoubleSliderWithTicks(0, 0.9, "red")
-    slider_widget = EPowerSliderWithTicks(0, 10, "red")
+    #slider_widget = DoubleSliderWithTicks(-2., 2., "red")
+    #slider_widget = EPowerSliderWithTicks(0, 10, "red")
+    slider_widget = EPowerSliderWithTicks(-10, 10, "red")
     slider_widget.resize(200, 300)
     slider_widget.show()
 

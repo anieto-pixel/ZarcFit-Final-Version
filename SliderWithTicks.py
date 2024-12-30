@@ -139,7 +139,8 @@ if __name__ == "__main__":
        app = QApplication(sys.argv)
 
        # Create and show an instance of SliderWithTicks
-       slider_widget = SliderWithTicks(0,150,"red")
+       #slider_widget = SliderWithTicks(0,130,"red")
+       slider_widget = SliderWithTicks(-10,10,"red")
        slider_widget.resize(200, 300)
        slider_widget.show()
        # Run the application
