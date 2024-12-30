@@ -18,30 +18,49 @@ import pyqtgraph as pg
 import numpy as np
 
 
+#MM
+#Refreshing completely ensures the plot's integrity, if filtering conditions change dynamically.
+#Dropping points directly could be more efficient but complicates the logic when multiple filters are applied.
+#since efficiency does not seem to be an issue, I am opting for refreshing fully
+#If it were to become an issue, or if filtering becomes a feature, this poitn shall be reviewed
+
+
+
+##MM
+#I can pass the label names and titles at construction, as variables, or I
+#can use the init file, or I can leave it as they are
+
 class ParentGraph(pg.PlotWidget):
     def __init__(self):
         super().__init__()
 
         #MM
         #figure out a better set of initialization values
-        freq = np.array([1, 10, 100, 1000, 10000])  
-        Z_real = np.array([100, 80, 60, 40, 20]) 
-        Z_imag = np.array([-50, -40, -30, -20, -10]) 
+        self.freq = np.array([1, 10, 100, 1000, 10000])  
+        self.Z_real = np.array([100, 80, 60, 40, 20]) 
+        self.Z_imag = np.array([-50, -40, -30, -20, -10]) 
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
         
         # Initial graph display
-        self.refresh_graph(freq,Z_real,Z_imag)
+        self.refresh_graph(self.freq, self.Z_real, self.Z_imag)
 
     def refresh_graph(self,freq,x ,y):
-        #MM
-        #should I jsut write pass in here?
-        self.clear()  # Clear previous plot
-        self.plot(x, y)
-
-
-
+        pass
+        
+    ##MM if I do not reset the frequency slider for any new file, I need to
+    #ensure that this method is called at initialization
+    def filter_frequency_range(self, f_min, f_max):
+        """
+        Filters the data to display only points within the specified frequency range.
+        """
+        mask = (self.freq >= f_min) & (self.freq <= f_max)
+        filtered_freq = self.freq[mask]
+        filtered_Z_real = self.Z_real[mask]
+        filtered_Z_imag = self.Z_imag[mask]
+        
+        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
 
 
 class PhaseGraph(ParentGraph):
@@ -60,6 +79,7 @@ class PhaseGraph(ParentGraph):
         phase = np.arctan2(Z_imag, Z_real) * 180 / np.pi  # Phase of Z (in degrees)
         self.clear()  # Clear previous plot
         self.plot(freq, phase)
+        #self.plot(freq, phase,pen=None, symbol='o', symbolSize=10, symbolBrush='r')
 
 
 class BodeGraph(ParentGraph):
@@ -77,7 +97,7 @@ class BodeGraph(ParentGraph):
 
         self.clear()  # Clear previous plot
         self.plot(freq, 20 * np.log10(magnitude))  # Plot magnitude in dB
-
+        #self.plot(freq, 20 * np.log10(magnitude), pen=None, symbol='o', symbolSize=10, symbolBrush='r')
 
 class ColeColeGraph(ParentGraph):
     def __init__(self):
@@ -93,7 +113,9 @@ class ColeColeGraph(ParentGraph):
         Updates the graph display with the latest computed data.
         """
         self.clear()  # Clear previous plot
-        self.plot(Z_real, Z_imag)  # Plot the points
+        #self.plot(Z_real, Z_imag)  # Plot the points
+        self.plot(Z_real, Z_imag, pen=None, symbol='o', symbolSize=10, symbolBrush='r')  # Plot the points
+
 
     
 
@@ -113,7 +135,6 @@ class GraphsWidget(QWidget):
         self.small_graph_1 = BodeGraph()
         self.small_graph_2 = PhaseGraph()
 
-
         # Layout for the stacked small graphs on the right
         right_graphs_layout = QVBoxLayout()
         right_graphs_layout.addWidget(self.small_graph_1)
@@ -130,6 +151,13 @@ class GraphsWidget(QWidget):
         # Set the main layout
         self.setLayout(graphs_layout)
         
+    def apply_filter_frequency_range(self, f_min, f_max):
+        
+        self.big_graph.filter_frequency_range(f_min, f_max)
+        self.small_graph_1.filter_frequency_range( f_min, f_max)
+        self.small_graph_2.filter_frequency_range( f_min, f_max)
+        
+        
         
 if __name__ == "__main__":
 
@@ -140,5 +168,6 @@ if __name__ == "__main__":
        graph_widget = GraphsWidget()
        graph_widget.resize(200, 300)
        graph_widget.show()
+       graph_widget.apply_filter_frequency_range(10, 100)
        # Run the application
        sys.exit(app.exec_())
