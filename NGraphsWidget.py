@@ -42,13 +42,17 @@ class ParentGraph(pg.PlotWidget):
         super().__init__()
 
         # Default initialization data
-        self._freq = np.array([1, 10, 100, 1000, 10000])  
-        self._Z_real = np.array([100, 80, 60, 40, 20]) 
-        self._Z_imag = np.array([-50, -40, -30, -20, -10]) 
-        
-        self._mfreq = np.array([1, 10, 100, 1000, 10000])  
-        self._mZ_real = np.array([90, 70, 50, 30, 10]) 
-        self._mZ_imag = np.array([-45, -35, -25, -15, -5]) 
+        self.base_data = {
+            'freq': np.array([1, 10, 100, 1000, 10000]),
+            'Z_real': np.array([100, 80, 60, 40, 20]),
+            'Z_imag': np.array([-50, -40, -30, -20, -10]),
+        }
+
+        self.manual_data = {
+            'freq': np.array([1, 10, 100, 1000, 10000]),
+            'Z_real': np.array([90, 70, 50, 30, 10]),
+            'Z_imag': np.array([-45, -35, -25, -15, -5]),
+        }
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
@@ -56,74 +60,82 @@ class ParentGraph(pg.PlotWidget):
         # Plot objects for static and dynamic lines
         self.static_plot = None
         self.dynamic_plot = None
-        
-        # Initial graph display
-        self.refresh_graph(self._freq, self._Z_real, self._Z_imag, self._mfreq, self._mZ_real, self._mZ_imag)
 
+        # Initial graph display
+        self.refresh_graph()
+
+    """
+    Prepares the X and Y values for plotting from impedance data.
+    Overriden in subclasses.
+    """
     def prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Prepares the X and Y values for plotting from impedance data.
-        Override this in subclasses if needed.
-        """
         return Z_real, Z_imag
 
-    def refresh_m_plot(self, freq, Z_real, Z_imag):
-        """
-        Updates the dynamic line (model data) on the graph without clearing it.
-        """
-        x, y = self.prepare_xy(freq, Z_real, Z_imag)
-        if self.dynamic_plot:  # Ensure the plot object exists
-            self.dynamic_plot.setData(x, y)
+    """
+    Refreshes a specific plot with the given data.
+    Arguments:
+    - data: A dictionary containing 'freq', 'Z_real', and 'Z_imag'.
+    - plot: The specific plot object to update (static or dynamic).
+    """
+    def refresh_plot(self, data, plot):
 
-    def refresh_graph(self, freq, Z_real, Z_imag, mfreq, mZ_real, mZ_imag):
-        """
-        Clears and refreshes the entire graph, including both static and dynamic lines.
-        """
-        self.clear()  # Clear previous plot
+        x, y = self.prepare_xy(data['freq'], data['Z_real'], data['Z_imag'])
+        if plot:
+            plot.setData(x, y)
 
-        # Prepare and plot static data (base impedance)
-        x, y = self.prepare_xy(freq, Z_real, Z_imag)
-        self.static_plot = self.plot(x, y, pen=None, symbol='o', symbolSize=8, symbolBrush='g')  # Green dots
+    """
+    Refreshes the entire graph by replotting both the static and dynamic data.
+    """
+    def refresh_graph(self):
+        self.clear()  # Clear the plot area
 
-        # Prepare and plot dynamic data (model impedance)
-        mx, my = self.prepare_xy(mfreq, mZ_real, mZ_imag)
-        self.dynamic_plot = self.plot(mx, my, pen=None, symbol='x', symbolSize=8, symbolBrush='b')  # Blue x's
+        # Plot static (base) data
+        self.static_plot = self.plot(pen=None, symbol='o', symbolSize=8, symbolBrush='g')  # Green dots
+        self.refresh_plot(self.base_data, self.static_plot)
 
+        # Plot dynamic (model) data
+        self.dynamic_plot = self.plot(pen=None, symbol='x', symbolSize=8, symbolBrush='b')  # Blue x's
+        self.refresh_plot(self.manual_data, self.dynamic_plot)
+
+    """
+    Filters the data to display only points within the specified frequency range.
+    """
     def filter_frequency_range(self, f_min, f_max):
-        """
-        Filters the data to display only points within the specified frequency range.
-        """
         # Filter static (base) data
-        base_mask = (self._freq >= f_min) & (self._freq <= f_max)
-        filtered_freq = self._freq[base_mask]
-        filtered_Z_real = self._Z_real[base_mask]
-        filtered_Z_imag = self._Z_imag[base_mask]
+        base_mask = (self.base_data['freq'] >= f_min) & (self.base_data['freq'] <= f_max)
+        filtered_base = {
+            'freq': self.base_data['freq'][base_mask],
+            'Z_real': self.base_data['Z_real'][base_mask],
+            'Z_imag': self.base_data['Z_imag'][base_mask],
+        }
 
         # Filter dynamic (model) data
-        model_mask = (self._mfreq >= f_min) & (self._mfreq <= f_max)
-        filtered_mfreq = self._mfreq[model_mask]
-        filtered_mZ_real = self._mZ_real[model_mask]
-        filtered_mZ_imag = self._mZ_imag[model_mask]
+        model_mask = (self.manual_data['freq'] >= f_min) & (self.model_data['freq'] <= f_max)
+        filtered_model = {
+            'freq': self.manual_data['freq'][model_mask],
+            'Z_real': self.manual_data['Z_real'][model_mask],
+            'Z_imag': self.manual_data['Z_imag'][model_mask],
+        }
 
-        # Refresh the graph with the filtered data
-        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag,
-                           filtered_mfreq, filtered_mZ_real, filtered_mZ_imag)
+        # Update data and refresh graph
+        self.base_data = filtered_base
+        self.manual_data = filtered_model
+        self.refresh_graph()
 
+    """
+    Sets new static data (base impedance) and refreshes the entire graph.
+    """
     def setter_parameters_base(self, freq, Z_real, Z_imag):
-        """
-        Sets new static data (base impedance).
-        """
-        self._freq = freq
-        self._Z_real = Z_real
-        self._Z_imag = Z_imag
+        self.base_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
+        self.refresh_graph()  # Reset the entire graph
 
-    def setter_manual_parameters(self, freq, Z_real, Z_imag):
-        """
-        Sets new dynamic data (model impedance).
-        """
-        self._mfreq = freq
-        self._mZ_real = Z_real
-        self._mZ_imag = Z_imag
+    """
+    Sets new dynamic data (model impedance) and refreshes only the dynamic plot.
+    """
+    def setter_parameters_model(self, freq, Z_real, Z_imag):
+
+        self.manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
+        self.refresh_plot(self.model_data, self.dynamic_plot)  # Refresh only the dynamic plot
 
 
 """
