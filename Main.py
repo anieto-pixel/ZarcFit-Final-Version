@@ -191,7 +191,7 @@ class MainWidget(QWidget):
         # Calculators
         self.calculator = GraphCalculator(self.list_of_sliders[5])
         for slider in self.list_of_sliders[5].list_of_sliders:
-            slider.valueChanged().connect(self.calculator.update_graph)
+            slider.value_changed().connect(self.calculator.update_graph)
 
         # Graphs
         graphs_widget=self.create_graphs_widget()

@@ -25,7 +25,7 @@ class NSlidersWidget(QWidget):
         # Connect sliders to update total value
         self.value_label_total = QLabel(f"Total: {self.calculate_total()}")
         for slider in self.list_of_sliders:
-            slider.valueChanged().connect(self.update_labels)
+            slider.value_changed().connect(self.update_labels)
 
         # Layout
         main_layout = QHBoxLayout()
