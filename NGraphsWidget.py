@@ -30,6 +30,11 @@ import numpy as np
 #I can pass the label names and titles at construction, as variables, or I
 #can use the init file, or I can leave it as they are
 
+
+#MM
+#Do I want to keep six separate atributes for the graphs, or do I want
+#to pas themdoel and regular frec,zr,zi as to lists of three arrays each?
+
 class ParentGraph(pg.PlotWidget):
     def __init__(self):
         super().__init__()
@@ -39,15 +44,25 @@ class ParentGraph(pg.PlotWidget):
         self._freq = np.array([1, 10, 100, 1000, 10000])  
         self._Z_real = np.array([100, 80, 60, 40, 20]) 
         self._Z_imag = np.array([-50, -40, -30, -20, -10]) 
+        
+        self._mfreq = np.array([1, 10, 100, 1000, 10000])  
+        self._mZ_real = np.array([100, 80, 60, 40, 20]) 
+        self._mZ_imag = np.array([-50, -40, -30, -20, -10]) 
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
         
         # Initial graph display
         self.refresh_graph(self._freq, self._Z_real, self._Z_imag)
+        
+    #prep x and y would be the method I am looking for. 
+    #Then I can leave the other refreshes in peace, and
+    #things would even be more easy to hardcode
 
     def refresh_graph(self,freq,Z_real ,Z_imag):
-        pass
+        #pass
+        self.clear()  # Clear previous plot
+        self.plot(Z_real, Z_imag)  # Plot the points
         
     ##MM if I do not reset the frequency slider for any new file, I need to
     #ensure that this method is called at initialization
@@ -62,14 +77,29 @@ class ParentGraph(pg.PlotWidget):
         
         self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
 
-    def setter_parameters(self,freq,Z_real ,Z_imag):
+        filtered_freq = self._mfreq[mask]
+        filtered_Z_real = self._mZ_real[mask]
+        filtered_Z_imag = self._mZ_imag[mask]
         
+        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
+
+
+
+
+    def setter_parameters_base(self,freq,Z_real ,Z_imag):
         #MM
         #I dont think i will need to refresha fter this, but keep an eye just in case
 
         self._freq=freq
         self._Z_real=Z_real
         self._Z_imag= Z_imag
+        
+    def setter_parameters_model(self,freq,Z_real ,Z_imag):
+        #MM
+        #I dont think i will need to refresha fter this, but keep an eye just in case
+        self._mfreq=freq
+        self._mZ_real=Z_real
+        self._mZ_imag= Z_imag
      
 
 
