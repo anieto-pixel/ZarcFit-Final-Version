@@ -36,9 +36,9 @@ class NSlidersWidget(QWidget):
             main_layout.addWidget(s)
 
         # Set margins to the layout
-        main_layout.setContentsMargins(0, 10, 10, 0)  # Set top, left, right, and bottom margins
+        #main_layout.setContentsMargins(0, 10, 10, 0)  # Set top, left, right, and bottom margins
                                                         #(for horizontal distribution: left , top, right, bottom)
-
+        main_layout.setContentsMargins(0, 0, 10, 0)
         self.setLayout(main_layout)
 
     def calculate_total(self):

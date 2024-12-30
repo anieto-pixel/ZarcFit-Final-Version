@@ -15,122 +15,127 @@ from InputFileWidget import InputFileWidget
 from SliderWithTicks import SliderWithTicks
 from NSlidersWidget import NSlidersWidget
 from ButtonsWidgetRow import ButtonsWidgetRow
-from NGraphsWidget import *
+from NGraphsWidget import GraphsWidget
 
 
-
+"""
+Main application widget that handles the interactions between 
+file management, sliders, buttons, and graphs into a unified layout.
+"""
 class MainWidget(QWidget):
-    
-    def create_widget_from_layout(self, layout):
+
+    def __init__(self):
+        super().__init__()
+
+        # Initialize attributes
+        self.file_content = ""
+        self.calculator = None
+        self.list_of_sliders = []
+
+        # Initialize UI components
+        self.input_file_widget = InputFileWidget()
+        self.output_file_widget = OutputFileWidget()
+        self.sliders_widget = None
+        self.buttons_widget = ButtonsWidgetRow()
+        self.graphs_widget = GraphsWidget()
+
+        # Setup the UI
+        self._initialize_ui()
+
+    def _initialize_ui(self):
         """
-        Helper method to create a QWidget from a layout so that it can be added to the QSplitter.
+        Organizes the layout and settings for the MainWidget.
+        """
+        # Connect input file widget to update the file content
+        self.input_file_widget.file_contents_updated.connect(self.update_file_content)
+
+        # Create the top bar widget
+        self.top_bar_widget = self._create_file_options_widget()
+
+        # Create sliders widget
+        self.sliders_widget = self._create_sliders_widget()
+
+        # Create the bottom half layout (sliders and buttons)
+        bottom_half_layout = QHBoxLayout()
+        bottom_half_layout.addWidget(self.sliders_widget)
+        bottom_half_layout.addWidget(self.buttons_widget)
+
+        # Wrap bottom_half_layout in a QWidget
+        bottom_half_widget = self._create_widget_from_layout(bottom_half_layout)
+
+        # Create a splitter for graphs and bottom half layout
+        splitter = QSplitter(Qt.Vertical)
+        splitter.addWidget(self.graphs_widget)
+        splitter.addWidget(bottom_half_widget)
+        splitter.setSizes([500, 300])  # Set initial size proportions
+
+        # Main layout combining the top bar and splitter
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.top_bar_widget)
+        main_layout.addWidget(splitter)
+
+        # Reduce margins around main components
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Left, Top, Right, Bottom margins
+
+        self.setLayout(main_layout)
+    
+
+    def _create_file_options_widget(self):
+        """
+        Creates the top bar widget containing input and output file widgets.
+        """
+        layout = QHBoxLayout()
+        layout.addWidget(self.input_file_widget)
+        layout.addStretch()  # Separates the input and output widgets visually
+        layout.addWidget(self.output_file_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        return self._create_widget_from_layout(layout)
+
+    def _create_sliders_widget(self):
+        """
+        Creates the sliders widget based on specified configurations.
+        """
+        default_slider_range = (0, 100)
+        slider_specs = [
+            (1, "black"), (1, "black"), (3, "red"),
+            (3, "green"), (3, "blue"), (4, "black"),
+        ]
+
+        # Initialize sliders
+        self.list_of_sliders = [
+            NSlidersWidget(num_sliders, *default_slider_range, color)
+            for num_sliders, color in slider_specs
+        ]
+
+        # Add sliders to a horizontal layout
+        layout = QHBoxLayout()
+        for slider in self.list_of_sliders:
+            layout.addWidget(slider)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        return self._create_widget_from_layout(layout)
+
+    def _create_widget_from_layout(self, layout):
+        """
+        Helper method to wrap a layout in a QWidget.
         """
         widget = QWidget()
         widget.setLayout(layout)
         return widget
-    
-    
-    def create_sliders_widget(self):
-        default_slider_range = (0, 100)
-        
-        slider_specs = [
-            (1, "black"), (1, "black"), (3, "red"),
-            (3, "green"), (3, "blue"), (4, "black")
-        ]
-        self.list_of_sliders = [
-            NSlidersWidget(num, *default_slider_range, color)
-            for num, color in slider_specs
-        ]
-    
-        layout = QHBoxLayout()
-        for slider in self.list_of_sliders:
-            layout.addWidget(slider)
-            
-        return self.create_widget_from_layout(layout)
-    
-    def create_files_options_widget(self):
-        
-        layout = QHBoxLayout()
-        layout.addWidget(self.input_file_widget)
-        layout.addStretch()  #keeps both widgets separate in the layout
-        layout.addWidget(self.output_file_widget)
-        
-        return self.create_widget_from_layout(layout)
-    
-    
-    def __init__(self):
-        
-        super().__init__()
-        self.input_content="patatito"
 
-        #Would initializing help me with my issues?
-
-        #self.patatito = "pattito"  # Dummy Variable to write to file
-        self.calculator=None
-        self.list_of_sliders=[]
-
-        #top bar deals with input and output files
-        self.input_file_widget = InputFileWidget()
-        self.output_file_widget = OutputFileWidget()
-        
-        self.input_file_widget.file_contents_updated.connect(self.update_filecontent)
-        
-        self.top_bar_widget= self.create_files_options_widget()
-
-        # Buttons Widget
-        self.buttons_widget = ButtonsWidgetRow()  
-
-        # Slider widgets
-        #frequency = l_inf = NSlidersWidget(1, 0, 100, "orange")
-        self.sliders_widget=self.create_sliders_widget()
-
-        # Calculators
-        self.calculator = GraphCalculator(self.list_of_sliders[5])
-        for slider in self.list_of_sliders[5].list_of_sliders:
-            slider.value_changed().connect(self.calculator.update_graph)
-
-        # Graphs
-        graphs_widget=self.create_graphs_widget()
-
-        ###########################
-        #bttom half layout
-        ##########################
-        bottom_half_layout = QHBoxLayout()
-        bottom_half_layout.addWidget(self.sliders_widget)
-        bottom_half_layout.addWidget(self.buttons_widget)  # Add the button layout here
-
-        ##################
-        # Main Layout
-        ####################
-        main_layout = QVBoxLayout()
-        # Create a QSplitter to make graph_layout and bottom_half_layout adjustable
-        splitter = QSplitter(Qt.Vertical)
-
-        # Add both layouts to the splitter
-        splitter.addWidget(graphs_widget)
-        splitter.addWidget(self.create_widget_from_layout(bottom_half_layout))
-
-        # Set the initial size for each layout (optional)
-        splitter.setSizes([500, 300])  # Change the values to whatever ratio you want
-        
-        # Add output file widget and the splitter to the main layout
-        main_layout.addWidget(self.top_bar_widget)
-        main_layout.addWidget(splitter)
-
-        self.setLayout(main_layout)
-        
-    def update_filecontent(self, file_path):
+    def update_file_content(self, file_path):
+        """
+        Updates the file content by reading from the provided file path.
+        """
         try:
             with open(file_path, 'r') as file:
-                contents = file.read()
-            self.patatito = contents  # Update patatito with the file contents
-            print(f"File contents loaded into patatito:\n{self.patatito}")  # Optional: to check the result
+                self.file_content = file.read()
+            print(f"File contents loaded:\n{self.file_content}")
         except Exception as e:
             print(f"Error reading file: {e}")
-            self.patatito = "Error loading file."  # Fallback text
+            self.file_content = "Error loading file."
 
-
-    
 # Main code to start the application
 if __name__ == "__main__":
     app = QApplication(sys.argv)
