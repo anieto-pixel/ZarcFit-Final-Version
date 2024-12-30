@@ -18,14 +18,6 @@ import pyqtgraph as pg
 import numpy as np
 
 
-#MM
-#Refreshing completely ensures the plot's integrity, if filtering conditions change dynamically.
-#Dropping points directly could be more efficient but complicates the logic when multiple filters are applied.
-#since efficiency does not seem to be an issue, I am opting for refreshing fully
-#If it were to become an issue, or if filtering becomes a feature, this poitn shall be reviewed
-
-
-
 ##MM
 #I can pass the label names and titles at construction, as variables, or I
 #can use the init file, or I can leave it as they are
@@ -35,75 +27,108 @@ import numpy as np
 #Do I want to keep six separate atributes for the graphs, or do I want
 #to pas themdoel and regular frec,zr,zi as to lists of three arrays each?
 
+import numpy as np
+import pyqtgraph as pg
+
+import numpy as np
+import pyqtgraph as pg
+
+"""
+Parent class for all the graphs.
+Defines common methods and default values for all graph classes
+"""
 class ParentGraph(pg.PlotWidget):
     def __init__(self):
         super().__init__()
 
-        #MM
-        #figure out a better set of initialization values
+        # Default initialization data
         self._freq = np.array([1, 10, 100, 1000, 10000])  
         self._Z_real = np.array([100, 80, 60, 40, 20]) 
         self._Z_imag = np.array([-50, -40, -30, -20, -10]) 
         
         self._mfreq = np.array([1, 10, 100, 1000, 10000])  
-        self._mZ_real = np.array([100, 80, 60, 40, 20]) 
-        self._mZ_imag = np.array([-50, -40, -30, -20, -10]) 
+        self._mZ_real = np.array([90, 70, 50, 30, 10]) 
+        self._mZ_imag = np.array([-45, -35, -25, -15, -5]) 
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
+
+        # Plot objects for static and dynamic lines
+        self.static_plot = None
+        self.dynamic_plot = None
         
         # Initial graph display
-        self.refresh_graph(self._freq, self._Z_real, self._Z_imag)
-        
-    #prep x and y would be the method I am looking for. 
-    #Then I can leave the other refreshes in peace, and
-    #things would even be more easy to hardcode
+        self.refresh_graph(self._freq, self._Z_real, self._Z_imag, self._mfreq, self._mZ_real, self._mZ_imag)
 
-    def refresh_graph(self,freq,Z_real ,Z_imag):
-        #pass
+    def prepare_xy(self, freq, Z_real, Z_imag):
+        """
+        Prepares the X and Y values for plotting from impedance data.
+        Override this in subclasses if needed.
+        """
+        return Z_real, Z_imag
+
+    def refresh_m_plot(self, freq, Z_real, Z_imag):
+        """
+        Updates the dynamic line (model data) on the graph without clearing it.
+        """
+        x, y = self.prepare_xy(freq, Z_real, Z_imag)
+        if self.dynamic_plot:  # Ensure the plot object exists
+            self.dynamic_plot.setData(x, y)
+
+    def refresh_graph(self, freq, Z_real, Z_imag, mfreq, mZ_real, mZ_imag):
+        """
+        Clears and refreshes the entire graph, including both static and dynamic lines.
+        """
         self.clear()  # Clear previous plot
-        self.plot(Z_real, Z_imag)  # Plot the points
-        
-    ##MM if I do not reset the frequency slider for any new file, I need to
-    #ensure that this method is called at initialization
+
+        # Prepare and plot static data (base impedance)
+        x, y = self.prepare_xy(freq, Z_real, Z_imag)
+        self.static_plot = self.plot(x, y, pen=None, symbol='o', symbolSize=8, symbolBrush='g')  # Green dots
+
+        # Prepare and plot dynamic data (model impedance)
+        mx, my = self.prepare_xy(mfreq, mZ_real, mZ_imag)
+        self.dynamic_plot = self.plot(mx, my, pen=None, symbol='x', symbolSize=8, symbolBrush='b')  # Blue x's
+
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters the data to display only points within the specified frequency range.
         """
-        mask = (self._freq >= f_min) & (self._freq <= f_max)
-        filtered_freq = self._freq[mask]
-        filtered_Z_real = self._Z_real[mask]
-        filtered_Z_imag = self._Z_imag[mask]
-        
-        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
+        # Filter static (base) data
+        base_mask = (self._freq >= f_min) & (self._freq <= f_max)
+        filtered_freq = self._freq[base_mask]
+        filtered_Z_real = self._Z_real[base_mask]
+        filtered_Z_imag = self._Z_imag[base_mask]
 
-        filtered_freq = self._mfreq[mask]
-        filtered_Z_real = self._mZ_real[mask]
-        filtered_Z_imag = self._mZ_imag[mask]
-        
-        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag)
+        # Filter dynamic (model) data
+        model_mask = (self._mfreq >= f_min) & (self._mfreq <= f_max)
+        filtered_mfreq = self._mfreq[model_mask]
+        filtered_mZ_real = self._mZ_real[model_mask]
+        filtered_mZ_imag = self._mZ_imag[model_mask]
+
+        # Refresh the graph with the filtered data
+        self.refresh_graph(filtered_freq, filtered_Z_real, filtered_Z_imag,
+                           filtered_mfreq, filtered_mZ_real, filtered_mZ_imag)
+
+    def setter_parameters_base(self, freq, Z_real, Z_imag):
+        """
+        Sets new static data (base impedance).
+        """
+        self._freq = freq
+        self._Z_real = Z_real
+        self._Z_imag = Z_imag
+
+    def setter_manual_parameters(self, freq, Z_real, Z_imag):
+        """
+        Sets new dynamic data (model impedance).
+        """
+        self._mfreq = freq
+        self._mZ_real = Z_real
+        self._mZ_imag = Z_imag
 
 
-
-
-    def setter_parameters_base(self,freq,Z_real ,Z_imag):
-        #MM
-        #I dont think i will need to refresha fter this, but keep an eye just in case
-
-        self._freq=freq
-        self._Z_real=Z_real
-        self._Z_imag= Z_imag
-        
-    def setter_parameters_model(self,freq,Z_real ,Z_imag):
-        #MM
-        #I dont think i will need to refresha fter this, but keep an eye just in case
-        self._mfreq=freq
-        self._mZ_real=Z_real
-        self._mZ_imag= Z_imag
-     
-
-
-
+"""
+Phase graph class
+"""
 class PhaseGraph(ParentGraph):
     def __init__(self): 
         super().__init__()
@@ -115,14 +140,14 @@ class PhaseGraph(ParentGraph):
         # Initial graph display
         # Initial graph display
 
-    def refresh_graph(self,freq,Z_real,Z_imag):
+    def prepare_xy(self,freq,Z_real,Z_imag):
         
         phase = np.arctan2(Z_imag, Z_real) * 180 / np.pi  # Phase of Z (in degrees)
-        self.clear()  # Clear previous plot
-        self.plot(freq, phase)
-        #self.plot(freq, phase,pen=None, symbol='o', symbolSize=10, symbolBrush='r')
+        return freq, phase
 
-
+"""
+Bode graph class
+"""
 class BodeGraph(ParentGraph):
     def __init__(self):
         super().__init__()
@@ -132,14 +157,14 @@ class BodeGraph(ParentGraph):
         self.setLabel('left', "Total Impedance [Ohms]")
         #self.setAspectLocked(True)  # Lock aspect ratio to 1:1
 
-    def refresh_graph(self,freq,Z_real,Z_imag):
+    def prepare_xy(self,freq,Z_real,Z_imag):
         
         magnitude = np.sqrt(Z_real**2 + Z_imag**2)
+        return freq, 20 * np.log10(magnitude)
 
-        self.clear()  # Clear previous plot
-        self.plot(freq, 20 * np.log10(magnitude))  # Plot magnitude in dB
-        #self.plot(freq, 20 * np.log10(magnitude), pen=None, symbol='o', symbolSize=10, symbolBrush='r')
-
+"""
+Bode graph class
+"""
 class ColeColeGraph(ParentGraph):
     def __init__(self):
         super().__init__()
@@ -149,17 +174,9 @@ class ColeColeGraph(ParentGraph):
         self.setLabel('left', "-Z'' [Ohms]")
         #self.setAspectLocked(True)  # Lock aspect ratio to 1:1
 
-    def refresh_graph(self, frec, Z_real, Z_imag):
-        """
-        Updates the graph display with the latest computed data.
-        """
-        self.clear()  # Clear previous plot
-        #self.plot(Z_real, Z_imag)  # Plot the points
-        self.plot(Z_real, Z_imag, pen=None, symbol='o', symbolSize=10, symbolBrush='r')  # Plot the points
+    def prepare_xy(self, freq, Z_real, Z_imag):
 
-
-    
-
+        return Z_real, -Z_imag
 #MM
 #this widget will ened to be refactored but 
 #right now I don't want to over engineer things
@@ -209,6 +226,6 @@ if __name__ == "__main__":
        graph_widget = GraphsWidget()
        graph_widget.resize(200, 300)
        graph_widget.show()
-       graph_widget.apply_filter_frequency_range(10, 100)
+       #graph_widget.apply_filter_frequency_range(10, 100)
        # Run the application
        sys.exit(app.exec_())
