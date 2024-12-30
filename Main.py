@@ -15,97 +15,9 @@ from InputFileWidget import InputFileWidget
 from SliderWithTicks import SliderWithTicks
 from NSlidersWidget import NSlidersWidget
 from ButtonsWidgetRow import ButtonsWidgetRow
+from NGraphsWidget import *
 
 
-#########################################################################       
-#############################################################################        
-#Graphs Stuff
-#############################################################################        
-################################################################
-class GraphCalculator(QObject):
-    """
-    Handles the computation for the graph based on sliders.
-    """
-    # Declare the signal at the class level
-    data_changed = pyqtSignal()
-    
-    def __init__(self, sliders_widget):
-        super().__init__()  # Initialize QObject
-        self.sliders_widget = sliders_widget
-
-    def compute_graph_data(self):
-        """
-        Computes the x and y values for the graph.
-        Returns: (x, y) tuple
-        """
-        suma = sum(slider.get_value() for slider in self.sliders_widget.list_of_sliders)
-        x = np.linspace(-100, 100, 1000)
-        a = 1  # Quadratic coefficient
-        y = a * (x - suma) ** 2  # Quadratic function
-        return x, y
-    
-    def update_graph(self):
-        """
-        Emits a signal when graph data changes.
-        """
-        self.data_changed.emit()
-
-
-class GraphWidget(pg.PlotWidget):
-    """
-    Displays the graph based on computed data from GraphCalculator.
-    """
-    def __init__(self, calculator):
-        super().__init__()
-        self.calculator = calculator
-        self.setTitle("Quadratic Equation: y = ax^2 + bx + c")
-        self.setLabel('left', 'y')
-        self.setLabel('bottom', 'x')
-
-        # Connect calculator's data_changed signal to refresh_graph
-        self.calculator.data_changed.connect(self.refresh_graph)
-        
-        # Initial graph display
-        self.refresh_graph()
-
-    def refresh_graph(self):
-        """
-        Updates the graph display with the latest computed data.
-        """
-        x, y = self.calculator.compute_graph_data()
-        self.clear()  # Clear previous plot
-        self.plot(x, y)
-
-    
-class ColeGraphWidget(pg.PlotWidget):
-    """
-    Displays the graph based on computed data from GraphCalculator.
-    """
-    def __init__(self, calculator):
-        super().__init__()
-        self.calculator = calculator
-        self.setTitle("Quadratic Equation: y = ax^2 + bx + c")
-        self.setLabel('left', 'y')
-        self.setLabel('bottom', 'x')
-
-        # Connect calculator's data_changed signal to refresh_graph
-        self.calculator.data_changed.connect(self.refresh_graph)
-        
-        # Initial graph display
-        self.refresh_graph()
-
-    def refresh_graph(self):
-        """
-        Updates the graph display with the latest computed data.
-        """
-        x, y = self.calculator.compute_graph_data()
-        self.clear()  # Clear previous plot
-        self.plot(x, y)
-  
-
-###################################
-#Files
-###################################
 
 class MainWidget(QWidget):
     
@@ -117,22 +29,6 @@ class MainWidget(QWidget):
         widget.setLayout(layout)
         return widget
     
-    def create_graphs_widget(self):
-        self.big_graph = GraphWidget(self.calculator)
-        self.small_graph_1 = GraphWidget(self.calculator)
-        self.small_graph_2 = GraphWidget(self.calculator)
-        
-        # Layout for the two stacked graqphs to the left
-        right_graphs_layout=QVBoxLayout()
-        right_graphs_layout.addWidget(self.small_graph_1)
-        right_graphs_layout.addWidget(self.small_graph_2)
-        
-        #layout for all graphs
-        graphs_layout = QHBoxLayout()
-        graphs_layout.addWidget(self.big_graph)
-        graphs_layout.addLayout(right_graphs_layout)
-        
-        return self.create_widget_from_layout(graphs_layout)
     
     def create_sliders_widget(self):
         default_slider_range = (0, 100)
