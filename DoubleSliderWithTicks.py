@@ -53,7 +53,9 @@ class DoubleSliderWithTicks(SliderWithTicks):
         Returns the current value of the slider.
         """
         return self._slider.value() / self._scale_factor
-        
+    
+    def _string_by_tick(self, i):
+        return str(i/self._scale_factor)
     
 
 if __name__ == "__main__":

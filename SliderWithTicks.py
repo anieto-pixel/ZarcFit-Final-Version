@@ -97,21 +97,27 @@ class SliderWithTicks(QWidget):
         painter.setPen(QColor(0, 0, 0))
 
         #gets min, max and tick interval values from slider
-
+        min_value = self._slider.minimum()
+        max_value = self._slider.maximum()
         tick_interval = self._slider.tickInterval()
+        
+        print(f"min_value:{min_value} max_value:{max_value}, tick_interval:{tick_interval}")
 
         height = self._slider.height()
         top_offset = 5
         bottom_offset = 5
         effective_height = height - top_offset - bottom_offset
 
-        for i in range(self._min_value, self._max_value + 1, tick_interval):
+        for i in range(min_value, max_value + 1, tick_interval):
             tick_pos = (
-                height - bottom_offset - (effective_height * (i - self._min_value)) // (self._max_value - self._min_value)
+                height - bottom_offset - (effective_height * (i - min_value)) // (max_value - min_value)
             )
             text_rect = QRect(30, tick_pos, 50, 20)
-            painter.drawText(text_rect, Qt.AlignCenter, str(i))
-
+            painter.drawText(text_rect, Qt.AlignCenter, self._string_by_tick(i))
+            
+    def _string_by_tick(self, i):
+        return str(i)
+        
 
 
 #class SliderForFrequency(QWidget):
@@ -132,7 +138,7 @@ if __name__ == "__main__":
        app = QApplication(sys.argv)
 
        # Create and show an instance of SliderWithTicks
-       slider_widget = SliderWithTicks(0,10,"red")
+       slider_widget = SliderWithTicks(0,150,"red")
        slider_widget.resize(200, 300)
        slider_widget.show()
        # Run the application
