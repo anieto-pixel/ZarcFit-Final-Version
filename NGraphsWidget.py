@@ -27,12 +27,6 @@ import numpy as np
 #Do I want to keep six separate atributes for the graphs, or do I want
 #to pas themdoel and regular frec,zr,zi as to lists of three arrays each?
 
-import numpy as np
-import pyqtgraph as pg
-
-import numpy as np
-import pyqtgraph as pg
-
 """
 Parent class for all the graphs.
 Defines common methods and default values for all graph classes
@@ -110,7 +104,7 @@ class ParentGraph(pg.PlotWidget):
         }
 
         # Filter dynamic (model) data
-        model_mask = (self._manual_data['freq'] >= f_min) & (self._model_data['freq'] <= f_max)
+        model_mask = (self._manual_data['freq'] >= f_min) & (self._manual_data['freq'] <= f_max)
         filtered_model = {
             'freq': self._manual_data['freq'][model_mask],
             'Z_real': self._manual_data['Z_real'][model_mask],
@@ -135,7 +129,7 @@ class ParentGraph(pg.PlotWidget):
     def update_parameters_manual(self, freq, Z_real, Z_imag):
 
         self._manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        self._refresh_plot(self._model_data, self._dynamic_plot)  # Refresh only the dynamic plot
+        self._refresh_plot(self._manual_data, self._dynamic_plot)  # Refresh only the dynamic plot
 
 
 """

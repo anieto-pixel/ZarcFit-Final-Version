@@ -29,6 +29,8 @@ class ManualModel(QWidget):
         """
         Initializes the frequency array and re-runs the model calculations.
         """
+        
+        print("manual model initialize frequencies")
         self._manual_data['freq'] = freq_array
         self._run_model()
 
@@ -37,10 +39,13 @@ class ManualModel(QWidget):
         Updates Z_real and Z_imag based on the current frequencies
         and the sum of the variable dictionary values.
         """
+        print("manual model run model")
+        
         total_offset = sum(self._variables_dictionary.values())
         self._manual_data['Z_real'] = self._manual_data['freq'] + total_offset
         self._manual_data['Z_imag'] = self._manual_data['freq'] + total_offset
 
+        print("send signal")
         # Emit the updated data
         self.manual_model_updated.emit(
             self._manual_data['freq'],
@@ -52,6 +57,8 @@ class ManualModel(QWidget):
         """
         Updates a variable in the dictionary and re-runs the model.
         """
+        
+        print(f"update variable reached {key}")
         if key in self._variables_dictionary:
             self._variables_dictionary[key] = new_value
             self._run_model()

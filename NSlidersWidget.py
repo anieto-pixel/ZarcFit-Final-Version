@@ -14,7 +14,7 @@ from OutputFileWidget import OutputFileWidget
 
 class NSlidersWidget(QWidget):
     # Signal to emit when a slider changes value
-    slider_value_changed = pyqtSignal(str, float)
+    slider_value_updated = pyqtSignal(str, float)
 
     def __init__(self, slider_configurations, parent=None):
         super().__init__(parent)
@@ -46,13 +46,15 @@ class NSlidersWidget(QWidget):
         Connects the sliders' value change signals to emit their value and key.
         """
         for key, slider in self.sliders.items():
-            slider.value_changed().connect(lambda value, k=key: self.slider_value_changed.emit(k, value))
+            slider.value_changed().connect(lambda value, k=key: self.slider_value_updated.emit(k, value))
 
     def get_slider(self, key):
         """
         Retrieves a slider by its key.
         """
         return self.sliders.get(key)
+    
+    
         
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
@@ -71,6 +73,7 @@ if __name__ == "__main__":
                     }
         widget = NSlidersWidget(slider_configurations)
         widget.setWindowTitle("Test NSlidersWidget")
+        widget.setGeometry(100, 100, 800, 900)
         
         #testing for sizing options
         min_size = widget.minimumSize()  # Returns a QSize object
