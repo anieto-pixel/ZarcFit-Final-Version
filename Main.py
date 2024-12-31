@@ -77,7 +77,7 @@ class MainWidget(QWidget):
         # Connect input file widget to update the file content
         self.input_file_widget.file_contents_updated.connect(self.update_file_content)
         self.manual_model.manual_model_updated.connect(self.update_manual_content)
-        #self.sliders_widget.slider_value_updated.connect(self.manual_model.update_variable)
+        self.sliders_widget.slider_value_updated.connect(self.manual_model.update_variable)
 
     def _initialize_ui(self):
         """
@@ -133,8 +133,6 @@ class MainWidget(QWidget):
     and modifies class parameters necessary.
     """
     def update_file_content(self, freq, Z_real, Z_imag):
-        
-        print("update_file_content")
     
         self.file_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self.graphs_widget.update_graphs(freq,Z_real,Z_imag)
