@@ -7,7 +7,6 @@ Created on Fri Dec  6 13:07:51 2024
 
 @author: agarcian
 """
-
 class ErrorWindow:
     @staticmethod
     def show_error_message(message, title="Error"):
@@ -30,6 +29,9 @@ class FileWriter:
         """
         Writes the provided content to the given file.
         """
+        if not file_path:
+            ErrorWindow.show_error_message("No file selected for writing.")
+            return
         try:
             with open(file_path, "a") as f:  # Open file in append mode
                 f.write(f"{content}\n")
@@ -44,10 +46,9 @@ class FileSelector:
     @staticmethod
     def create_new_file(desired_type, set_file_callback, set_message_callback):
         """
-        Opens a dialog for creating a new CSV file and creates the file if it doesn't exist.
+        Opens a dialog for creating a new file and creates the file if it doesn't exist.
         """
-        file, _ = QFileDialog.getSaveFileName(None, f"Create New {desired_type} File",
-                                              os.getcwd(), "CSV Files (*.csv);;All Files (*)")
+        file, _ = QFileDialog.getSaveFileName(None, f"Create New {desired_type} File", os.getcwd(), "CSV Files (*.csv);;All Files (*)")
 
         if file:
             if not file.lower().endswith(desired_type):
@@ -84,7 +85,7 @@ class FileSelector:
     @staticmethod
     def validate(file_path, desired_type):
         if not file_path.lower().endswith(desired_type):
-            raise ValueError("The selected file is of an invalid type.")
+            raise ValueError(f"The selected file must end with '{desired_type}'")
         return True
 
 
@@ -95,66 +96,70 @@ class OutputFileWidget(QWidget):
     def __init__(self):
         super().__init__()
 
-        #Atributes
-        self.__desired_type = ".csv"
-        self.__search_parameters = "CSV Files (*.csv);;All Files (*)"
-        self.__output_file = None
+        # Attributes
+        self._desired_type = ".csv"
+        self._search_parameters = "CSV Files (*.csv);;All Files (*)"
+        self._output_file = None
 
-        #Create and connect buttons
-        self.__newfile_button = QPushButton("New File")
-        self.__newfile_button.clicked.connect(self.__handle_create_new_file)
+        # Create and connect buttons
+        self._newfile_button = QPushButton("New File")
+        self._newfile_button.clicked.connect(self._handle_create_new_file)
 
-        self.__select_button = QPushButton("Select .csv File")
-        self.__select_button.clicked.connect(self.__handle_open_file_dialog)
+        self._select_button = QPushButton("Select .csv File")
+        self._select_button.clicked.connect(self._handle_open_file_dialog)
 
-        #Create label
-        self.__file_label = QLabel("No output file selected")
-        self.__file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-
+        # Create label
+        self._file_label = QLabel("No output file selected")
+        self._file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self._initialize_ui()
-        
+
     def _initialize_ui(self):
-        
         output_layout = QHBoxLayout()
-        self.__newfile_button.setFixedSize(100, 30)
-        output_layout.addWidget(self.__newfile_button)
-        output_layout.addWidget(self.__select_button)
-        output_layout.addWidget(self.__file_label)
+        self._newfile_button.setFixedSize(100, 30)
+        output_layout.addWidget(self._newfile_button)
+        output_layout.addWidget(self._select_button)
+        output_layout.addWidget(self._file_label)
 
         output_layout.setContentsMargins(5, 5, 5, 5)
         output_layout.setSpacing(1)
         self.setLayout(output_layout)
 
-    def __handle_create_new_file(self):
+    def _handle_create_new_file(self):
         FileSelector.create_new_file(
-            self.__desired_type,
-            self.__set_file_label,
-            self.__set_file_message
+            self._desired_type,
+            self._set_file_label,
+            self._set_file_message
         )
 
-    def __handle_open_file_dialog(self):
+    def _handle_open_file_dialog(self):
         FileSelector.open_file_dialog(
-            self.__search_parameters,
-            lambda file: FileSelector.validate(file, self.__desired_type),
-            self.__set_file_label,
-            self.__set_file_message
+            self._search_parameters,
+            lambda file: FileSelector.validate(file, self._desired_type),
+            self._set_file_label,
+            self._set_file_message
         )
 
-    def __set_file_label(self, file_path):
-        self.__output_file = file_path
-        self.__file_label.setText(os.path.basename(file_path))
+    def _set_file_label(self, file_path):
+        self._output_file = file_path
+        self._file_label.setText(os.path.basename(file_path))
 
-    def __set_file_message(self, message):
-        self.__file_label.setText(message)
+    def _set_file_message(self, message):
+        self._file_label.setText(message)
+        
+    """PUBLIC METHODS"""
 
     def get_output_file(self):
         """Public getter for the selected output file path."""
-        return self.__output_file
+        return self._output_file
     
     def write_to_file(self, content):
-        """Public method to write content in output file."""
-        FileWriter.write_to_file(self.__output_file, content)
+        """Public method to write content in the output file."""
+        if self._output_file:
+            FileWriter.write_to_file(self._output_file, content)
+        else:
+            ErrorWindow.show_error_message("No output file selected. Please select a file first.")
+
 
 
 # To run the test in a standalone application
