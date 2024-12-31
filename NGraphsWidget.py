@@ -42,13 +42,13 @@ class ParentGraph(pg.PlotWidget):
         super().__init__()
 
         # Default initialization data
-        self.base_data = {
+        self._base_data = {
             'freq': np.array([1, 10, 100, 1000, 10000]),
             'Z_real': np.array([100, 80, 60, 40, 20]),
             'Z_imag': np.array([-50, -40, -30, -20, -10]),
         }
 
-        self.manual_data = {
+        self._manual_data = {
             'freq': np.array([1, 10, 100, 1000, 10000]),
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
@@ -58,17 +58,17 @@ class ParentGraph(pg.PlotWidget):
         self.showGrid(x=True, y=True)
 
         # Plot objects for static and dynamic lines
-        self.static_plot = None
-        self.dynamic_plot = None
+        self._static_plot = None
+        self._dynamic_plot = None
 
         # Initial graph display
-        self.refresh_graph()
+        self._refresh_graph()
 
     """
     Prepares the X and Y values for plotting from impedance data.
     Overriden in subclasses.
     """
-    def prepare_xy(self, freq, Z_real, Z_imag):
+    def _prepare_xy(self, freq, Z_real, Z_imag):
         return Z_real, Z_imag
 
     """
@@ -77,65 +77,65 @@ class ParentGraph(pg.PlotWidget):
     - data: A dictionary containing 'freq', 'Z_real', and 'Z_imag'.
     - plot: The specific plot object to update (static or dynamic).
     """
-    def refresh_plot(self, data, plot):
+    def _refresh_plot(self, data, plot):
 
-        x, y = self.prepare_xy(data['freq'], data['Z_real'], data['Z_imag'])
+        x, y = self._prepare_xy(data['freq'], data['Z_real'], data['Z_imag'])
         if plot:
             plot.setData(x, y)
 
     """
     Refreshes the entire graph by replotting both the static and dynamic data.
     """
-    def refresh_graph(self):
+    def _refresh_graph(self):
         self.clear()  # Clear the plot area
 
         # Plot static (base) data
-        self.static_plot = self.plot(pen=None, symbol='o', symbolSize=8, symbolBrush='g')  # Green dots
-        self.refresh_plot(self.base_data, self.static_plot)
+        self._static_plot = self.plot(pen=None, symbol='o', symbolSize=8, symbolBrush='g')  # Green dots
+        self._refresh_plot(self._base_data, self._static_plot)
 
         # Plot dynamic (model) data
-        self.dynamic_plot = self.plot(pen=None, symbol='x', symbolSize=8, symbolBrush='b')  # Blue x's
-        self.refresh_plot(self.manual_data, self.dynamic_plot)
+        self._dynamic_plot = self.plot(pen=None, symbol='x', symbolSize=8, symbolBrush='b')  # Blue x's
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
 
     """
     Filters the data to display only points within the specified frequency range.
     """
     def filter_frequency_range(self, f_min, f_max):
         # Filter static (base) data
-        base_mask = (self.base_data['freq'] >= f_min) & (self.base_data['freq'] <= f_max)
+        base_mask = (self._base_data['freq'] >= f_min) & (self._base_data['freq'] <= f_max)
         filtered_base = {
-            'freq': self.base_data['freq'][base_mask],
-            'Z_real': self.base_data['Z_real'][base_mask],
-            'Z_imag': self.base_data['Z_imag'][base_mask],
+            'freq': self._base_data['freq'][base_mask],
+            'Z_real': self._base_data['Z_real'][base_mask],
+            'Z_imag': self._base_data['Z_imag'][base_mask],
         }
 
         # Filter dynamic (model) data
-        model_mask = (self.manual_data['freq'] >= f_min) & (self.model_data['freq'] <= f_max)
+        model_mask = (self._manual_data['freq'] >= f_min) & (self._model_data['freq'] <= f_max)
         filtered_model = {
-            'freq': self.manual_data['freq'][model_mask],
-            'Z_real': self.manual_data['Z_real'][model_mask],
-            'Z_imag': self.manual_data['Z_imag'][model_mask],
+            'freq': self._manual_data['freq'][model_mask],
+            'Z_real': self._manual_data['Z_real'][model_mask],
+            'Z_imag': self._manual_data['Z_imag'][model_mask],
         }
 
         # Update data and refresh graph
-        self.base_data = filtered_base
-        self.manual_data = filtered_model
-        self.refresh_graph()
+        self._base_data = filtered_base
+        self._manual_data = filtered_model
+        self._refresh_graph()
 
     """
     Sets new static data (base impedance) and refreshes the entire graph.
     """
-    def setter_parameters_base(self, freq, Z_real, Z_imag):
-        self.base_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        self.refresh_graph()  # Reset the entire graph
+    def update_parameters_base(self, freq, Z_real, Z_imag):
+        self._base_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
+        self._refresh_graph()  # Reset the entire graph
 
     """
     Sets new dynamic data (model impedance) and refreshes only the dynamic plot.
     """
-    def setter_parameters_model(self, freq, Z_real, Z_imag):
+    def update_parameters_manual(self, freq, Z_real, Z_imag):
 
-        self.manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        self.refresh_plot(self.model_data, self.dynamic_plot)  # Refresh only the dynamic plot
+        self._manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
+        self._refresh_plot(self._model_data, self._dynamic_plot)  # Refresh only the dynamic plot
 
 
 """
@@ -152,7 +152,7 @@ class PhaseGraph(ParentGraph):
         # Initial graph display
         # Initial graph display
 
-    def prepare_xy(self,freq,Z_real,Z_imag):
+    def _prepare_xy(self,freq,Z_real,Z_imag):
         
         phase = np.arctan2(Z_imag, Z_real) * 180 / np.pi  # Phase of Z (in degrees)
         return freq, phase
@@ -169,7 +169,7 @@ class BodeGraph(ParentGraph):
         self.setLabel('left', "Total Impedance [Ohms]")
         #self.setAspectLocked(True)  # Lock aspect ratio to 1:1
 
-    def prepare_xy(self,freq,Z_real,Z_imag):
+    def _prepare_xy(self,freq,Z_real,Z_imag):
         
         magnitude = np.sqrt(Z_real**2 + Z_imag**2)
         return freq, 20 * np.log10(magnitude)
@@ -186,7 +186,7 @@ class ColeColeGraph(ParentGraph):
         self.setLabel('left', "-Z'' [Ohms]")
         #self.setAspectLocked(True)  # Lock aspect ratio to 1:1
 
-    def prepare_xy(self, freq, Z_real, Z_imag):
+    def _prepare_xy(self, freq, Z_real, Z_imag):
 
         return Z_real, -Z_imag
 #MM
@@ -201,31 +201,45 @@ class GraphsWidget(QWidget):
         super().__init__()
 
         # Initialize the graph widgets
-        self.big_graph = ColeColeGraph()
-        self.small_graph_1 = BodeGraph()
-        self.small_graph_2 = PhaseGraph()
+        self._big_graph = ColeColeGraph()
+        self._small_graph_1 = BodeGraph()
+        self._small_graph_2 = PhaseGraph()
 
         # Layout for the stacked small graphs on the right
         right_graphs_layout = QVBoxLayout()
-        right_graphs_layout.addWidget(self.small_graph_1)
-        right_graphs_layout.addWidget(self.small_graph_2)
+        right_graphs_layout.addWidget(self._small_graph_1)
+        right_graphs_layout.addWidget(self._small_graph_2)
 
         # Layout for all graphs
         graphs_layout = QHBoxLayout()
         big_graph_layout = QVBoxLayout()
-        big_graph_layout.addWidget(self.big_graph)
+        big_graph_layout.addWidget(self._big_graph)
 
         graphs_layout.addLayout(big_graph_layout)
         graphs_layout.addLayout(right_graphs_layout)
 
         # Set the main layout
         self.setLayout(graphs_layout)
-        
+       
+    #public methods
+    
     def apply_filter_frequency_range(self, f_min, f_max):
         
-        self.big_graph.filter_frequency_range(f_min, f_max)
-        self.small_graph_1.filter_frequency_range( f_min, f_max)
-        self.small_graph_2.filter_frequency_range( f_min, f_max)
+        self._big_graph.filter_frequency_range(f_min, f_max)
+        self._small_graph_1.filter_frequency_range( f_min, f_max)
+        self._small_graph_2.filter_frequency_range( f_min, f_max)
+        
+    def update_graphs(self, freq, Z_real, Z_imag):
+        
+        self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
+        
+    def update_manual_plot(self, freq, Z_real, Z_imag):
+        
+        self._big_graph.update_parameters_manual(freq, Z_real, Z_imag)
+        self._small_graph_1.update_parameters_manual(freq, Z_real, Z_imag)
+        self._small_graph_2.update_parameters_manual(freq, Z_real, Z_imag)
         
         
         

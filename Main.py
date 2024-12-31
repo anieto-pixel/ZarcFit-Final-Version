@@ -144,8 +144,7 @@ class MainWidget(QWidget):
         """
     
         self.file_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        
-        print(f"Received Frequencies: {self.file_content['freq']}")
+        self.graphs_widget.update_graphs(freq,Z_real,Z_imag)
 
         
             
