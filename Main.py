@@ -28,7 +28,16 @@ class MainWidget(QWidget):
         super().__init__()
 
         # Initialize attributes
-        self.file_content = ""
+        self.file_content = {
+            'freq': None,
+            'Z_real': None,
+            'Z_imag': None,
+        }
+        self.model_content = {
+            'freq': None,
+            'Z_real': None,
+            'Z_imag': None,
+        }
         self.calculator = None
         self.list_of_sliders = []
 
@@ -41,14 +50,18 @@ class MainWidget(QWidget):
 
         # Setup the UI
         self._initialize_ui()
+        
+        # Setup connections
+        # Connect input file widget to update the file content
+        self.input_file_widget.file_contents_updated.connect(self.update_file_content)
+
+        
 
     def _initialize_ui(self):
         """
         Organizes the layout and settings for the MainWidget.
         """
-        # Connect input file widget to update the file content
-        self.input_file_widget.file_contents_updated.connect(self.update_file_content)
-
+        
         # Create the top bar widget
         self.top_bar_widget = self._create_file_options_widget()
 
@@ -124,17 +137,18 @@ class MainWidget(QWidget):
         widget.setLayout(layout)
         return widget
 
-    def update_file_content(self, file_path):
+    def update_file_content(self, freq, Z_real, Z_imag):
         """
-        Updates the file content by reading from the provided file path.
+        Receives the numpy arrays (frequencies, resistances, reactances) from the signal 
+        and processes them further as needed.
         """
-        try:
-            with open(file_path, 'r') as file:
-                self.file_content = file.read()
-            print(f"File contents loaded:\n{self.file_content}")
-        except Exception as e:
-            print(f"Error reading file: {e}")
-            self.file_content = "Error loading file."
+    
+        self.file_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
+        
+        print(f"Received Frequencies: {self.file_content['freq']}")
+
+        
+            
 
 # Main code to start the application
 if __name__ == "__main__":
