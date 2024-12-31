@@ -1,1 +1,8 @@
 -no tnego muy clro el comportamiento del modelo cuando muevo los sliders sin que haya un file cargado. No parece dar problemas peor no lo entiendo
+
+-que necesito imprimir exactamente?
+
+-implementar el modelo bien.
+-Implementar impression a file, ma so menos
+-implementar the init file
+-ver como ponerle un minimum width a los widgets que permita ver su etiqueta
