@@ -21,7 +21,7 @@ class SliderWithTicks(QWidget):
         self._min_value= min_value
         self._max_value= max_value
         self._slider = QSlider(Qt.Vertical, self)
-        self._value_label = QLabel(f"Slider: {self._slider.value()}", self)
+        self._value_label = QLabel(f"{self._slider.value()}", self)
         self._layout = QVBoxLayout()
         
         #Connect Slider and Label
