@@ -16,6 +16,27 @@ from NSlidersWidget import NSlidersWidget
 from ButtonsWidgetRow import ButtonsWidgetRow
 from NGraphsWidget import GraphsWidget
 from SubclassesSliderWithTicks import *
+from ManualModel import *
+
+#sliders, will be in init at some point I guess. No clue of where ir shall go:
+    
+slider_configurations = {
+            'linf': (EPowerSliderWithTicks, -9, 0, 'black'),
+            'rinf': (EPowerSliderWithTicks, 0, 6, 'black'),
+            'rh': (EPowerSliderWithTicks, 0, 10, 'red'),
+            'fh': (EPowerSliderWithTicks, 0, 10, 'red'),
+            'ph': (DoubleSliderWithTicks, 0.0, 1.0, 'red'),
+            'rm': (EPowerSliderWithTicks, 0, 10, 'green'),
+            'fm': (EPowerSliderWithTicks, 0, 10, 'green'),
+            'pm': (DoubleSliderWithTicks, 0.0, 1.0, 'green'),
+            'rl': (EPowerSliderWithTicks, 0, 10, 'blue'),
+            'fl': (EPowerSliderWithTicks, 0, 10, 'blue'),
+            'pl': (DoubleSliderWithTicks, 0.0, 1.0, 'blue'),
+            're': (EPowerSliderWithTicks, 0, 10, 'black'),
+            'qe': (EPowerSliderWithTicks, 0, 10, 'black'),
+            'pe_f': (DoubleSliderWithTicks, 0.0, 1.0, 'black'),
+            'pe_i': (DoubleSliderWithTicks, -2.0, 2.0, 'black'),
+        }
 
 
 """
@@ -39,13 +60,12 @@ class MainWidget(QWidget):
             'Z_imag': None,
         }
         self.calculator = None
-        self.manual_model = None
+        self.manual_model = ManualModel(slider_configurations.keys())
 
         # Initialize UI components
         self.input_file_widget = InputFileWidget()
         self.output_file_widget = OutputFileWidget()
-        self.sliders_widget = _create_sliders_widget()#MM find
-                #a better way to hide the giantic list of sldier specifictions. Maybe init one day?
+        self.sliders_widget = NSlidersWidget(slider_configurations)
         self.buttons_widget = ButtonsWidgetRow()
         self.graphs_widget = GraphsWidget()
 
@@ -53,9 +73,11 @@ class MainWidget(QWidget):
         self._initialize_ui()
         
         # Setup connections
+        
         # Connect input file widget to update the file content
         self.input_file_widget.file_contents_updated.connect(self.update_file_content)
-  
+        self.manual_model.manual_model_updated.connect(self.update_manual_content)
+
 
     def _initialize_ui(self):
         """
@@ -64,9 +86,6 @@ class MainWidget(QWidget):
         
         # Create the top bar widget
         self.top_bar_widget = self._create_file_options_widget()
-
-        # Create sliders widget
-        self.sliders_widget = self._create_sliders_widget()
 
         # Create the bottom half layout (sliders and buttons)
         bottom_half_layout = QHBoxLayout()
@@ -103,36 +122,11 @@ class MainWidget(QWidget):
         layout.addWidget(self.output_file_widget)
         layout.setContentsMargins(0, 0, 0, 0)
        
-        return QWidget().setLayout(layout)
-        
         return self._create_widget_from_layout(layout)
-
-    def _create_sliders_widget(self):
-        """
-        Creates and returns a widget containing multiple sliders.
-        Each slider's configuration is stored in a list, ensuring the correct order.
-        """
-        # List of sliders, where each slider configuration is represented by a tuple (slider type, min, max, color)
-        slider_configurations = [
-            (EPowerSliderWithTicks, -9, 0, 'black'),
-            (EPowerSliderWithTicks, 0, 6, 'black'),
-            (EPowerSliderWithTicks, 0, 10, 'red'),
-            (EPowerSliderWithTicks, 0, 10, 'red'),
-            (DoubleSliderWithTicks, 0.0, 1.0, 'red'),
-            (EPowerSliderWithTicks, 0, 10, 'green'),
-            (EPowerSliderWithTicks, 0, 10, 'green'),
-            (DoubleSliderWithTicks, 0.0, 1.0, 'green'),
-            (EPowerSliderWithTicks, 0, 10, 'blue'),
-            (EPowerSliderWithTicks, 0, 10, 'blue'),
-            (DoubleSliderWithTicks, 0.0, 1.0, 'blue'),
-            (EPowerSliderWithTicks, 0, 10, 'black'),
-            (EPowerSliderWithTicks, 0, 10, 'black'),
-            (DoubleSliderWithTicks, 0.0, 1.0, 'black'),
-            (DoubleSliderWithTicks, -2.0, 2.0, 'black')
-        ]
-        
-        # Create sliders widget with configurations
-        return NSlidersWidget(slider_configurations)
+    
+##
+#listeners and conections
+##
 
     """
     Receives the numpy arrays (frequencies, resistances, reactances) from the signal 
@@ -142,6 +136,7 @@ class MainWidget(QWidget):
     
         self.file_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self.graphs_widget.update_graphs(freq,Z_real,Z_imag)
+        self.manual_model.initialize_frequencies(freq)
         
     """
     Receives the numpy arrays (frequencies, resistances, reactances) from the signal 
@@ -152,7 +147,14 @@ class MainWidget(QWidget):
         self.manual_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self.graphs_widget.update_manual_plot(freq,Z_real,Z_imag)
 
-
+##
+##utilities
+##
+    def _create_widget_from_layout(self, layout):
+        
+        widget = QWidget()
+        widget.setLayout(layout)
+        return widget
         
             
 

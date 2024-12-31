@@ -13,33 +13,46 @@ from OutputFileWidget import OutputFileWidget
 
 
 class NSlidersWidget(QWidget):
+    # Signal to emit when a slider changes value
+    slider_value_changed = pyqtSignal(str, float)
+
     def __init__(self, slider_configurations, parent=None):
         super().__init__(parent)
-        self.slider_configurations = slider_configurations
-        self.sliders = self._create_sliders()
+        self.sliders = self._create_sliders(slider_configurations)
         self._setup_layout()
-    
-    def _create_sliders(self):
+        self._connect_signals()
+
+    def _create_sliders(self, slider_configurations):
         """
-        Creates sliders based on the provided slider configurations.
+        Creates a dictionary of sliders based on the provided slider configurations.
         """
-        sliders = []
-        for slider_type, min_value, max_value, color in self.slider_configurations:
-            sliders.append(slider_type(min_value, max_value, color))
+        sliders = {}
+        for key, (slider_type, min_value, max_value, color) in slider_configurations.items():
+            sliders[key] = slider_type(min_value, max_value, color)
         return sliders
-    
+
     def _setup_layout(self):
         """
-        Creates a layout and adds all sliders to it.
+        Creates a layout and adds all sliders to it in dictionary order.
         """
         layout = QHBoxLayout()
-        for slider in self.sliders:
+        for slider in self.sliders.values():
             layout.addWidget(slider)
-        layout.setContentsMargins(0, 0, 15, 0)# Set top, left, right, and bottom margins
-        #(for horizontal distribution: left , top, right, bottom)
-        
+        layout.setContentsMargins(0, 0, 15, 0)
         self.setLayout(layout)
-            
+
+    def _connect_signals(self):
+        """
+        Connects the sliders' value change signals to emit their value and key.
+        """
+        for key, slider in self.sliders.items():
+            slider.value_changed().connect(lambda value, k=key: self.slider_value_changed.emit(k, value))
+
+    def get_slider(self, key):
+        """
+        Retrieves a slider by its key.
+        """
+        return self.sliders.get(key)
         
 if __name__ == "__main__":
     from PyQt5.QtWidgets import QApplication
@@ -49,13 +62,13 @@ if __name__ == "__main__":
     def test_n_sliders_widget():
         app = QApplication(sys.argv)
         
-        slider_configurations = [
-            (EPowerSliderWithTicks, -10, 0, 'black'),
-            (EPowerSliderWithTicks, -10, 10, 'black'),
-            (DoubleSliderWithTicks, 0.0, 1.0, 'red'),
-            (DoubleSliderWithTicks, -10.00, 1.0, 'green')
-            ]
+        slider_configurations = {
+                    'linf': (EPowerSliderWithTicks, -9, 0, 'black'),
 
+                    'ph': (DoubleSliderWithTicks, 0.0, 1.0, 'red'),
+                    'pm': (DoubleSliderWithTicks, -1.0, 1.0, 'green'),
+                    'rl': (EPowerSliderWithTicks, 0, 10, 'blue')
+                    }
         widget = NSlidersWidget(slider_configurations)
         widget.setWindowTitle("Test NSlidersWidget")
         
