@@ -39,7 +39,7 @@ class MainWidget(QWidget):
             'Z_imag': None,
         }
         self.calculator = None
-        self.list_of_sliders = []
+        self.manual_model = None
 
         # Initialize UI components
         self.input_file_widget = InputFileWidget()
@@ -55,8 +55,7 @@ class MainWidget(QWidget):
         # Setup connections
         # Connect input file widget to update the file content
         self.input_file_widget.file_contents_updated.connect(self.update_file_content)
-
-        
+  
 
     def _initialize_ui(self):
         """
@@ -103,6 +102,8 @@ class MainWidget(QWidget):
         layout.addStretch()  # Separates the input and output widgets visually
         layout.addWidget(self.output_file_widget)
         layout.setContentsMargins(0, 0, 0, 0)
+       
+        return QWidget().setLayout(layout)
         
         return self._create_widget_from_layout(layout)
 
@@ -132,41 +133,6 @@ class MainWidget(QWidget):
         
         # Create sliders widget with configurations
         return NSlidersWidget(slider_configurations)
-        
-        #NSlidersWidget(self.list_of_sliders)
-
-        """
-        
-
-        default_slider_range = (0, 100)
-        slider_specs = [
-            (1, "black"), (1, "black"), (3, "red"),
-            (3, "green"), (3, "blue"), (4, "black"),
-        ]
-
-        # Initialize sliders
-        self.list_of_sliders = [
-            NSlidersWidget(num_sliders, *default_slider_range, color)
-            for num_sliders, color in slider_specs
-        ]
-
-        
-    
-        """
-    
-    
-    
-    
-    
-    
-
-    def _create_widget_from_layout(self, layout):
-        """
-        Helper method to wrap a layout in a QWidget.
-        """
-        widget = QWidget()
-        widget.setLayout(layout)
-        return widget
 
     """
     Receives the numpy arrays (frequencies, resistances, reactances) from the signal 
