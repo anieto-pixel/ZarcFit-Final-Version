@@ -35,8 +35,7 @@ class MainWidget(QWidget):
             pass
             #throws error    
         else:
-            self.slider_configurations, 
-            self.slider_default_values = self._read_config_file(config_file) 
+            self.slider_configurations, self.slider_default_values = self._read_config_file(config_file) 
             #here we will get the name of the buttons when it is time
         
         # Initialize widgets
