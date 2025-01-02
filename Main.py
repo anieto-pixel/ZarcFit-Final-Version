@@ -21,52 +21,60 @@ from ManualModel import *
 import configparser
 
 class MainWidget(QWidget):
-    """
-    Main widget for the application, combining UI components and logic.
-    """
-
+    
     def __init__(self, config_file=None):
+        
+        
         super().__init__()
-
-        # Initialize attributes
         self.file_content = {"freq": None, "Z_real": None, "Z_imag": None}
         self.manual_content = {"freq": None, "Z_real": None, "Z_imag": None}
         self.calculator = None
 
-        # Read slider configurations
-        self.slider_configurations = SLIDER_CONFIGURATIONS if config_file is None else self._read_slider_configurations(config_file)
-        self.manual_model = ManualModel(self.slider_configurations.keys())
-
-        # Initialize UI components
+        # Read slider configurations and defaults
+        if config_file is None:
+            pass
+            #throws error    
+        else:
+            self.slider_configurations, 
+            self.slider_default_values = self._read_config_file(config_file) 
+            #here we will get the name of the buttons when it is time
+        
+        # Initialize widgets
         self.input_file_widget = InputFileWidget(config_file)
         self.output_file_widget = OutputFileWidget()
-        self.sliders_widget = NSlidersWidget(self.slider_configurations)
+        self.sliders_widget = NSlidersWidget(self.slider_configurations, self.slider_default_values)
         self.buttons_widget = ButtonsWidgetRow()
         self.graphs_widget = GraphsWidget()
 
-        # Setup the UI
+        # Pass configurations and default values to ManualModel
+        self.manual_model = ManualModel(
+            list(self.slider_configurations.keys()),
+            self.slider_default_values)
+
+        # Set up UI
         self._initialize_ui()
 
-        # Setup connections
+        # Connect signals
         self.input_file_widget.file_contents_updated.connect(self.update_file_content)
         self.manual_model.manual_model_updated.connect(self.update_manual_content)
         self.sliders_widget.slider_value_updated.connect(self.manual_model.update_variable)
 
-    def _read_slider_configurations(self, config_file):
-        """
-        Reads slider configurations from the INI file.
-        Args:config_file (str): Path to the configuration file.
-        Returns:dict: Parsed slider configurations.
-        """
+
+    def _read_config_file(self, config_file):
         config = configparser.ConfigParser()
         config.read(config_file)
-
+    
+        # Read slider configurations
         sliders = {}
         for key, value in config["SliderConfigurations"].items():
             slider_type, min_value, max_value, color = value.split(",")
             sliders[key] = (self._safe_import(slider_type), float(min_value), float(max_value), color)
-        return sliders
 
+        defaults_str = config["SliderDefaultValues"]["defaults"]
+        defaults = [float(val) for val in defaults_str.split(",")]
+
+        return sliders, defaults
+    
     @staticmethod
     def _safe_import(class_name):
         """
@@ -103,7 +111,6 @@ class MainWidget(QWidget):
         main_layout.setContentsMargins(5, 5, 5, 5)
 
         self.setLayout(main_layout)
-    
 
     def _create_file_options_widget(self):
         """

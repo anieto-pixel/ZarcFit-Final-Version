@@ -76,6 +76,12 @@ class SliderWithTicks(QWidget):
         Returns the current value of the slider.
         """
         return self._slider.value()
+    
+    def set_value(self, value):
+        """
+        Sets the slider to a given value.
+        """
+        self._slider.setValue(value)
 
     def value_changed(self):
         """
@@ -159,6 +165,9 @@ class DoubleSliderWithTicks(SliderWithTicks):
          """
          self._value_label.setText(f"{self.get_value():.3f}")
     
+    def _string_by_tick(self, i):
+            return str(i/self._scale_factor)
+    
     def get_value(self):
         """
         Returns the current value of the slider.
@@ -166,8 +175,13 @@ class DoubleSliderWithTicks(SliderWithTicks):
         """
         return self._slider.value() / self._scale_factor
     
-    def _string_by_tick(self, i):
-        return str(i/self._scale_factor)
+    def set_value(self, value):
+        """
+        Sets the slider to a given value.
+        """
+        value=int(value*self._scale_factor)
+        self._slider.setValue(value)
+
     
 """
 Subclass of DoubleSliderWithTicks that accepts the double exponent of powers of N

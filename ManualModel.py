@@ -10,20 +10,29 @@ from PyQt5.QtCore import pyqtSignal
 import numpy as np
 
 class ManualModel(QWidget):
-    # Signal emitted every time the model is run
     manual_model_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
-    def __init__(self, variables_keys):
+    def __init__(self, variables_keys, variables_default_values):
         super().__init__()
-        # Initialize a dictionary with variables
+        # Initialize variables dictionary with keys and default values
         self._variables_dictionary = {key: 0.0 for key in variables_keys}
+        self._variables_keys = variables_keys
+        self._variables_default_values = variables_default_values
 
-        # Default frequency data (can be replaced with input file frequencies)
+        # Default frequency data
         self._manual_data = {
             'freq': np.array([1, 10, 100, 1000, 10000]),
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
         }
+
+        # Set default values
+        self._set_default_values()
+
+    def _set_default_values(self):
+        # Assign values from the default array to the dictionary keys in order
+        for key, default_value in zip(self._variables_keys, self._variables_default_values):
+            self._variables_dictionary[key] = default_value
 
     def initialize_frequencies(self, freq_array):
         """
@@ -31,6 +40,7 @@ class ManualModel(QWidget):
         """
         
         self._manual_data['freq'] = freq_array
+        self._set_default_values()#not sure if I want to keep this one here
         self._run_model()
 
     def _run_model(self):
