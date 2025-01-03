@@ -83,6 +83,7 @@ class NSlidersWidget(QWidget):
         """
         return self.sliders.get(key)
 
+
     def set_default_values(self):
         """
         Sets the default values for all sliders based on the provided defaults.

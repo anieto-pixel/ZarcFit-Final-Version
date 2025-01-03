@@ -22,9 +22,11 @@ from ConfigImporter import *
 
 
 class ManualModel(QWidget):
+    
     manual_model_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
     def __init__(self, variables_keys, variables_default_values):
+        
         super().__init__()
         self._variables_dictionary = {key: 0.0 for key in variables_keys}
         self._variables_keys = variables_keys
@@ -35,46 +37,44 @@ class ManualModel(QWidget):
             'freq': np.array([1, 10, 100, 1000, 10000]),
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
+            # TEST: We'll store Z_total results here after each run:
+            'Z_total': np.zeros(5, dtype=complex)  # A placeholder
         }
 
         # Set default values
         self._set_default_values()
 
-    def _calculate_Zarc(self, frec, r, fo, p):
+    def _calculate_Zarc(self, f, r, f0, p):
+    
         """
         Calculate the real and imaginary components of impedance for a Zarc circuit.
         """
-        omega = 2 * np.pi * frec
-        omega_h = 2 * np.pi * fo
-        Q = 1 / (omega_h ** p)  # CPE scaling constant approximation
         
-        print(omega, omega_h, Q)
-
-        Z_cpe_mag = 1 / (Q * omega ** p)
-        Z_cpe_real = Z_cpe_mag * np.cos(-np.pi * p / 2)
-        Z_cpe_imag = Z_cpe_mag * np.sin(-np.pi * p / 2)
-
-        Z_real = 1 / (1 / r + 1 / Z_cpe_real)
-        Z_imag = 1 / (1 / Z_cpe_imag)
-
-        return Z_real, Z_imag
-
-    def _run_model(self):
-        pass
+        q = 1.0 / (r * (2*np.pi*f0)**p)
+        z_cpe = 1.0 / (q * ((2*np.pi*f*1j) ** p))
+        Z_r = r
         
-        """ 
+        z_total=(z_cpe*Z_r)/(z_cpe+Z_r)
+        
+        return z_total
+
+    def _run_model(self):   
+         
         zarc_h_real=[]
         zarc_h_imag=[]
-        for freq in self._manual_data['freq']:
-            z_real,z_imag = self._calculate_Zarc(freq, 
-                                 self._variables_dictionary['rh'], 
-                                 self._variables_dictionary['fh'], 
-                                 self._variables_dictionary['ph']
-                                 )
-            zarc_h_real.append(z_real)
-            zarc_h_imag.append(z_imag)
+        z_totalh_all = []  # TEST USE: store each z_total here
         
-                            
+        for freq in self._manual_data['freq']:
+            z_total = self._calculate_Zarc(freq, 
+                        self._variables_dictionary['rh'], 
+                        self._variables_dictionary['fh'], 
+                        self._variables_dictionary['ph']
+                        )
+            zarc_h_real.append(np.real(z_total))
+            zarc_h_imag.append(np.imag(z_total))
+            z_totalh_all.append(z_total) # TEST USE: store each z_total here
+        
+        """                       
         zarc_m_real=[]
         zarc_m_imag=[]
         for freq in self._manual_data['freq']:
@@ -103,14 +103,19 @@ class ManualModel(QWidget):
         self._manual_data['Z_real'] = np.array(zarc_h_real)
         self._manual_data['Z_imag'] = np.array(zarc_h_imag)
     
-    
+    """
+        self._manual_data['Z_real'] = np.array(zarc_h_real)
+        self._manual_data['Z_imag'] = np.array(zarc_h_imag)
+        self._manual_data['Z_total'] = np.array(z_totalh_all) # TEST
+        
         # Emit the updated data
         self.manual_model_updated.emit(
             self._manual_data['freq'],
             self._manual_data['Z_real'],
             self._manual_data['Z_imag'],
+            
         )
-        """
+        
         
 
     def _set_default_values(self):
@@ -148,6 +153,16 @@ class ManualModel(QWidget):
 """TEST"""
     
 if __name__ == "__main__":
+    import sys
+    import numpy as np
+    from PyQt5.QtWidgets import (
+        QApplication, QWidget, QVBoxLayout, QTableWidget,
+        QTableWidgetItem, QHBoxLayout
+    )
+    from PyQt5.QtCore import Qt
+    from ConfigImporter import ConfigImporter
+    from NSlidersWidget import NSlidersWidget
+
     app = QApplication(sys.argv)
 
     # 1. Load config
@@ -166,52 +181,85 @@ if __name__ == "__main__":
         config.slider_default_values
     )
 
-    # 4. Build a test window and layout
+    # 4. Build the main window and main layout
     test_window = QWidget()
     test_window.setWindowTitle("Test ManualModel - Side-by-side Display")
-    test_window.setGeometry(100, 100, 800, 900)
-    main_layout = QVBoxLayout(test_window)
+    test_window.setGeometry(100, 100, 1200, 600)  # Make it a bit wider
+    main_layout = QVBoxLayout(test_window)  # Vertical layout
 
-    # Add the sliders widget on top
+    # Place sliders on top
     main_layout.addWidget(sliders_widget)
 
-    # 5. Create a QTableWidget to display variable info side by side
+    # 5. Create the "Variables" table (Variable, Slider Value, Model Value)
     variables_keys = list(manual_model._variables_dictionary.keys())
-    table = QTableWidget(len(variables_keys), 3)
-    table.setHorizontalHeaderLabels(["Variable", "Slider Value", "Model Value"])
+    table_vars = QTableWidget(len(variables_keys), 3)
+    table_vars.setHorizontalHeaderLabels(["Variable", "Slider Value", "Model Value"])
 
     # Map each variable to a row index
     row_index_map = {}
     for i, key in enumerate(variables_keys):
         row_index_map[key] = i
         # Column 0: Variable name
-        table.setItem(i, 0, QTableWidgetItem(key))
-        # Pre-fill columns 1 and 2 with defaults
-        # (Slider Value, Model Value)
+        table_vars.setItem(i, 0, QTableWidgetItem(key))
+        # Columns 1 & 2: initial slider/model values
         slider_val = str(manual_model._variables_dictionary[key])
-        table.setItem(i, 1, QTableWidgetItem(slider_val))
-        table.setItem(i, 2, QTableWidgetItem(slider_val))
+        table_vars.setItem(i, 1, QTableWidgetItem(slider_val))
+        table_vars.setItem(i, 2, QTableWidgetItem(slider_val))
 
-    main_layout.addWidget(table)
+    # 6. Create the "Impedance" table (Frequency, Z_total, Z_real, Z_imag)
+    freq_array = manual_model._manual_data['freq']
+    table_imp = QTableWidget(len(freq_array), 4)
+    table_imp.setHorizontalHeaderLabels(["Frequency", "Z_total", "Z_real", "Z_imag"])
 
-    # 6. Define a slot to handle slider_value_updated from NSlidersWidget
+    # Fill initial values
+    for i, f in enumerate(freq_array):
+        table_imp.setItem(i, 0, QTableWidgetItem(str(f)))
+        table_imp.setItem(i, 1, QTableWidgetItem(str(manual_model._manual_data['Z_total'][i])))
+        table_imp.setItem(i, 2, QTableWidgetItem(str(manual_model._manual_data['Z_real'][i])))
+        table_imp.setItem(i, 3, QTableWidgetItem(str(manual_model._manual_data['Z_imag'][i])))
+
+    # 7. Create a sub-layout to hold the two tables side by side
+    tables_layout = QHBoxLayout()
+    tables_layout.addWidget(table_vars)
+    tables_layout.addWidget(table_imp)
+
+    # Add the sub-layout to the main layout
+    main_layout.addLayout(tables_layout)
+
+    # 8. A helper to refresh the impedance table after each slider move
+    def update_impedance_table():
+        freqs = manual_model._manual_data['freq']
+        z_totals = manual_model._manual_data['Z_total']
+        z_reals = manual_model._manual_data['Z_real']
+        z_imags = manual_model._manual_data['Z_imag']
+
+        for i in range(len(freqs)):
+            table_imp.setItem(i, 0, QTableWidgetItem(str(freqs[i])))
+            table_imp.setItem(i, 1, QTableWidgetItem(str(z_totals[i])))
+            table_imp.setItem(i, 2, QTableWidgetItem(str(z_reals[i])))
+            table_imp.setItem(i, 3, QTableWidgetItem(str(z_imags[i])))
+
+    # 9. Slot to handle slider_value_updated from NSlidersWidget
     def on_slider_value_updated(key, new_value):
         """
         Updates the ManualModel with the new slider value, then
-        displays both the slider value and model value in the table.
+        displays both the slider value and model value in the variables table,
+        and refreshes the impedance table.
         """
         manual_model.update_variable(key, new_value)
-        row = row_index_map[key]
-        # Update 'Slider Value' column
-        table.setItem(row, 1, QTableWidgetItem(str(new_value)))
-        # Update 'Model Value' column (from the model)
-        model_val = str(manual_model._variables_dictionary[key])
-        table.setItem(row, 2, QTableWidgetItem(model_val))
 
-    # 7. Connect NSlidersWidget signal to the slot
-    #    Note that NSlidersWidget has slider_value_updated, not slider_value_changed
+        # Update the 'Variables' table
+        row = row_index_map[key]
+        table_vars.setItem(row, 1, QTableWidgetItem(str(new_value)))
+        model_val = str(manual_model._variables_dictionary[key])
+        table_vars.setItem(row, 2, QTableWidgetItem(model_val))
+
+        # Update the impedance table with new results
+        update_impedance_table()
+
+    # 10. Connect NSlidersWidget signal to the slot
     sliders_widget.slider_value_updated.connect(on_slider_value_updated)
 
-    # 8. Show the test window
+    # 11. Show the test window
     test_window.show()
     sys.exit(app.exec_())
