@@ -20,166 +20,194 @@ from SubclassesSliderWithTicks import *
 from ConfigImporter import *
 
 
-
 class ManualModel(QWidget):
-    
+    """
+    A model class for computing combined impedance data from:
+      - Resistor + Inductor in series (R_inf, L_inf).
+      - Three Zarc circuits (H, M, L).
+      - An optional 'modified Zarc' (E) circuit.
+
+    The results (Z_real, Z_imag) are emitted via the signal `manual_model_updated`.
+    """
+
     manual_model_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
     def __init__(self, variables_keys, variables_default_values):
-        
+        """
+        Parameters
+        ----------
+        variables_keys : list of str
+            A list of keys, e.g. ['rinf', 'linf', 'rh', 'fh', 'ph', ...]
+
+        variables_default_values : list of float
+            The default values for each key, in the same order.
+        """
         super().__init__()
-        self._variables_dictionary = {key: 0.0 for key in variables_keys}
+        
+        # Store the variable names and defaults
         self._variables_keys = variables_keys
         self._variables_default_values = variables_default_values
         
-        #MM I will implement the "tail titl" when I figur eout what it is
+        # Dictionary storing all slider/settable variable values
+        self._variables_dictionary = {
+            key: 0.0 for key in variables_keys
+        }
 
-        # Default frequency data
+        # Default frequency data & placeholders for computed impedances
         self._manual_data = {
             'freq': np.array([1, 10, 100, 1000, 10000]),
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
-            # TEST: We'll store Z_total results here after each run:
-            'Z_total': np.zeros(5, dtype=complex)  # A placeholder
+            'Z_total': np.zeros(5, dtype=complex),  # example placeholder
         }
 
-        # Set default values
         self._set_default_values()
 
-    def _zarc(self, freq, r_val, f_val, pi_val, pf_val):
-    
+    # -----------------------------------------------------------------------
+    #  Private Helper Methods
+    # -----------------------------------------------------------------------
+    def _compute_inductor_and_resistor(self, freq_array, r_key='rinf', l_key='linf'):
         """
-        Calculate the real and imaginary components of impedance for a Zarc circuit.
+        Returns two NumPy arrays (real, imag) for the resistor (r_key) 
+        and inductor (l_key) in series: Z = R + j(2πfL).
         """
-        
-        q = 1.0 / (r_val * (2*np.pi*f_val)**pf_val)
-        
-        phas=(1j)**pi_val
-        pw=(2*np.pi*freq)**pf_val
-        z_cpe = 1.0 / (q * phas * pw)
-        
-        Z_r = r_val
-        
-        z_total=(z_cpe*Z_r)/(z_cpe+Z_r)
-        
-        return z_total
-    
-    def _compute_zarc_for_range(self, r_key, f_key, pi_key, pf_key):
+        r_val = self._variables_dictionary[r_key]
+        l_val = self._variables_dictionary[l_key]
+
+        # Z = R + jωL for each frequency
+        # => real part = R, imag part = ωL
+        # freq_array is length N, so we build length N arrays:
+        omega = 2 * np.pi * freq_array
+        z_complex = r_val + (1j * omega * l_val)
+
+        return np.real(z_complex), np.imag(z_complex)
+
+    def _zarc_impedance(self, freq, r_val, f_val, pi_val, pf_val):
         """
-        Helper method that:
-          1) Loops over self._manual_data['freq']
-          2) Calls _calculate_Zarc(freq, R, F, P)
-          3) Returns three lists: [Re(Z)], [Im(Z)], [Z_total]
+        Compute the impedance of a single Zarc circuit at one frequency.
+        Zarc is (Z_r * Z_cpe) / (Z_r + Z_cpe).
+
+        freq    : float
+            A single frequency point.
+        r_val   : float
+            R in ohms.
+        f_val   : float
+            The characteristic frequency (f0).
+        pi_val  : float
+            The exponent for the imaginary base (1j)^pi_val.
+        pf_val  : float
+            The exponent for the angular frequency term (ω^pf_val).
         """
-        zarc_real = []
-        zarc_imag = []
-    
+        # Q = 1 / ( R * (2πf0)^pf_val ) for example
+        q_val = 1.0 / (r_val * (2.0 * np.pi * f_val)**pf_val)
+
+        phase_factor = (1j)**pi_val  # e.g. (j)^0.8
+        omega_exp = (2.0 * np.pi * freq)**pf_val
+
+        z_cpe = 1.0 / (q_val * phase_factor * omega_exp)  # 1 / (Q * j^p * ω^p)
+        z_r = r_val
+
+        return (z_cpe * z_r) / (z_cpe + z_r)
+
+    def _compute_zarc_impedance_for_range(self, r_key, f_key, pi_key, pf_key):
+        """
+        Loops over self._manual_data['freq'] to compute the real & imaginary 
+        parts of a Zarc for each frequency. Returns two arrays: (real, imag).
+        """
+        freq_array = self._manual_data['freq']
+        
         r_val = self._variables_dictionary[r_key]
         f_val = self._variables_dictionary[f_key]
         pi_val = self._variables_dictionary[pi_key]
         pf_val = self._variables_dictionary[pf_key]
-    
-        for freq in self._manual_data['freq']:
-            z_total = self._zarc(freq, r_val, f_val, pi_val, pf_val)
-            zarc_real.append(np.real(z_total))
-            zarc_imag.append(np.imag(z_total))
-    
-        return np.array(zarc_real), np.array(zarc_imag)
-    
 
-    def _run_model(self):
-        """
-        Compute the impedance for H, M, and L Zarc circuits, then
-        combine them as needed into self._manual_data.
-        """
-        
-        #1. Compute inductor inf and resistor inf combined value
-        #MM UGLY, need to consider efactoring
-        r_inf=self._variables_dictionary['rinf']
-        inductance=self._variables_dictionary['linf']
-        
-        r_i_real=[]
-        r_i_imag=[]
-        
-        for freq in self._manual_data['freq']:
-            z_total = (r_inf + inductance*2*np.pi*freq*1j)
-            r_i_real.append(np.real(z_total))
-            r_i_imag.append(np.imag(z_total))
-        r_i_real=np.array(r_i_real)
-        r_i_imag=np.array(r_i_imag)
-        
-        
-        # 2. Compute Zarc H
-        zarc_h_real, zarc_h_imag = self._compute_zarc_for_range(
-            r_key='rh',
-            f_key='fh',
-            pi_key='ph',
-            pf_key='ph'
-        )
-    
-        # 3. Compute Zarc M
-        zarc_m_real, zarc_m_imag = self._compute_zarc_for_range(
-            r_key='rm',
-            f_key='fm',
-            pi_key='pm',
-            pf_key='pm'
-        )
-    
-        # 4. Compute Zarc L
-        zarc_l_real, zarc_l_imag = self._compute_zarc_for_range(
-            r_key='rl',
-            f_key='fl',
-            pi_key='pl',
-            pf_key='pl'
-        )
+        real_parts = []
+        imag_parts = []
 
-        
-        # 5. Compute Modified Zarc 
-        zarc_e_real, zarc_e_imag = self._compute_zarc_for_range(
-            r_key='re',
-            f_key='qe',
-            pf_key='pe_f',
-            pi_key='pe_i'
-        )
-    
-        # Combine the individual Zarc results
-        # If you need them combined in a single series, do something like:
-        self._manual_data['Z_real'] = np.array(r_i_real + zarc_h_real + zarc_m_real + zarc_l_real)
-        self._manual_data['Z_imag'] = np.array(r_i_imag + zarc_h_imag + zarc_m_imag + zarc_l_imag)
-    
-        # Emit the updated data
-        self.manual_model_updated.emit(
-            self._manual_data['freq'],
-            self._manual_data['Z_real'],
-            self._manual_data['Z_imag'],
-        )
+        for freq in freq_array:
+            z_total = self._zarc_impedance(freq, r_val, f_val, pi_val, pf_val)
+            real_parts.append(z_total.real)
+            imag_parts.append(z_total.imag)
 
+        return np.array(real_parts), np.array(imag_parts)
 
     def _set_default_values(self):
-        """
-        Sets the variables to the default values.
-        """
-        for key, default_value in zip(self._variables_keys, self._variables_default_values):
-            self._variables_dictionary[key] = default_value
+        """Sets the variables to their default values, then runs the model once."""
+        for key, default_val in zip(self._variables_keys, self._variables_default_values):
+            self._variables_dictionary[key] = default_val
 
+    # -----------------------------------------------------------------------
+    #  Main Calculation Routine
+    # -----------------------------------------------------------------------
+    def _run_model(self):
+        """
+        Compute the total impedance as a sum of:
+          1. R_inf + L_inf in series,
+          2. Zarc H,
+          3. Zarc M,
+          4. Zarc L,
+          5. Zarc E (modified Zarc, optional).
+        Then update self._manual_data['Z_real'] and ['Z_imag'].
+        """
+        freq_array = self._manual_data['freq']
+
+        # 1) Compute resistor + inductor (in series)
+        r_i_real, r_i_imag = self._compute_inductor_and_resistor(freq_array, 'rinf', 'linf')
+
+        # 2) Zarc H
+        zarc_h_real, zarc_h_imag = self._compute_zarc_impedance_for_range('rh', 'fh', 'ph', 'ph')
+
+        # 3) Zarc M
+        zarc_m_real, zarc_m_imag = self._compute_zarc_impedance_for_range('rm', 'fm', 'pm', 'pm')
+
+        # 4) Zarc L
+        zarc_l_real, zarc_l_imag = self._compute_zarc_impedance_for_range('rl', 'fl', 'pl', 'pl')
+
+        # 5) Zarc E (modified) 
+        #    if you want it actually combined, you'd do the same approach below:
+        zarc_e_real, zarc_e_imag = self._compute_zarc_impedance_for_range('re', 'qe', 'pe_i', 'pe_f')
+
+        # Combine them. Example: element-wise sum of real parts & sum of imaginary parts
+        # (Adjust if your actual circuit is not purely series addition.)
+        total_real = r_i_real + zarc_h_real + zarc_m_real + zarc_l_real
+        total_imag = r_i_imag + zarc_h_imag + zarc_m_imag + zarc_l_imag
+
+        # If you also want to include zarc E in that final sum:
+        #   total_real += zarc_e_real
+        #   total_imag += zarc_e_imag
+
+        # Store final arrays in the data dictionary
+        self._manual_data['Z_real'] = total_real
+        self._manual_data['Z_imag'] = total_imag
+
+        # (Optionally update self._manual_data['Z_total'] if needed)
+        self._manual_data['Z_total'] = total_real + 1j * total_imag
+
+        # Emit the updated data
+        self.manual_model_updated.emit(freq_array, total_real, total_imag)
+
+    # -----------------------------------------------------------------------
+    #  Public Interface
+    # -----------------------------------------------------------------------
     def initialize_frequencies(self, freq_array):
         """
-        Initializes the frequency array and re-runs the model calculations.
+        Allows the user to change the base frequency array (self._manual_data['freq']) 
+        and re-run the model from scratch. Also resets defaults if desired.
         """
         self._manual_data['freq'] = freq_array
-        self._set_default_values()  # Optionally reset variables to defaults
+        self._set_default_values()
         self._run_model()
 
     def update_variable(self, key, new_value):
         """
-        Updates a variable in the dictionary and re-runs the model.
+        Update a single variable in the model (e.g., 'rh', 'fh', etc.)
+        and re-run the calculation, triggering an update signal.
         """
-        if key in self._variables_dictionary:
-            self._variables_dictionary[key] = new_value
-            self._run_model()
-        else:
+        if key not in self._variables_dictionary:
             raise KeyError(f"Variable '{key}' not found in the model.")
-           
+
+        self._variables_dictionary[key] = new_value
+        self._run_model()
     #MM future tail moving thing
     """
     def set_flag_pe_f(turth_value):
