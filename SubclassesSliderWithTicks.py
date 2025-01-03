@@ -128,20 +128,18 @@ class DoubleSliderWithTicks(SliderWithTicks):
     
     valueChanged = pyqtSignal(float)  # Override the parent class signal with a float signal
     
-    def __init__(self,min_value, max_value, colour):
-        
+    def __init__(self, min_value, max_value, colour):
         self._scale_factor = 1000  # Scale factor for converting doubles to integers
 
         super().__init__(min_value, max_value, colour)
         
-        # Connect the original slider signal to a custom slot
+        # Connect the original slider signal to the overridden signal
         self._slider.valueChanged.connect(self._emit_corrected_value)
             
     def _setup_slider(self, colour):
         """
         Configure the slider's properties.
         """
-        
         int_min = int(self._min_value * self._scale_factor)
         int_max = int(self._max_value * self._scale_factor)
         
@@ -161,30 +159,29 @@ class DoubleSliderWithTicks(SliderWithTicks):
                 border-radius: 5px;
             }}
         """)
-
         self.setMinimumWidth(75)
     
     def _update_label(self):
-         """
-         Update the label when the slider value changes.
-         """
-         self._value_label.setText(f"{self.get_value():.3f}")
+        """
+        Update the label when the slider value changes.
+        """
+        self._value_label.setText(f"{self.get_value():.3f}")
     
     def _string_by_tick(self, i):
-            return str(i/self._scale_factor)
+        return str(i / self._scale_factor)
     
     def get_value(self):
         """
         Returns the current value of the slider.
-        USE THIS METHOD. dO NOT ACCES SLIDER DIRECTLY
         """
+        # Centralized calculation for the corrected value
         return self._slider.value() / self._scale_factor
     
     def set_value(self, value):
         """
         Sets the slider to a given value.
         """
-        value=int(value*self._scale_factor)
+        value = int(value * self._scale_factor)
         self._slider.setValue(value)
         
     def value_changed(self):
@@ -197,8 +194,9 @@ class DoubleSliderWithTicks(SliderWithTicks):
         """
         Emits the corrected value through the overridden valueChanged signal.
         """
-        corrected_value = raw_value / self._scale_factor
-        self.valueChanged.emit(corrected_value)
+        # Use get_value() to fetch the corrected value
+        self.valueChanged.emit(self.get_value())
+
         
     
 """
@@ -218,13 +216,6 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
     def _string_by_tick(self, i):
         return f"1E{int(i/self._scale_factor)}"
     
-    def _emit_corrected_value(self, raw_value):
-        """
-        Emits the corrected value through the overridden valueChanged signal.
-        """
-        n= raw_value / self._scale_factor
-        corrected_value=self._base_power**n
-        self.valueChanged.emit(corrected_value)
         
     def get_value(self):
         n=self._slider.value()/self._scale_factor
