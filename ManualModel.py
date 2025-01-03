@@ -31,6 +31,8 @@ class ManualModel(QWidget):
         self._variables_dictionary = {key: 0.0 for key in variables_keys}
         self._variables_keys = variables_keys
         self._variables_default_values = variables_default_values
+        
+        #MM I will implement the "tail titl" when I figur eout what it is
 
         # Default frequency data
         self._manual_data = {
@@ -44,88 +46,114 @@ class ManualModel(QWidget):
         # Set default values
         self._set_default_values()
 
-    def _calculate_Zarc(self, f, r, f0, p):
+    def _zarc(self, freq, r_val, f_val, pi_val, pf_val):
     
         """
         Calculate the real and imaginary components of impedance for a Zarc circuit.
         """
         
-        q = 1.0 / (r * (2*np.pi*f0)**p)
-        z_cpe = 1.0 / (q * ((2*np.pi*f*1j) ** p))
-        Z_r = r
+        q = 1.0 / (r_val * (2*np.pi*f_val)**pf_val)
+        
+        phas=(1j)**pi_val
+        pw=(2*np.pi*freq)**pf_val
+        z_cpe = 1.0 / (q * phas * pw)
+        
+        Z_r = r_val
         
         z_total=(z_cpe*Z_r)/(z_cpe+Z_r)
         
         return z_total
+    
+    def _compute_zarc_for_range(self, r_key, f_key, pi_key, pf_key):
+        """
+        Helper method that:
+          1) Loops over self._manual_data['freq']
+          2) Calls _calculate_Zarc(freq, R, F, P)
+          3) Returns three lists: [Re(Z)], [Im(Z)], [Z_total]
+        """
+        zarc_real = []
+        zarc_imag = []
+    
+        r_val = self._variables_dictionary[r_key]
+        f_val = self._variables_dictionary[f_key]
+        pi_val = self._variables_dictionary[pi_key]
+        pf_val = self._variables_dictionary[pf_key]
+    
+        for freq in self._manual_data['freq']:
+            z_total = self._zarc(freq, r_val, f_val, pi_val, pf_val)
+            zarc_real.append(np.real(z_total))
+            zarc_imag.append(np.imag(z_total))
+    
+        return np.array(zarc_real), np.array(zarc_imag)
+    
 
-    def _run_model(self):   
-         
-        zarc_h_real=[]
-        zarc_h_imag=[]
-        z_totalh_all = []  # TEST USE: store each z_total here
+    def _run_model(self):
+        """
+        Compute the impedance for H, M, and L Zarc circuits, then
+        combine them as needed into self._manual_data.
+        """
+        
+        #1. Compute inductor inf and resistor inf combined value
+        #MM UGLY, need to consider efactoring
+        r_inf=self._variables_dictionary['rinf']
+        inductance=self._variables_dictionary['linf']
+        
+        r_i_real=[]
+        r_i_imag=[]
         
         for freq in self._manual_data['freq']:
-            z_total = self._calculate_Zarc(freq, 
-                        self._variables_dictionary['rh'], 
-                        self._variables_dictionary['fh'], 
-                        self._variables_dictionary['ph']
-                        )
-            zarc_h_real.append(np.real(z_total))
-            zarc_h_imag.append(np.imag(z_total))
-            z_totalh_all.append(z_total) # TEST USE: store each z_total here
+            z_total = (r_inf + inductance*2*np.pi*freq*1j)
+            r_i_real.append(np.real(z_total))
+            r_i_imag.append(np.imag(z_total))
+        r_i_real=np.array(r_i_real)
+        r_i_imag=np.array(r_i_imag)
         
-                               
-        zarc_m_real=[]
-        zarc_m_imag=[]
-        z_totalm_all = []  # TEST USE: store each z_total here
         
-        for freq in self._manual_data['freq']:
-            z_total = self._calculate_Zarc(freq, 
-                        self._variables_dictionary['rh'], 
-                        self._variables_dictionary['fh'], 
-                        self._variables_dictionary['ph']
-                        )
-            zarc_m_real.append(np.real(z_total))
-            zarc_m_imag.append(np.imag(z_total))
-            z_totalm_all.append(z_total) # TEST USE: store each z_total here
- 
-            
-        zarc_l_real=[]
-        zarc_l_imag=[]
-        z_totall_all = []  # TEST USE: store each z_total here
-        
-        for freq in self._manual_data['freq']:
-            z_total = self._calculate_Zarc(freq, 
-                        self._variables_dictionary['rh'], 
-                        self._variables_dictionary['fh'], 
-                        self._variables_dictionary['ph']
-                        )
-            zarc_l_real.append(np.real(z_total))
-            zarc_l_imag.append(np.imag(z_total))
-            z_totall_all.append(z_total) # TEST USE: store each z_total here
- 
+        # 2. Compute Zarc H
+        zarc_h_real, zarc_h_imag = self._compute_zarc_for_range(
+            r_key='rh',
+            f_key='fh',
+            pi_key='ph',
+            pf_key='ph'
+        )
     
- 
-        self._manual_data['Z_real'] = zarc_h_real+zarc_m_real+zarc_l_real
-        self._manual_data['Z_imag'] = zarc_h_imag+zarc_m_imag+zarc_l_imag
-      
-        self._manual_data['Z_real'] = np.array(zarc_h_real)
-        self._manual_data['Z_imag'] = np.array(zarc_h_imag)
+        # 3. Compute Zarc M
+        zarc_m_real, zarc_m_imag = self._compute_zarc_for_range(
+            r_key='rm',
+            f_key='fm',
+            pi_key='pm',
+            pf_key='pm'
+        )
     
- 
-        self._manual_data['Z_real'] = np.array(zarc_h_real)
-        self._manual_data['Z_imag'] = np.array(zarc_h_imag)
-        self._manual_data['Z_total'] = np.array(z_totalh_all) # TEST
+        # 4. Compute Zarc L
+        zarc_l_real, zarc_l_imag = self._compute_zarc_for_range(
+            r_key='rl',
+            f_key='fl',
+            pi_key='pl',
+            pf_key='pl'
+        )
+
         
+        # 5. Compute Modified Zarc 
+        zarc_e_real, zarc_e_imag = self._compute_zarc_for_range(
+            r_key='re',
+            f_key='qe',
+            pf_key='pe_f',
+            pi_key='pe_i'
+        )
+    
+        # Combine the individual Zarc results
+        # If you need them combined in a single series, do something like:
+        self._manual_data['Z_real'] = np.array(r_i_real + zarc_h_real + zarc_m_real + zarc_l_real)
+        self._manual_data['Z_imag'] = np.array(r_i_imag + zarc_h_imag + zarc_m_imag + zarc_l_imag)
+    
         # Emit the updated data
         self.manual_model_updated.emit(
             self._manual_data['freq'],
             self._manual_data['Z_real'],
             self._manual_data['Z_imag'],
-            
         )
-        
-        
+
 
     def _set_default_values(self):
         """
@@ -151,10 +179,17 @@ class ManualModel(QWidget):
             self._run_model()
         else:
             raise KeyError(f"Variable '{key}' not found in the model.")
+           
+    #MM future tail moving thing
+    """
+    def set_flag_pe_f(turth_value):
+        previos_value=self._flag_pe_f
+        
+        if(turth_value==False):self._flag_pe_f=False
+        if(turth_value==True):self._flag_pe_f=True
+        if(previos_value!= self._flag_pe_f):self._run_model()
+    """
             
-        #test method
-        def print_manual_value(self):
-            print(self._manual_data)
 
 
 #################################################################################################################################              
@@ -215,18 +250,17 @@ if __name__ == "__main__":
         table_vars.setItem(i, 1, QTableWidgetItem(slider_val))
         table_vars.setItem(i, 2, QTableWidgetItem(slider_val))
 
-    # 6. Create the "Impedance" table (Frequency, Z_total, Z_real, Z_imag)
+    # 6. Create an Impedance table with 3 columns: Frequency, Z_real, Z_imag
     freq_array = manual_model._manual_data['freq']
-    table_imp = QTableWidget(len(freq_array), 4)
-    table_imp.setHorizontalHeaderLabels(["Frequency", "Z_total", "Z_real", "Z_imag"])
-
+    table_imp = QTableWidget(len(freq_array), 3)
+    table_imp.setHorizontalHeaderLabels(["Frequency", "Z_real", "Z_imag"])
+    
     # Fill initial values
     for i, f in enumerate(freq_array):
         table_imp.setItem(i, 0, QTableWidgetItem(str(f)))
-        table_imp.setItem(i, 1, QTableWidgetItem(str(manual_model._manual_data['Z_total'][i])))
-        table_imp.setItem(i, 2, QTableWidgetItem(str(manual_model._manual_data['Z_real'][i])))
-        table_imp.setItem(i, 3, QTableWidgetItem(str(manual_model._manual_data['Z_imag'][i])))
-
+        table_imp.setItem(i, 1, QTableWidgetItem(str(manual_model._manual_data['Z_real'][i])))
+        table_imp.setItem(i, 2, QTableWidgetItem(str(manual_model._manual_data['Z_imag'][i])))
+    
     # 7. Create a sub-layout to hold the two tables side by side
     tables_layout = QHBoxLayout()
     tables_layout.addWidget(table_vars)
@@ -238,15 +272,13 @@ if __name__ == "__main__":
     # 8. A helper to refresh the impedance table after each slider move
     def update_impedance_table():
         freqs = manual_model._manual_data['freq']
-        z_totals = manual_model._manual_data['Z_total']
         z_reals = manual_model._manual_data['Z_real']
         z_imags = manual_model._manual_data['Z_imag']
-
+    
         for i in range(len(freqs)):
             table_imp.setItem(i, 0, QTableWidgetItem(str(freqs[i])))
-            table_imp.setItem(i, 1, QTableWidgetItem(str(z_totals[i])))
-            table_imp.setItem(i, 2, QTableWidgetItem(str(z_reals[i])))
-            table_imp.setItem(i, 3, QTableWidgetItem(str(z_imags[i])))
+            table_imp.setItem(i, 1, QTableWidgetItem(str(z_reals[i])))
+            table_imp.setItem(i, 2, QTableWidgetItem(str(z_imags[i])))
 
     # 9. Slot to handle slider_value_updated from NSlidersWidget
     def on_slider_value_updated(key, new_value):
