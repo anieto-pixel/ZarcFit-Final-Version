@@ -9,7 +9,7 @@ import sys
 from PyQt5.QtWidgets import *
 
 #my own classes
-from SliderWithTicks import SliderWithTicks
+from SubclassesSliderWithTicks import *
 from OutputFileWidget import OutputFileWidget
 
 class ButtonsWidgetRow(QWidget):

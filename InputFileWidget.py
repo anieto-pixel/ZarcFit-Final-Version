@@ -11,6 +11,7 @@ import pandas as pd
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout
 from PyQt5.QtCore import pyqtSignal, Qt
 
+from ConfigImporter import *
 import configparser
 
 
@@ -29,15 +30,14 @@ class InputFileWidget(QWidget):
         super().__init__()
 
         # Read configuration from the provided config file
-        self.config = configparser.ConfigParser()
-        self.config.read(config_file)
+        self.config = ConfigImporter(config_file)
 
-        self.supported_file_extension = self.config.get("InputFileWidget", "SUPPORTED_FILE_EXTENSION")
-        self.skip_rows = self.config.getint("InputFileWidget", "SKIP_ROWS")
-        self.freq_column = self.config.getint("InputFileWidget", "FREQ_COLUMN")
-        self.z_real_column = self.config.getint("InputFileWidget", "Z_REAL_COLUMN")
-        self.z_imag_column = self.config.getint("InputFileWidget", "Z_IMAG_COLUMN")
-
+        self.supported_file_extension = self.config.input_file_widget_config.get('supported_file_extension')
+        self.skip_rows = int(self.config.input_file_widget_config.get('skip_rows'))
+        self.freq_column = int(self.config.input_file_widget_config.get('freq_column'))
+        self.z_real_column = int(self.config.input_file_widget_config.get('z_real_column'))
+        self.z_imag_column = int(self.config.input_file_widget_config.get('z_imag_column'))
+        
         # Private attributes
         self._folder_path = None
         self._files = []
@@ -123,6 +123,7 @@ class InputFileWidget(QWidget):
         except Exception as e:
             print(f"Error reading file: {e}")
             self.file_contents_updated.emit(np.array([]), np.array([]), np.array([]))
+   
     """PUBLIC METHODS."""
 
     def get_folder_path(self):
@@ -144,8 +145,68 @@ class InputFileWidget(QWidget):
             return self._files[self._current_index]
         return None
 
+###################################################################################################
+
+"""TEST"""
+
+def test_input_file_widget():
+    # Define the path to the configuration file (adjust as necessary)
+    config_file = "test_config.ini"
+    
+    # Create a sample configuration file for testing (adjust as needed)
+    with open(config_file, "w") as file:
+        file.write("""
+[SliderConfigurations]
+slider1 = EPowerSliderWithTicks,0.0,100.0,red
+slider2 = DoubleSliderWithTicks,10.0,200.0,blue
+
+[SliderDefaultValues]
+defaults = 50.0,20.0
+
+[InputFileWidget]
+SUPPORTED_FILE_EXTENSION = .z
+SKIP_ROWS = 128
+FREQ_COLUMN = 0
+Z_REAL_COLUMN = 4
+Z_IMAG_COLUMN = 5
+        """)
+
+    try:
+        # Initialize the QApplication
+        app = QApplication([])
+
+        # Initialize the InputFileWidget with the test config
+        widget = InputFileWidget(config_file)
+
+        # Test the configuration values from the ConfigImporter
+        assert widget.supported_file_extension == ".z", "Test failed: SUPPORTED_FILE_EXTENSION mismatch."
+        assert widget.skip_rows == 128, "Test failed: SKIP_ROWS mismatch."
+        assert widget.freq_column == 0, "Test failed: FREQ_COLUMN mismatch."
+        assert widget.z_real_column == 4, "Test failed: Z_REAL_COLUMN mismatch."
+        assert widget.z_imag_column == 5, "Test failed: Z_IMAG_COLUMN mismatch."
+
+        print("Configuration values correctly loaded!")
+
+        # Initialize the widget UI and run the app
+        widget.show()
+        app.exec_()
+
+        # Indicate the test passed
+        print("\nTest passed: InputFileWidget loaded the configuration correctly.")
+
+    except Exception as e:
+        # Print the error if something goes wrong
+        print(f"Test failed: {e}")
+
+    finally:
+        # Clean up by removing the test configuration file
+        if os.path.exists(config_file):
+            os.remove(config_file)
+
 
 if __name__ == "__main__":
+    test_input_file_widget()
+    
     app = QApplication([])
 
     widget = InputFileWidget("config.ini")

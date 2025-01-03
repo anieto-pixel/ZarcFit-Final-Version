@@ -28,6 +28,10 @@ class SliderWithTicks(QWidget):
         #Setup widget's layout
         self._setup_layout()
         
+    """
+    PRIVATE METHODS
+    """
+        
     def _setup_layout(self):
         """
         Configure the layout and add widgets.
@@ -70,25 +74,16 @@ class SliderWithTicks(QWidget):
         self._value_label.setText(f"Slider: {self.get_value()}")
         #Convinient but causes dependency issues between methods
         #reconsider later
-
-    def get_value(self):
-        """
-        Returns the current value of the slider.
-        """
-        return self._slider.value()
     
-    def set_value(self, value):
+    def _string_by_tick(self, i):
         """
-        Sets the slider to a given value.
+        returns the string e want to print near te ticks at the paint event
         """
-        self._slider.setValue(value)
-
-    def value_changed(self):
-        """
-        Exposes the slider's valueChanged signal for external use.
-        """
-        return self._slider.valueChanged
-
+        return str(i)
+    
+    """
+    EVENTS
+    """
     def paintEvent(self, event):
         """
         Custom painting for drawing tick labels.
@@ -116,9 +111,29 @@ class SliderWithTicks(QWidget):
             )
             text_rect = QRect(30, tick_pos, 50, 20)
             painter.drawText(text_rect, Qt.AlignCenter, self._string_by_tick(i))
-            
-    def _string_by_tick(self, i):
-        return str(i)
+        
+    """
+    PUBLIC METHODS
+    """
+
+    def get_value(self):
+        """
+        Returns the current value of the slider.
+        """
+        return self._slider.value()
+    
+    def set_value(self, value):
+        """
+        Sets the slider to a given value.
+        """
+        self._slider.setValue(value)
+
+    def value_changed(self):
+        """
+        Exposes the slider's valueChanged signal for external use.
+        """
+        return self._slider.valueChanged
+
         
 
 """
@@ -135,6 +150,10 @@ class DoubleSliderWithTicks(SliderWithTicks):
         
         # Connect the original slider signal to the overridden signal
         self._slider.valueChanged.connect(self._emit_corrected_value)
+        
+    """
+    PRIVATE METHODS
+    """
             
     def _setup_slider(self, colour):
         """
@@ -166,9 +185,21 @@ class DoubleSliderWithTicks(SliderWithTicks):
         Update the label when the slider value changes.
         """
         self._value_label.setText(f"{self.get_value():.3f}")
+        
+    def _emit_corrected_value(self, raw_value):
+        """
+        Emits the corrected value through the overridden valueChanged signal.
+        """
+        # Use get_value() to fetch the corrected value
+        self.valueChanged.emit(self.get_value())
+
     
     def _string_by_tick(self, i):
         return str(i / self._scale_factor)
+    
+    """
+    PUBLIC METHODS
+    """
     
     def get_value(self):
         """
@@ -190,13 +221,6 @@ class DoubleSliderWithTicks(SliderWithTicks):
         """
         return self.valueChanged
     
-    def _emit_corrected_value(self, raw_value):
-        """
-        Emits the corrected value through the overridden valueChanged signal.
-        """
-        # Use get_value() to fetch the corrected value
-        self.valueChanged.emit(self.get_value())
-
         
     
 """
@@ -209,14 +233,20 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         self._base_power = 10  # base power to use
         super().__init__(min_value, max_value, colour)
         
+    """
+    PRIVATE METHODS
+    """
+        
     def _update_label(self):
         self._value_label.setText(f"{self.get_value():.1e}")
         #return f"{self.get_value():.3e}"  
                 
     def _string_by_tick(self, i):
         return f"1E{int(i/self._scale_factor)}"
-    
-        
+
+    """
+    PUBLIC METHODS
+    """
     def get_value(self):
         n=self._slider.value()/self._scale_factor
         return self._base_power**n
