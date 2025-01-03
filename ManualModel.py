@@ -74,36 +74,45 @@ class ManualModel(QWidget):
             zarc_h_imag.append(np.imag(z_total))
             z_totalh_all.append(z_total) # TEST USE: store each z_total here
         
-        """                       
+                               
         zarc_m_real=[]
         zarc_m_imag=[]
+        z_totalm_all = []  # TEST USE: store each z_total here
+        
         for freq in self._manual_data['freq']:
-            z_real,z_imag = self._calculate_Zarc(freq, 
-                                 self._variables_dictionary['rm'], 
-                                 self._variables_dictionary['fm'], 
-                                 self._variables_dictionary['pm']
-                                 )
-            zarc_m_real.append(z_real)
-            zarc_m_imag.append(z_imag)
+            z_total = self._calculate_Zarc(freq, 
+                        self._variables_dictionary['rh'], 
+                        self._variables_dictionary['fh'], 
+                        self._variables_dictionary['ph']
+                        )
+            zarc_m_real.append(np.real(z_total))
+            zarc_m_imag.append(np.imag(z_total))
+            z_totalm_all.append(z_total) # TEST USE: store each z_total here
+ 
             
         zarc_l_real=[]
         zarc_l_imag=[]
+        z_totall_all = []  # TEST USE: store each z_total here
+        
         for freq in self._manual_data['freq']:
-            z_real,z_imag = self._calculate_Zarc(freq, 
-                                 self._variables_dictionary['rl'], 
-                                 self._variables_dictionary['fl'], 
-                                 self._variables_dictionary['pl']
-                                 )
-            zarc_l_real.append(z_real)
-            zarc_l_imag.append(z_imag)
+            z_total = self._calculate_Zarc(freq, 
+                        self._variables_dictionary['rh'], 
+                        self._variables_dictionary['fh'], 
+                        self._variables_dictionary['ph']
+                        )
+            zarc_l_real.append(np.real(z_total))
+            zarc_l_imag.append(np.imag(z_total))
+            z_totall_all.append(z_total) # TEST USE: store each z_total here
+ 
     
+ 
         self._manual_data['Z_real'] = zarc_h_real+zarc_m_real+zarc_l_real
         self._manual_data['Z_imag'] = zarc_h_imag+zarc_m_imag+zarc_l_imag
       
         self._manual_data['Z_real'] = np.array(zarc_h_real)
         self._manual_data['Z_imag'] = np.array(zarc_h_imag)
     
-    """
+ 
         self._manual_data['Z_real'] = np.array(zarc_h_real)
         self._manual_data['Z_imag'] = np.array(zarc_h_imag)
         self._manual_data['Z_total'] = np.array(z_totalh_all) # TEST
