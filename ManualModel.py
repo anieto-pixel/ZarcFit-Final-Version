@@ -36,9 +36,15 @@ class ManualModel(QWidget):
         """
         Calculate the real and imaginary components of impedance for a Zarc circuit.
         """
+        print('hi')
+        print(frec, r, fo, p)
+        
+        
         omega = 2 * np.pi * frec
         omega_h = 2 * np.pi * fo
         Q = 1 / (omega_h ** p)  # CPE scaling constant approximation
+        
+        print(omega, omega_h, Q)
 
         Z_cpe_mag = 1 / (Q * omega ** p)
         Z_cpe_real = Z_cpe_mag * np.cos(-np.pi * p / 2)
@@ -50,46 +56,56 @@ class ManualModel(QWidget):
         return Z_real, Z_imag
 
     def _run_model(self):
-        """
-        Updates Z_real and Z_imag based on the current frequencies
-        and the sum of the variable dictionary values.
-        """
         
-        ##MM
-        ##I don't like this logic for the upcoming 2 zark elements that are still meant to ge involved
-        
-        Z_real_combined = []
-        Z_imag_combined = []
-
-        # Process high (h), medium (m), and low (l) components
-        for prefix in ['h', 'm', 'l']:
-            r_key = f"r{prefix}"
-            f_key = f"f{prefix}"
-            p_key = f"p{prefix}"
-
-            if r_key in self._variables_dictionary and f_key in self._variables_dictionary and p_key in self._variables_dictionary:
-                r = self._variables_dictionary[r_key]
-                f = self._variables_dictionary[f_key]
-                p = self._variables_dictionary[p_key]
-
-                Z_real, Z_imag = zip(*[
-                    self._calculate_Zarc(freq, r, f, p)
-                    for freq in self._manual_data['freq']
-                ])
-
-                Z_real_combined.extend(Z_real)
-                Z_imag_combined.extend(Z_imag)
-
-        # Update manual data
-        self._manual_data['Z_real'] = np.array(Z_real_combined) #+self._variables_dictionary["rinf"]
-        self._manual_data['Z_imag'] = np.array(Z_imag_combined) #+self._variables_dictionary["linf"]
-
+        zarc_h_real=[]
+        zarc_h_imag=[]
+        for freq in self._manual_data['freq']:
+            z_real,z_imag = self._calculate_Zarc(freq, 
+                                 self._variables_dictionary['rh'], 
+                                 self._variables_dictionary['fh'], 
+                                 self._variables_dictionary['ph']
+                                 )
+            zarc_h_real.append(z_real)
+            zarc_h_imag.append(z_imag)
+            """
+                                 
+                                 
+        zarc_m_real=[]
+        zarc_m_imag=[]
+        for freq in self._manual_data['freq']:
+            z_real,z_imag = self._calculate_Zarc(freq, 
+                                 self._variables_dictionary['rm'], 
+                                 self._variables_dictionary['fm'], 
+                                 self._variables_dictionary['pm']
+                                 )
+            zarc_m_real.append(z_real)
+            zarc_m_imag.append(z_imag)
+            
+        zarc_l_real=[]
+        zarc_l_imag=[]
+        for freq in self._manual_data['freq']:
+            z_real,z_imag = self._calculate_Zarc(freq, 
+                                 self._variables_dictionary['rl'], 
+                                 self._variables_dictionary['fl'], 
+                                 self._variables_dictionary['pl']
+                                 )
+            zarc_l_real.append(z_real)
+            zarc_l_imag.append(z_imag)
+    
+        self._manual_data['Z_real'] = zarc_h_real+zarc_m_real+zarc_l_real
+        self._manual_data['Z_imag'] = zarc_h_imag+zarc_m_imag+zarc_l_imag
+        """
+        self._manual_data['Z_real'] = np.array(zarc_h_real)
+        self._manual_data['Z_imag'] = np.array(zarc_h_imag)
+    
+    
         # Emit the updated data
         self.manual_model_updated.emit(
             self._manual_data['freq'],
             self._manual_data['Z_real'],
             self._manual_data['Z_imag'],
         )
+        
 
     def _set_default_values(self):
         """

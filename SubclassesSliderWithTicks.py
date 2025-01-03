@@ -126,11 +126,16 @@ Subclass of SliderWithTicks that accepts doubles instead of integers
 """
 class DoubleSliderWithTicks(SliderWithTicks):
     
+    valueChanged = pyqtSignal(float)  # Override the parent class signal with a float signal
+    
     def __init__(self,min_value, max_value, colour):
         
         self._scale_factor = 1000  # Scale factor for converting doubles to integers
 
         super().__init__(min_value, max_value, colour)
+        
+        # Connect the original slider signal to a custom slot
+        self._slider.valueChanged.connect(self._emit_corrected_value)
             
     def _setup_slider(self, colour):
         """
@@ -181,7 +186,20 @@ class DoubleSliderWithTicks(SliderWithTicks):
         """
         value=int(value*self._scale_factor)
         self._slider.setValue(value)
-
+        
+    def value_changed(self):
+        """
+        Exposes the slider's valueChanged signal for external use.
+        """
+        return self.valueChanged
+    
+    def _emit_corrected_value(self, raw_value):
+        """
+        Emits the corrected value through the overridden valueChanged signal.
+        """
+        corrected_value = raw_value / self._scale_factor
+        self.valueChanged.emit(corrected_value)
+        
     
 """
 Subclass of DoubleSliderWithTicks that accepts the double exponent of powers of N
@@ -205,7 +223,54 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         return f"1E{int(i/self._scale_factor)}"
 
 
+
+"""
+
+if __name__ == "__main__":
+    class TestWidget(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.init_ui()
+        
+        def init_ui(self):
+            # Create layout
+            layout = QVBoxLayout()
+            
+            # Create EPowerSliderWithTicks
+            self.slider_widget = EPowerSliderWithTicks(-10, 10, "red")
+            layout.addWidget(self.slider_widget)
+            
+            # Labels to display signal value and getter value
+            self.signal_value_label = QLabel("Signal Value: N/A", self)
+            self.getter_value_label = QLabel("Getter Value: N/A", self)
+            layout.addWidget(self.signal_value_label)
+            layout.addWidget(self.getter_value_label)
+            
+            # Connect slider signal to update function
+            self.slider_widget.value_changed().connect(self.update_values)
+            
+            self.setLayout(layout)
+        
+        def update_values(self):
+            # Get values from signal and getter
+            signal_value = self.slider_widget.get_value()  # For clarity, using the getter value
+            getter_value = self.slider_widget.get_value()
+            
+            # Update labels
+            self.signal_value_label.setText(f"Signal Value: {signal_value:.2e}")
+            self.getter_value_label.setText(f"Getter Value: {getter_value:.2e}")
     
+    # Create application and test widget
+    app = QApplication(sys.argv)
+    test_widget = TestWidget()
+    test_widget.resize(300, 400)
+    test_widget.show()
+    
+    # Run the application
+    sys.exit(app.exec_())
+
+
+"""
 
 if __name__ == "__main__":
 
@@ -214,11 +279,14 @@ if __name__ == "__main__":
 
     # Create and show an instance of SliderWithTicks with float range
     #slider_widget = DoubleSliderWithTicks(0, 0.9, "red")
-    #slider_widget = DoubleSliderWithTicks(-2., 2., "red")
+    slider_widget = DoubleSliderWithTicks(-2., 2., "red")
     #slider_widget = EPowerSliderWithTicks(0, 10, "red")
-    slider_widget = EPowerSliderWithTicks(-10, 10, "red")
+    #slider_widget = EPowerSliderWithTicks(-10, 10, "red")
     slider_widget.resize(200, 300)
+    
+    slider_widget.value_changed().connect(print)
     slider_widget.show()
-
     # Run the application
     sys.exit(app.exec_())
+    
+
