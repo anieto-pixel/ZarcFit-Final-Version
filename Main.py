@@ -1,73 +1,100 @@
-import sys
 import os
+import sys
 import numpy as np
 
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import QPainter, QFont, QColor 
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QSplitter
+)
+from PyQt5.QtCore import Qt
 
+# Updated Imports with Renamed Classes
+from ConfigImporter import ConfigImporter
+from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+from ModelCalculator import ModelCalculator
+from ModelManual import ModelManual
+from WidgetOutputFile import WidgetOutputFile
+from WidgetInputFile import WidgetInputFile
+from WidgetSliders import WidgetSliders
+from WidgetButtonsRow import WidgetButtonsRow
+from WidgetGraphs import WidgetGraphs
 
-# Import custom widgets
-from ConfigImporter import *
-from OutputFileWidget import OutputFileWidget
-from InputFileWidget import InputFileWidget
-from NSlidersWidget import NSlidersWidget
-from ButtonsWidgetRow import ButtonsWidgetRow
-from NGraphsWidget import GraphsWidget
-from SubclassesSliderWithTicks import EPowerSliderWithTicks, DoubleSliderWithTicks
-from ManualModel import ManualModel
 
 
 class MainWidget(QWidget):
-    def __init__(self, config_file):
+    """
+    The primary container for the application UI, assembling all widgets:
+      - File input/output
+      - Sliders
+      - Buttons
+      - Graph display
+      - Model (ModelManual) for computations
+    """
+
+    def __init__(self, config_file: str):
         super().__init__()
 
-        # Initialize ConfigImporter
+        # Parse config settings
         self.config = ConfigImporter(config_file)
+
+        # Data placeholders for file & model outputs
         self.file_content = {"freq": None, "Z_real": None, "Z_imag": None}
         self.manual_content = {"freq": None, "Z_real": None, "Z_imag": None}
-        self.calculator = None
 
-        # Initialize widgets
-        self.input_file_widget = InputFileWidget(config_file)
-        self.output_file_widget = OutputFileWidget()
-        self.sliders_widget = NSlidersWidget(
-            self.config.slider_configurations, self.config.slider_default_values
+        # Initialize core widgets
+        self.widget_input_file = WidgetInputFile(config_file)
+        self.widget_output_file = WidgetOutputFile()
+        self.widget_sliders = WidgetSliders(
+            self.config.slider_configurations,
+            self.config.slider_default_values
         )
-        self.buttons_widget = ButtonsWidgetRow()
-        self.graphs_widget = GraphsWidget()
+        
+        self.widget_buttons = WidgetButtonsRow()
+        self.widget_graphs = WidgetGraphs()
 
-        # Pass configurations and default values to ManualModel
-        self.manual_model = ManualModel(
+        # Model for manual and automatic computations
+        self.model_manual = ModelManual(
+            list(self.config.slider_configurations.keys()),
+            self.config.slider_default_values
+        )
+        self.model_calculator = ModelCalculator(
             list(self.config.slider_configurations.keys()),
             self.config.slider_default_values
         )
 
-        # Set up UI
+        # Layout the UI
         self._initialize_ui()
 
         # Connect signals
-        self.input_file_widget.file_contents_updated.connect(self.update_file_content)
-        self.manual_model.manual_model_updated.connect(self.update_manual_content)
-        self.sliders_widget.slider_value_updated.connect(self.manual_model.update_variable)
+        self.widget_input_file.file_contents_updated.connect(self._update_file_content)
+        self.model_manual.model_manual_updated.connect(self._update_manual_content)
+        self.widget_sliders.slider_value_updated.connect(self.model_manual.update_variable)
+
+
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
 
     def _initialize_ui(self):
         """
-        Organizes the layout and settings for the MainWidget.
+        Assembles the main layout, placing the top bar and bottom splitter.
         """
+        # Top bar with input/output widgets
         self.top_bar_widget = self._create_file_options_widget()
 
+        # Bottom area: sliders + buttons side by side
         bottom_half_layout = QHBoxLayout()
-        bottom_half_layout.addWidget(self.sliders_widget)
-        bottom_half_layout.addWidget(self.buttons_widget)
-
+        bottom_half_layout.addWidget(self.widget_sliders)
+        bottom_half_layout.addWidget(self.widget_buttons)
         bottom_half_widget = self._create_widget_from_layout(bottom_half_layout)
 
+        # Splitter: top for graphs, bottom for sliders+buttons
         splitter = QSplitter(Qt.Vertical)
-        splitter.addWidget(self.graphs_widget)
+        splitter.addWidget(self.widget_graphs)
         splitter.addWidget(bottom_half_widget)
         splitter.setSizes([500, 300])
 
+        # Main layout
         main_layout = QVBoxLayout()
         main_layout.addWidget(self.top_bar_widget)
         main_layout.addWidget(splitter)
@@ -75,43 +102,51 @@ class MainWidget(QWidget):
 
         self.setLayout(main_layout)
 
-    def _create_file_options_widget(self):
+    def _create_file_options_widget(self) -> QWidget:
         """
-        Creates the top bar widget containing input and output file widgets.
+        Builds the top bar containing the file input and file output widgets.
         """
         layout = QHBoxLayout()
-        layout.addWidget(self.input_file_widget)
-        layout.addStretch()  # Separates the input and output widgets visually
-        layout.addWidget(self.output_file_widget)
+        layout.addWidget(self.widget_input_file)
+        layout.addStretch()
+        layout.addWidget(self.widget_output_file)
         layout.setContentsMargins(0, 0, 0, 0)
-       
         return self._create_widget_from_layout(layout)
 
-    def update_file_content(self, freq, Z_real, Z_imag):
-        self.file_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        self.graphs_widget.update_graphs(freq, Z_real, Z_imag)
-        self.manual_model.initialize_frequencies(freq)
+    def _update_file_content(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
+        """
+        Called when WidgetInputFile emits new file data.
+        """
+        self.file_content.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
+        self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
+        self.model_manual.initialize_frequencies(freq)
 
-    def update_manual_content(self, freq, Z_real, Z_imag):
-        self.manual_content = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
-        self.graphs_widget.update_manual_plot(freq, Z_real, Z_imag)
+    def _update_manual_content(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
+        """
+        Called when ModelManual finishes recalculating with new slider values.
+        """
+        self.manual_content.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
+        self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
 
-    def _create_widget_from_layout(self, layout):
-        widget = QWidget()
-        widget.setLayout(layout)
-        return widget
+    def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:
+        """
+        Helper to wrap a given layout into a QWidget.
+        """
+        container = QWidget()
+        container.setLayout(layout)
+        return container
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     config_file = "config.ini"
 
-    # Create the main window and set its properties
+    # MainWindow container
     window = QMainWindow()
     main_widget = MainWidget(config_file)
     window.setCentralWidget(main_widget)
-    window.setWindowTitle("Slider with Ticks and Labels")
-    window.setGeometry(100, 100, 800, 900)
+    window.setWindowTitle("Slider with Ticks and Labels (Refactored)")
+    #window.setGeometry(100, 100, 800, 900)
     window.show()
 
     sys.exit(app.exec_())

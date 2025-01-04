@@ -1,50 +1,78 @@
+"""
+Loads configuration data for sliders, default values, and file-widget
+settings from a .ini file, storing them as attributes.
+
+Parameters
+----------
+config_file : str
+    The path to a .ini config file defining at least the following sections:
+      - [SliderConfigurations]
+      - [SliderDefaultValues]
+      - [InputFileWidget]
+
+Methods
+-------
+test_config_importer()
+    Basic test demonstrating how to create a config file, load it,
+    and inspect the results.
+"""
+
 import os
 import configparser
-from SubclassesSliderWithTicks import EPowerSliderWithTicks, DoubleSliderWithTicks
+from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+
 
 class ConfigImporter:
-    
-    def __init__(self, config_file):
+
+
+    def __init__(self, config_file: str):
+        
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"Configuration file '{config_file}' not found.")
-        
+
         self.config_file = config_file
         self.slider_configurations = {}
         self.slider_default_values = []
         self.input_file_widget_config = {}
+
         self._read_config_file()
+        
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
 
     def _read_config_file(self):
+        """
+        Internal: Reads and parses the .ini file, populating the class attributes.
+        """
         config = configparser.ConfigParser()
         config.read(self.config_file)
-        
-        # Read slider configurations
+
+        # SliderConfigurations
         sliders = {}
         for key, value in config["SliderConfigurations"].items():
-            slider_type, min_value, max_value, color = value.split(",")
-            sliders[key] = (self._safe_import(slider_type), float(min_value), float(max_value), color)
+            slider_type_str, min_val_str, max_val_str, color = value.split(",")
+            sliders[key] = (
+                self._safe_import(slider_type_str),
+                float(min_val_str),
+                float(max_val_str),
+                color
+            )
         self.slider_configurations = sliders
 
-        # Read default values
+        # SliderDefaultValues
         defaults_str = config["SliderDefaultValues"]["defaults"]
         self.slider_default_values = [float(val) for val in defaults_str.split(",")]
 
-        # Read InputFileWidget configurations
-        input_file_widget = {}
-        for key, value in config["InputFileWidget"].items():
-            input_file_widget[key] = value
-        self.input_file_widget_config = input_file_widget
-        
+        # InputFileWidget
+        if "InputFileWidget" in config:
+            self.input_file_widget_config = dict(config["InputFileWidget"])
 
     @staticmethod
-    def _safe_import(class_name):
+    def _safe_import(class_name: str):
         """
-        Safely imports and instantiates a class from a string.
-        Args:
-        class_name (str): Name of the class to import.
-        
-        Returns:
-        type: Class reference.
+        Returns the slider class reference matching the given class_name.
+        If the name is unrecognized, returns None.
         """
         classes = {
             "EPowerSliderWithTicks": EPowerSliderWithTicks,
@@ -53,14 +81,18 @@ class ConfigImporter:
         return classes.get(class_name)
 
 
-"""TEST"""
+# -----------------------------------------------------------------------
+#  TEST
+# -----------------------------------------------------------------------
 def test_config_importer():
-    # Define the path to the configuration file (adjust as necessary)
+    """
+    Demonstrates how to create a sample .ini file, load it via ConfigImporter,
+    and inspect the parsed configuration.
+    """
     config_file = "test_config.ini"
 
-    # Create a sample configuration file for testing
-    with open(config_file, "w") as file:
-        file.write("""[SliderConfigurations]
+    # Sample .ini content for testing
+    sample_ini_content = """[SliderConfigurations]
 slider1 = EPowerSliderWithTicks,0.0,100.0,red
 slider2 = DoubleSliderWithTicks,10.0,200.0,blue
 
@@ -73,39 +105,39 @@ SKIP_ROWS = 128
 FREQ_COLUMN = 0
 Z_REAL_COLUMN = 4
 Z_IMAG_COLUMN = 5
-        """)
+"""
+
+    # Write the sample config file
+    with open(config_file, "w") as file:
+        file.write(sample_ini_content)
 
     try:
-        # Initialize the ConfigImporter with the test config
         importer = ConfigImporter(config_file)
 
-        # Print the slider configurations
+        # Inspect slider_configurations
         print("Slider Configurations:")
-        for key, value in importer.slider_configurations.items():
-            print(f"{key}: {value}")
+        for key, val in importer.slider_configurations.items():
+            print(f"{key}: {val}")
 
-        # Print the default values
+        # Inspect default values
         print("\nSlider Default Values:")
         print(importer.slider_default_values)
 
-        # Print the InputFileWidget configuration
+        # Inspect InputFileWidget config
         print("\nInputFileWidget Config:")
-        for key, value in importer.input_file_widget_config.items():
-            print(f"{key}: {value}")
-        print(importer.input_file_widget_config.keys())
+        for k, v in importer.input_file_widget_config.items():
+            print(f"{k}: {v}")
 
-        # Indicate the test passed
         print("\nTest passed: ConfigImporter loaded the configuration correctly.")
-    
+
     except Exception as e:
-        # Print the error if something goes wrong
         print(f"Test failed: {e}")
 
     finally:
-        # Clean up by removing the test configuration file
+        # Cleanup
         if os.path.exists(config_file):
             os.remove(config_file)
 
-# Run the test
+
 if __name__ == "__main__":
     test_config_importer()
