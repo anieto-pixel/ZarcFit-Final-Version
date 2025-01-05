@@ -127,25 +127,66 @@ class WidgetSliders(QWidget):
         for key, default_value in self.slider_default_values.items():
             slider = self.sliders[key]
             slider.set_value(default_value)
+            
+    def update_all_variables(self, dictionary):
+        """
+        Receives a dict of { variable_key: value }, checks that it matches
+        this widget's slider keys, then updates each slider.
+        """
+        # 1) Ensure keys match
+        if set(dictionary.keys()) != set(self.sliders.keys()):
+            raise ValueError(
+                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
+            )
 
+        # 2) Update each slider
+        for key, val in dictionary.items():
+            slider = self.sliders[key]
+            slider.set_value(val)
+            
 
 # -----------------------------------------------------------------------
 #  Quick Test
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
     from ConfigImporter import ConfigImporter  # Only needed if testing
+    from PyQt5.QtWidgets import QPushButton
+    
+    #0 . method that sets all the sliders to 0, hopefully
+    def set_all_to_0(sliders_widget):
+        old_dict= sliders_widget.sliders
+        
+        new_dict = {k: 0.0 for k in old_dict.keys()}
+        sliders_widget.update_all_variables(new_dict)
 
     app = QApplication(sys.argv)
 
+    # 1. Load config
     config_file = "config.ini"
     config = ConfigImporter(config_file)
 
-    widget = WidgetSliders(config.slider_configurations, config.slider_default_values)
-    widget.setWindowTitle("Test WidgetSliders")
-    widget.setGeometry(100, 100, 800, 900)
+    # 2. Create WidgetSliders
+    sliders_widget = WidgetSliders(config.slider_configurations, config.slider_default_values)
+    
+    # 3. Create Button Widget
+    btn_set_0 = QPushButton("Set All Model Vars to 0.0")
+    btn_set_0.clicked.connect(set_all_to_0)
+    
+    # 4. Create Test Widget
+    test_window = QWidget()
+    test_window.setWindowTitle("Test ModelManual & WidgetSliders")
+    test_window.setGeometry(100, 100, 1200, 600)
 
+    main_layout = QVBoxLayout(test_window)
+    main_layout.addWidget(sliders_widget)
+    main_layout.addWidget(btn_set_0)
+    
     # Connect the signal to a simple print function
-    widget.slider_value_updated.connect(print)
+    sliders_widget.slider_value_updated.connect(print)
+    btn_set_0.clicked.connect(lambda: set_all_to_0(sliders_widget))
 
-    widget.show()
+    test_window.show()
     sys.exit(app.exec_())
+    
+    
+    

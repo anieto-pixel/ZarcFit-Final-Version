@@ -1,3 +1,5 @@
+
+
 import os
 import sys
 import numpy as np
@@ -69,6 +71,13 @@ class MainWidget(QWidget):
         self.widget_input_file.file_contents_updated.connect(self._update_file_content)
         self.model_manual.model_manual_updated.connect(self._update_manual_content)
         self.widget_sliders.slider_value_updated.connect(self.model_manual.update_variable)
+        
+        self.model_manual.model_manual_variables_updated.connect(self.model_calculator.listen_change_variables_signal)
+        self.model_calculator.model_calculator_variables_updated.connect(self.model_manual.listen_change_variables_signal)
+        self.model_calculator.model_calculator_variables_updated.connect(self.widget_sliders.update_all_variables)
+
+
+
 
 
     # -----------------------------------------------------------------------

@@ -57,13 +57,6 @@ class ModelCalculator(QWidget):
         ##MM And then right after call run model, or not bother?
         #Can cause issues (small) at initialziaiton if I do but it is covnenient
     
-    def _emit_variable_values(self):
-        """
-        when the values of the variables are changed, it sends a
-        dictionary/list of the new values as a signal
-
-        """
-        pass
     
     def _run_model(self):
         """
@@ -89,6 +82,15 @@ class ModelCalculator(QWidget):
              
         pass
     
+    def _fit_model(self):
+        """
+        runs the fit of the model, probably involving square_optimization
+        Emits model_calculator_variables_updated when done
+             
+        """
+             
+        pass
+    
     
     
     def return_variables_expanded(self):
@@ -99,10 +101,34 @@ class ModelCalculator(QWidget):
         format for the output-er to be able to print it. 
         Not sure of how I am going to handle the 
         """
-       
-
         
         pass
+    
+    def listen_change_variables_signal(self, dictionary):
+        """
+        Updates the entire variable dictionary from an external source.
+        If the incoming dict's keys don't match this model's keys, raise an error.
+        Otherwise, reset self._variables_dictionary to the new values
+        """
+        # 1) Check key consistency
+        if set(dictionary.keys()) != set(self._variables_keys):
+            raise ValueError(
+                "Incoming dictionary keys do not match the model's variable keys."
+            )
+
+        # 2) Update the internal variables to match
+        for k in dictionary:
+            self._variables_dictionary[k] = dictionary[k]
+
+
+    def emit_change_variables_signal(self):
+        """
+        Emits the entire self._variables_dictionary as a Python dict,
+        satisfying the model_manual_variables_updated signature of type dict.
+        """
+        # Create a shallow copy or just pass self._variables_dictionary if you prefer
+        variables_copy = dict(self._variables_dictionary)
+        self.model_manual_variables_updated.emit(variables_copy)
 
     
             

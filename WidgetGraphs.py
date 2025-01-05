@@ -13,9 +13,7 @@ import sys
 import numpy as np
 import pyqtgraph as pg
 
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout
-)
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
 
 
