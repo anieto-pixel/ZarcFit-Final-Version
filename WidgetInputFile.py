@@ -25,7 +25,7 @@ class WidgetInputFile(QWidget):
     and emitting arrays of frequency, real Z, and imaginary Z via a signal.
     """
 
-    file_contents_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
+    file_data_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
     def __init__(self, config_file: str):
         """
@@ -174,10 +174,10 @@ class WidgetInputFile(QWidget):
             z_real = df[self.z_real_column].to_numpy()
             z_imag = df[self.z_imag_column].to_numpy()
 
-            self.file_contents_updated.emit(freq, z_real, z_imag)
+            self.file_data_updated.emit(freq, z_real, z_imag)
         except Exception as e:
             print(f"Error reading file '{file_path}': {e}")
-            self.file_contents_updated.emit(np.array([]), np.array([]), np.array([]))
+            self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
 
     # -----------------------------------------------------------------------
     #  Public Methods

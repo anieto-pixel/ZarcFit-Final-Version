@@ -1,3 +1,11 @@
+"""
+  The primary container for the application UI, assembling all widgets:
+    - File input/output
+    - Sliders
+    - Buttons
+    - Graph display
+    - Model (ModelManual) for computations
+"""
 
 
 import os
@@ -24,14 +32,6 @@ from WidgetGraphs import WidgetGraphs
 
 
 class MainWidget(QWidget):
-    """
-    The primary container for the application UI, assembling all widgets:
-      - File input/output
-      - Sliders
-      - Buttons
-      - Graph display
-      - Model (ModelManual) for computations
-    """
 
     def __init__(self, config_file: str):
         super().__init__()
@@ -40,8 +40,8 @@ class MainWidget(QWidget):
         self.config = ConfigImporter(config_file)
 
         # Data placeholders for file & model outputs
-        self.file_content = {"freq": None, "Z_real": None, "Z_imag": None}
-        self.manual_content = {"freq": None, "Z_real": None, "Z_imag": None}
+        self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
+        self.modeled_data = {"freq": None, "Z_real": None, "Z_imag": None}
 
         # Initialize core widgets
         self.widget_input_file = WidgetInputFile(config_file)
@@ -61,22 +61,27 @@ class MainWidget(QWidget):
         )
         self.model_calculator = ModelCalculator(
             list(self.config.slider_configurations.keys()),
-            self.config.slider_default_values
+            self.config.slider_default_values,
+            self.file_data
         )
 
         # Layout the UI
         self._initialize_ui()
 
         # Connect signals
-        self.widget_input_file.file_contents_updated.connect(self._update_file_content)
-        self.model_manual.model_manual_updated.connect(self._update_manual_content)
+        
+        #Updates dictionaries in main
+        self.widget_input_file.file_data_updated.connect(self._update_file_data)
+        self.model_manual.modeled_data_updated.connect(self._update_modeled_data)
+        self.model_calculator.modeled_data_updated.connect(self._update_modeled_data)
+        
+        #connects manual model to the values in the sliders
         self.widget_sliders.slider_value_updated.connect(self.model_manual.update_variable)
         
-        self.model_manual.model_manual_variables_updated.connect(self.model_calculator.listen_change_variables_signal)
-        self.model_calculator.model_calculator_variables_updated.connect(self.model_manual.listen_change_variables_signal)
-        self.model_calculator.model_calculator_variables_updated.connect(self.widget_sliders.update_all_variables)
-
-
+        #connects both models to eachother and the sliders so vairables are consistent
+        self.model_manual.modeled_data_variables_updated.connect(self.model_calculator.listen_change_variables_signal)
+        self.model_calculator.modeled_data_variables_updated.connect(self.model_manual.listen_change_variables_signal)
+        self.model_calculator.modeled_data_variables_updated.connect(self.widget_sliders.update_all_variables)
 
 
 
@@ -122,19 +127,20 @@ class MainWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         return self._create_widget_from_layout(layout)
 
-    def _update_file_content(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
+    def _update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """
         Called when WidgetInputFile emits new file data.
         """
-        self.file_content.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
+        self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
         self.model_manual.initialize_frequencies(freq)
+        self.model_calculator.reset_experiment_values(self.file_data)
 
-    def _update_manual_content(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
+    def _update_modeled_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """
         Called when ModelManual finishes recalculating with new slider values.
         """
-        self.manual_content.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
+        self.modeled_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
 
     def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:

@@ -7,7 +7,7 @@ ModelManual is a widget that calculates combined impedance from:
   - Zarc circuits (H, M, L)
   - An optional 'modified Zarc' (E) circuit
 
-Emits a signal (modeled_data_updated) whenever it recalculates,
+Emits a signal (model_manual_updated) whenever it recalculates,
 passing the new Z_real and Z_imag arrays.
 """
 
@@ -18,11 +18,21 @@ from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import pyqtSignal
 
 
-class Model(QWidget):
+class ModelManual(QWidget):
+    """
+    A model class for computing combined impedance data from:
+      - Resistor + Inductor in series (rinf, linf).
+      - Three Zarc circuits (H, M, L).
+      - An optional 'modified Zarc' (E) circuit.
+
+    The results (Z_real, Z_imag) are emitted via the signal `model_manual_updated`.
+    Additionally, changes to the internal variables can be emitted via 
+    `model_manual_variables_updated` as a dictionary.
+    """
 
     # This signal now carries a dictionary, instead of three np.ndarray
-    modeled_data_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
-    modeled_data_variables_updated = pyqtSignal(dict)
+    model_manual_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
+    model_manual_variables_updated = pyqtSignal(dict)
 
     def __init__(self, variables_keys, variables_default_values):
         super().__init__()
@@ -50,91 +60,75 @@ class Model(QWidget):
         for key, default_val in zip(self._variables_keys, variables_values):
             self._variables_dictionary[key] = default_val
 
-
-    # -----------------------------------------------------------------------
-    #  Circuit Elements (simulator)
-    # -----------------------------------------------------------------------
-    """
-    Receive Frequency values and the keywords to retrieve the remaining 
-    information from the dictionary.
-    Return the cmplex impedance of the element
-    """
-    
-    def _inductor(self, freq, l_key):
-        l_val = self._variables_dictionary[l_key]
-        z_complex = (2 * np.pi * freq) * l_val *1j
-        
-        return z_complex
-        
-    def _cpe(self, freq,r_key, f_key, p_i_key, p_f_key):
+    def _compute_inductor_and_resistor(self, freq_array, r_key='rinf', l_key='linf'):
+        """Returns arrays (real, imag) for resistor (r_key) + jωL (l_key)."""
         r_val = self._variables_dictionary[r_key]
-        f_val = self._variables_dictionary[f_key]
-        pi_val = self._variables_dictionary[p_i_key]
-        pf_val = self._variables_dictionary[p_f_key]
-        
+        l_val = self._variables_dictionary[l_key]
+        omega = 2 * np.pi * freq_array
+        z_complex = r_val + (1j * omega * l_val)  # R + jωL
+        return np.real(z_complex), np.imag(z_complex)
+
+    def _zarc_impedance(self, freq, r_val, f_val, pi_val, pf_val):
+        """Computes Zarc = (Z_r * Z_cpe) / (Z_r + Z_cpe) at a single freq."""
+        # Example: Q = 1 / (R * (2πf0)^pf_val)
         q_val = 1.0 / (r_val * (2.0 * np.pi * f_val)**pf_val)
         phase_factor = (1j)**pi_val
         omega_exp = (2.0 * np.pi * freq)**pf_val
-        
-        z_complex = 1.0 / (q_val * phase_factor * omega_exp)
-        
-        return z_complex
-    
-    def _cpe_q(self, freq, q_key, p_i_key, p_f_key):
-        q_val = self._variables_dictionary[q_key]
-        pi_val = self._variables_dictionary[p_i_key]
-        pf_val = self._variables_dictionary[p_f_key]
-        
-        phase_factor = (1j)**pi_val
-        omega_exp = (2.0 * np.pi * freq)**pf_val
-        
-        z_complex = 1.0 / (q_val * phase_factor * omega_exp)
-        
-        return z_complex
-    
-    def _parallel_circuit(self,z_1, z_2):
-        return (z_1 * z_2) / (z_1 + z_2)
-  
-    # -----------------------------------------------------------------------
-    #  Model (simulator)
-    # -----------------------------------------------------------------------
 
-    def _model(self,freq):
-        pass
-        
+        z_cpe = 1.0 / (q_val * phase_factor * omega_exp)
+        z_r = r_val
+        return (z_cpe * z_r) / (z_cpe + z_r)
+
+    def _compute_zarc_impedance_for_range(self, r_key, f_key, pi_key, pf_key):
+        """Loops over self._modeled_data['freq'] to compute real & imag parts."""
+        freq_array = self._modeled_data['freq']
+        real_parts, imag_parts = [], []
+
+        r_val = self._variables_dictionary[r_key]
+        f_val = self._variables_dictionary[f_key]
+        pi_val = self._variables_dictionary[pi_key]
+        pf_val = self._variables_dictionary[pf_key]
+
+        for freq in freq_array:
+            z_total = self._zarc_impedance(freq, r_val, f_val, pi_val, pf_val)
+            real_parts.append(z_total.real)
+            imag_parts.append(z_total.imag)
+
+        return np.array(real_parts), np.array(imag_parts)
 
     def _run_model(self):
         """
-        runs the model for every frequency in frequency array
-        resets the model
-        EMITS signal with the new modeled data
+        1. R_inf + L_inf in series
+        2. Zarc H, M, L
+        3. Zarc E (modified)
+        Summation of real and imaginary parts. Then emits model_manual_updated.
         """
-        
-        z_real=[]
-        z_imag=[]         
-
         freq_array = self._modeled_data['freq']
-        
-        for freq in freq_array:
-            z_complex=self._model(freq)
-            
-            z_real.append(np.real(z_complex))
-            z_imag.append(np.imag(z_complex))
-            
-        z_real=np.array( z_real)
-        z_imag=np.array(z_imag)
-        
-        self._modeled_data['Z_real'] =z_real
-        self._modeled_data['Z_imag'] =z_imag
+
+        # (1) R+L
+        r_i_real, r_i_imag = self._compute_inductor_and_resistor(freq_array, 'rinf', 'linf')
+
+        # (2) H
+        zarc_h_real, zarc_h_imag = self._compute_zarc_impedance_for_range('rh', 'fh', 'ph', 'ph')
+        # (3) M
+        zarc_m_real, zarc_m_imag = self._compute_zarc_impedance_for_range('rm', 'fm', 'pm', 'pm')
+        # (4) L
+        zarc_l_real, zarc_l_imag = self._compute_zarc_impedance_for_range('rl', 'fl', 'pl', 'pl')
+        # (5) E
+        zarc_e_real, zarc_e_imag = self._compute_zarc_impedance_for_range('re', 'qe', 'pe_i', 'pe_f')
+
+        total_real = r_i_real + zarc_h_real + zarc_m_real + zarc_l_real + zarc_e_real
+        total_imag = r_i_imag + zarc_h_imag + zarc_m_imag + zarc_l_imag + zarc_e_imag
+
+        self._modeled_data['Z_real'] = total_real
+        self._modeled_data['Z_imag'] = total_imag
 
         # Emit the updated impedance arrays
-        self.modeled_data_updated.emit(freq_array, z_real, z_imag)
+        self.model_manual_updated.emit(freq_array, total_real, total_imag)
 
     # -----------------------------------------------------------------------
     #  Public Interface
     # -----------------------------------------------------------------------
-    
-    ##MM maybe delete and limit to the manual model
     def initialize_frequencies(self, freq_array):
         """
         Replaces 'freq' in self._modeled_data, resets default values, and re-runs the model.
@@ -143,6 +137,18 @@ class Model(QWidget):
         self._reset_values(self._variables_default_values)
         self._run_model()
 
+    def update_variable(self, key, new_value):
+        """
+        Updates one variable in _variables_dictionary, re-runs the model,
+        and emits the new data. Also emits model_manual_variables_updated
+        to indicate that variables have changed.
+        """
+        if key not in self._variables_dictionary:
+            raise KeyError(f"Variable '{key}' not found in the model.")
+
+        self._variables_dictionary[key] = new_value
+        self.emit_change_variables_signal()
+        self._run_model()
 
     def listen_change_variables_signal(self, dictionary):
         """
@@ -161,84 +167,14 @@ class Model(QWidget):
             self._variables_dictionary[k] = dictionary[k]
 
 
-    def emit_modeled_data_variables_updated(self):
+    def emit_change_variables_signal(self):
         """
         Emits the entire self._variables_dictionary as a Python dict,
-        satisfying the modeled_data_variables_updated signature of type dict.
+        satisfying the model_manual_variables_updated signature of type dict.
         """
         # Create a shallow copy or just pass self._variables_dictionary if you prefer
         variables_copy = dict(self._variables_dictionary)
-        self.modeled_data_variables_updated.emit(variables_copy)
-
-
-
-
-#########################################################################
-
-
-class ModelManual(Model):
-
-    def __init__(self, variables_keys, variables_default_values):
-        super().__init__(variables_keys, variables_default_values)
-  
-    # -----------------------------------------------------------------------
-    #  Model (simulator)
-    # -----------------------------------------------------------------------
-
-    def _model(self,freq):
-        
-        # 1. An inductor and a resistor in series
-        inductor=self._inductor(freq, l_key='linf')
-        resistor=self._variables_dictionary['rinf']
-        
-        z1_complex=inductor+resistor
-        
-        # 2. a parallel CPE-R for high frequency
-        
-        cpe_h=self._cpe(freq,r_key='rh', f_key='fh', p_i_key='ph', p_f_key='ph')
-        resistor_h=self._variables_dictionary['rh']
-        
-        z2_complex=self._parallel_circuit(cpe_h,resistor_h)
-        
-        # 3. a parallel CPE-R for medium frequency
-        cpe_m=self._cpe(freq,r_key='rm', f_key='fm', p_i_key='pm', p_f_key='pm')
-        resistor_m=self._variables_dictionary['rm']
-        
-        z3_complex=self._parallel_circuit(cpe_m,resistor_m)
-        
-        # 4. a parallel CPE-R for low frequency
-        cpe_l=self._cpe(freq,r_key='rl', f_key='fl', p_i_key='pl', p_f_key='pl')
-        resistor_l=self._variables_dictionary['rl']
-        
-        z4_complex=self._parallel_circuit(cpe_l,resistor_l)
-        
-        # 5. a modified CPE-R 
-        cpe_e=self._cpe_q(freq, q_key='qe', p_i_key='pe_i', p_f_key='pe_f')
-        resistor_e=self._variables_dictionary['re']
-        
-        z5_complex=self._parallel_circuit(cpe_e,resistor_e)
-        
-        #All of them in series
-        z_total_complex = z1_complex + z2_complex + z3_complex + z4_complex+z5_complex
-        
-        return z_total_complex
-    
-    # -----------------------------------------------------------------------
-    #  Public Interface
-    # -----------------------------------------------------------------------
-
-    def update_variable(self, key, new_value):
-        """
-        Updates one variable in _variables_dictionary, re-runs the model,
-        and emits the new data. Also emits modeled_data_variables_updated
-        to indicate that variables have changed.
-        """
-        if key not in self._variables_dictionary:
-            raise KeyError(f"Variable '{key}' not found in the model.")
-
-        self._variables_dictionary[key] = new_value
-        self.emit_modeled_data_variables_updated()
-        self._run_model()
+        self.model_manual_variables_updated.emit(variables_copy)
 
 
 # -----------------------------------------------------------------------
@@ -263,7 +199,7 @@ if __name__ == "__main__":
     config = ConfigImporter(config_file)
 
     # 2. Create an instance of ModelManual
-    modeled_data = ModelManual(
+    model_manual = ModelManual(
         list(config.slider_configurations.keys()),
         config.slider_default_values
     )
@@ -285,7 +221,7 @@ if __name__ == "__main__":
     main_layout.addWidget(sliders_widget)
 
     # Variables table
-    variables_keys = list(modeled_data._variables_dictionary.keys())
+    variables_keys = list(model_manual._variables_dictionary.keys())
     table_vars = QTableWidget(len(variables_keys), 3)
     table_vars.setHorizontalHeaderLabels(["Variable", "Slider Value", "Model Value"])
 
@@ -293,19 +229,19 @@ if __name__ == "__main__":
     for i, key in enumerate(variables_keys):
         row_index_map[key] = i
         table_vars.setItem(i, 0, QTableWidgetItem(key))
-        slider_val = str(modeled_data._variables_dictionary[key])
+        slider_val = str(model_manual._variables_dictionary[key])
         table_vars.setItem(i, 1, QTableWidgetItem(slider_val))
         table_vars.setItem(i, 2, QTableWidgetItem(slider_val))
 
     # Impedance table: freq, Z_real, Z_imag
-    freq_array = modeled_data._modeled_data['freq']
+    freq_array = model_manual._modeled_data['freq']
     table_imp = QTableWidget(len(freq_array), 3)
     table_imp.setHorizontalHeaderLabels(["Frequency", "Z_real", "Z_imag"])
 
     for i, f in enumerate(freq_array):
         table_imp.setItem(i, 0, QTableWidgetItem(str(f)))
-        table_imp.setItem(i, 1, QTableWidgetItem(str(modeled_data._modeled_data['Z_real'][i])))
-        table_imp.setItem(i, 2, QTableWidgetItem(str(modeled_data._modeled_data['Z_imag'][i])))
+        table_imp.setItem(i, 1, QTableWidgetItem(str(model_manual._modeled_data['Z_real'][i])))
+        table_imp.setItem(i, 2, QTableWidgetItem(str(model_manual._modeled_data['Z_imag'][i])))
 
     # Combine tables side by side
     tables_layout = QHBoxLayout()
@@ -314,9 +250,9 @@ if __name__ == "__main__":
     main_layout.addLayout(tables_layout)
 
     def update_impedance_table():
-        freqs = modeled_data._modeled_data['freq']
-        z_reals = modeled_data._modeled_data['Z_real']
-        z_imags = modeled_data._modeled_data['Z_imag']
+        freqs = model_manual._modeled_data['freq']
+        z_reals = model_manual._modeled_data['Z_real']
+        z_imags = model_manual._modeled_data['Z_imag']
 
         # If freq array changed size, adjust the table row count
         table_imp.setRowCount(len(freqs))
@@ -330,11 +266,11 @@ if __name__ == "__main__":
         """
         Called when a slider changes. Updates ModelManual & table.
         """
-        modeled_data.update_variable(key, new_value)
+        model_manual.update_variable(key, new_value)
 
         row = row_index_map[key]
         table_vars.setItem(row, 1, QTableWidgetItem(str(new_value)))
-        model_val = str(modeled_data._variables_dictionary[key])
+        model_val = str(model_manual._variables_dictionary[key])
         table_vars.setItem(row, 2, QTableWidgetItem(model_val))
 
         # Refresh impedance table
@@ -345,7 +281,7 @@ if __name__ == "__main__":
     test_window.show()
 
     
-    modeled_data.modeled_data_variables_updated.connect(print)
-    modeled_data.emit_modeled_data_variables_updated()
+    model_manual.model_manual_variables_updated.connect(print)
+    model_manual.emit_change_variables_signal()
     
     sys.exit(app.exec_())

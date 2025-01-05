@@ -27,135 +27,191 @@ class ModelCalculator(Model):
         
         self._experiment_data=[]
         
+        # A small adjustable scale factor for building the initial simplex
+        self._simplex_size = 0.05  # You can adjust this as you like
         
         self._calculate_all_variables()
         self.reset_experiment_values(experiment_data)
         
-        
-    
-    
+# -----------------------------------------------------------------------
+    #  Compute intermediate variables
+    # -----------------------------------------------------------------------
     def _calculate_all_variables(self):
         linf = self._variables_dictionary["linf"]
         rinf = self._variables_dictionary["rinf"]
-        rh = self._variables_dictionary["rh"]
-        fh = self._variables_dictionary["fh"]
-        ph = self._variables_dictionary["ph"]
-        rm = self._variables_dictionary["rm"]
-        fm = self._variables_dictionary["fm"]
-        pm = self._variables_dictionary["pm"]
-        rl = self._variables_dictionary["rl"]
-        fl = self._variables_dictionary["fl"]
-        pl = self._variables_dictionary["pl"]
-        re = self._variables_dictionary["re"]
-        qe = self._variables_dictionary["qe"]
+        rh   = self._variables_dictionary["rh"]
+        fh   = self._variables_dictionary["fh"]
+        ph   = self._variables_dictionary["ph"]
+        rm   = self._variables_dictionary["rm"]
+        fm   = self._variables_dictionary["fm"]
+        pm   = self._variables_dictionary["pm"]
+        rl   = self._variables_dictionary["rl"]
+        fl   = self._variables_dictionary["fl"]
+        pl   = self._variables_dictionary["pl"]
+        re   = self._variables_dictionary["re"]
+        qe   = self._variables_dictionary["qe"]
         pe_f = self._variables_dictionary["pe_f"]
         pe_i = self._variables_dictionary["pe_i"]
         
-        qh = 1/(rh*(2*np.pi*fh)**ph)
-        qm = 1/(rm*(2*np.pi*fm)**pm) #### Calculating Qs from given resonant frequencies
-        ql = 1/(rl*(2*np.pi*fl)**pl)
+        qh = 1.0 / (rh * (2*np.pi*fh)**ph)
+        qm = 1.0 / (rm * (2*np.pi*fm)**pm)
+        ql = 1.0 / (rl * (2*np.pi*fl)**pl)
+
+        r0 = rinf + rh + rm + rl
         
-        r0 = rinf + rh + rm + rl    ### Randy's series to parallel parameter conversions
-        rh_p = rinf/rh*(rinf+rh)
-        qh_p = qh*(rh/(rinf+rh))**2
-        rm_p = (rinf+rh)/rm*(rinf+rh+rm)
-        qm_p = qm*(rm/(rinf+rh+rm))**2
-        rl_p = (rinf+rh+rm)/rl*(rinf+rh+rm+rl)
-        ql_p = ql*(rl/(rinf+rh+rm+rl))**2
+        rh_p = (rinf / rh) * (rinf + rh)
+        qh_p = qh * (rh / (rinf + rh))**2
         
-        self._variables_dictionary["r0"]=r0
-        self._variables_dictionary["rh_p"]=rh_p
-        self._variables_dictionary["qh_p"]=qh_p
-        self._variables_dictionary["rm_p"]=rm_p
-        self._variables_dictionary["qm_p"]=qm_p
-        self._variables_dictionary["rl_p"]=rl_p
-        self._variables_dictionary["ql_p"]=ql_p
+        rm_p = ((rinf + rh) / rm) * (rinf + rh + rm)
+        qm_p = qm * (rm / (rinf + rh + rm))**2
         
+        rl_p = ((rinf + rh + rm) / rl) * (rinf + rh + rm + rl)
+        ql_p = ql * (rl / (rinf + rh + rm + rl))**2
         
-        #[R0p,RHp,QHp,RMp,QMp,RLp,QLp,pCh,pCm,pCl]
-    
-    def _model(self,freq):
-        
-        # 0.0 an inductor
+        self._variables_dictionary["r0"]   = r0
+        self._variables_dictionary["rh_p"] = rh_p
+        self._variables_dictionary["qh_p"] = qh_p
+        self._variables_dictionary["rm_p"] = rm_p
+        self._variables_dictionary["qm_p"] = qm_p
+        self._variables_dictionary["rl_p"] = rl_p
+        self._variables_dictionary["ql_p"] = ql_p
+
+    # -----------------------------------------------------------------------
+    #  Full Model definition
+    # -----------------------------------------------------------------------
+    def _model(self, freq):
+        # 0.0: inductor
         z_0 = self._inductor(freq, l_key='linf')
         
-        #the rock (z_1)
-        # 1.0 a resistence
+        # The rock (z_1)
         z_10 = self._variables_dictionary["r0"]
         
-        # 1.1 a m cpe and a resistence in series
-        cpe_m=self._cpe_q(freq, q_key='qm_p', p_i_key='pm', p_f_key='pm')
-        p_rm = self._variables_dictionary["rm_p"]
+        # Middle branch: CPE + resistor in series
+        cpe_m = self._cpe_q(freq, q_key='qm_p', p_i_key='pm', p_f_key='pm')
+        p_rm  = self._variables_dictionary["rm_p"]
+        z_11  = p_rm + cpe_m
         
-        z_11=p_rm + cpe_m
+        # Low branch: CPE + resistor in series
+        cpe_l = self._cpe_q(freq, q_key='ql_p', p_i_key='pl', p_f_key='pl')
+        p_rl  = self._variables_dictionary["rl_p"]
+        z_12  = p_rl + cpe_l
         
-        # 1.2 a l cpe and a resistence in series
-        cpe_l=self._cpe_q(freq, q_key='ql_p', p_i_key='pl', p_f_key='pl')
-        p_rl = self._variables_dictionary["rl_p"]
+        # Middle branch in parallel with r0
+        z_r_cpem = self._parallel_circuit(z_10, z_11)
+        z_1      = self._parallel_circuit(z_r_cpem, z_12)
         
-        z_12=p_rl + cpe_l
+        # High branch: CPE + resistor in series
+        cpe_h = self._cpe_q(freq, q_key='qh_p', p_i_key='ph', p_f_key='ph')
+        p_rh  = self._variables_dictionary["rh_p"]
+        z_20  = p_rh + cpe_h
         
-        #the resistor parallel to the medium circuit
-        #both parallel to the low circuit
-        z_r_cpem=self._parallel_circuit(z_10,z_11)
-        z_1=self._parallel_circuit(z_r_cpem,z_12)
+        # z_2: parallel with the rock
+        z_2 = self._parallel_circuit(z_1, z_20)
         
-        # 2.0 a cpe and a resistor in series
-        cpe_h=self._cpe_q(freq, q_key='qh_p', p_i_key='ph', p_f_key='ph')
-        p_rh = self._variables_dictionary["rh_p"]
+        # Electrode branch: a modified CPE-R in parallel
+        cpe_e = self._cpe_q(freq, q_key='qe', p_i_key='pe_i', p_f_key='pe_f')
+        resistor_e = self._variables_dictionary['re']
+        z_3 = self._parallel_circuit(cpe_e, resistor_e)
         
-        z_20=p_rh + cpe_h
-        
-        #2.1 in parallel to the rock(z_1)
-        z_2=self._parallel_circuit(z_1,z_20)
-        
-        # 3. a modified CPE-R 
-        cpe_e=self._cpe_q(freq, q_key='qe', p_i_key='pe_i', p_f_key='pe_f')
-        resistor_e=self._variables_dictionary['re']
-        
-        z_3=self._parallel_circuit(cpe_e,resistor_e)
-        
-        #Total: z_0, z_2 and z_3 in series
+        # Total: z_0, z_2, z_3 in series
         z_total_complex = z_0 + z_2 + z_3
-        
         return z_total_complex
-    
 
+    # -----------------------------------------------------------------------
+    #  Re-run the model for all frequencies
+    # -----------------------------------------------------------------------
+    def _run_model(self):
+        z_real = []
+        z_imag = []         
+        freq_array = self._modeled_data['freq']
+        
+        for f in freq_array:
+            z_comp = self._model(f)
+            z_real.append(np.real(z_comp))
+            z_imag.append(np.imag(z_comp))
+        
+        # Convert to NumPy arrays
+        z_real = np.array(z_real)
+        z_imag = np.array(z_imag)
+        
+        # Store
+        self._modeled_data['Z_real'] = z_real
+        self._modeled_data['Z_imag'] = z_imag
 
+        # Emit the updated arrays
+        self.modeled_data_updated.emit(freq_array, z_real, z_imag)
+
+    # -----------------------------------------------------------------------
+    #  Nelder-Mead Fitting Logic (Optimized)
+    # -----------------------------------------------------------------------
     def _fit_model(self):
         """
-        Fits the model to the experimental data using the Nelder-Mead simplex algorithm.
-        Mimics the functionality of a 'fit_curve' approach.
+        Fits the model to the experimental data using Nelder-Mead.
+        Uses:
+         - A custom initial simplex
+         - Vectorized cost function
+         - Adaptive, with function tolerance (fatol) and parameter tolerance (xatol)
         """
 
-        # Parameter names and initial guesses
-        param_names = list(self._variables_dictionary.keys())
-        initial_guess = [self._variables_dictionary[name] for name in param_names]
+        # Make sure everything is up-to-date
+        self._calculate_all_variables()
 
-        # Objective function for sum of squared real & imaginary residuals
+        param_names = list(self._variables_dictionary.keys())
+        initial_guess = np.array([self._variables_dictionary[n] for n in param_names])
+
+        # Build a custom initial simplex
+        # Each vertex is offset by a fraction of the current param or a fallback min offset
+        init_simplex = [initial_guess]
+        for i in range(len(initial_guess)):
+            guess_copy = initial_guess.copy()
+            # scale offset by either self._simplex_size * param_value or a small absolute value
+            offset = max(1e-8, abs(guess_copy[i]) * self._simplex_size)
+            guess_copy[i] += offset
+            init_simplex.append(guess_copy)
+        init_simplex = np.array(init_simplex)
+
+        # Vectorized objective: combine real & imaginary in one pass
         def objective_function(params):
-            # Update variables with guess
-            for i, name in enumerate(param_names):
-                self._variables_dictionary[name] = params[i]
+            # Update model parameters
+            for i, p_name in enumerate(param_names):
+                self._variables_dictionary[p_name] = params[i]
             
-            # Re-run the model with updated params
+            # Run model
             self._run_model()
             
-            # Compare with experiment data
-            diff_real = self._experiment_data["Z_real"] - self._modeled_data["Z_real"]
-            diff_imag = self._experiment_data["Z_imag"] - self._modeled_data["Z_imag"]
-            
-            return np.sum(diff_real**2) + np.sum(diff_imag**2)
+            # Combine real & imag data into a single complex difference
+            diff_complex = (
+                (self._experiment_data["Z_real"] - self._modeled_data["Z_real"])
+                + 1j * (self._experiment_data["Z_imag"] - self._modeled_data["Z_imag"])
+            )
+            return np.sum(np.abs(diff_complex)**2)
 
         # Perform the minimization
-        result = opt.minimize(objective_function, initial_guess, method='Nelder-Mead', options={'maxiter': 700})
+        result = opt.minimize(
+            objective_function,
+            x0=initial_guess,
+            method='Nelder-Mead',
+            options={
+                'initial_simplex': init_simplex,
+                'adaptive': True,
+                'maxiter': 2000,      # tweak as needed
+                'fatol': 1e-9,        # function tolerance
+                'xatol': 1e-9,        # parameter tolerance
+            }
+        )
 
-        # Update the dictionary with the best fit values
+        # Update dictionary with the best-fit values
         for i, name in enumerate(param_names):
             self._variables_dictionary[name] = result.x[i]
 
-        # Return the updated dictionary or you could just keep it stored
+        # Return the updated dictionary
         return self._variables_dictionary
+    
+    
+    
+    # -----------------------------------------------------------------------
+    #  Public Interface
+    # -----------------------------------------------------------------------
 
     def reset_experiment_values(self, experiment_data):
         """
