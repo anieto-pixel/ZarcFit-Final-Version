@@ -7,10 +7,10 @@ Created on Fri Jan  3 15:42:43 2025
 
 import numpy as np
 import configparser
+import scipy.optimize as opt
 
 from PyQt5.QtWidgets import QWidget
 from PyQt5.QtCore import pyqtSignal
-import scipy.optimize as opt
 from PyQt5.QtWidgets import QPushButton
 
 # Updated imports (class name changes)
