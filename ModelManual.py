@@ -169,6 +169,14 @@ class Model(QWidget):
         # Create a shallow copy or just pass self._variables_dictionary if you prefer
         variables_copy = dict(self._variables_dictionary)
         self.modeled_data_variables_updated.emit(variables_copy)
+        
+    def print_model_parameters(self):
+        """
+        Emits the entire self._variables_dictionary as a Python dict,
+        satisfying the modeled_data_variables_updated signature of type dict.
+        """
+        return self._variables_dictionary.values(),self._variables_dictionary.keys()
+        
 
 
 
@@ -219,7 +227,7 @@ class ModelManual(Model):
         z5_complex=self._parallel_circuit(cpe_e,resistor_e)
         
         #All of them in series
-        z_total_complex = z1_complex + z2_complex + z3_complex + z4_complex+z5_complex
+        z_total_complex = z1_complex + z2_complex + z3_complex + z4_complex + z5_complex
         
         return z_total_complex
     

@@ -4,5 +4,11 @@
 
 -implementar el modelo bien.
 -Implementar impression a file, ma so menos
--implementar the init file
--ver como ponerle un minimum width a los widgets que permita ver su etiqueta
+
+NOTE TO SELF
+las dos operaciones de los modelos las va a terminar por hace runa sola clase, creo, porque es una lata tener toda la informacion que uno debe imprimir por duplicado (O quiza hagamos que ModelCalculator tenga las funciones de ModelManual Tambien. Eso seria conveniente. Una vez esten bien ebigeados los dos
+
+BIG NOTE TO SELF
+the flow of the models is absurd. It is not just a matter of calculating the models with less overhead,
+it is a matter of when and how many to calculate the secondary variables, and which ones :S I think it is causing issues
+(I think Josh' modle may be overfitting? :S)

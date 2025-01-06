@@ -1,4 +1,6 @@
 import os
+import csv
+
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel,
     QFileDialog, QHBoxLayout, QMessageBox
@@ -124,6 +126,7 @@ class WidgetOutputFile(QWidget):
         self._desired_type = ".csv"
         self._search_parameters = "CSV Files (*.csv);;All Files (*)"
         self._output_file = None
+        self._output_header = None
 
         # Create UI elements
         self._newfile_button = QPushButton("New File")
@@ -194,12 +197,27 @@ class WidgetOutputFile(QWidget):
         """
         return self._output_file
 
-    def write_to_file(self, content):
+    def write_to_file(self, content, header=None):
         """
-        Writes 'content' to the selected output file. If none is selected, shows an error.
-        """
+        Writes iterable 'content' to the selected output file. If none is selected, shows an error.
+        """ 
         if self._output_file:
-            FileWriter.write_to_file(self._output_file, content)
+            if(self._output_header==None and header != None):
+                self._output_header=header
+                try:
+                    with open(self._output_file, "a", newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow(header)  # 'content' must be an iterable (e.g., list)
+                except Exception as e:
+                    ErrorWindow.show_error_message(f"Could not write to file: {e}")
+
+            #FileWriter.write_to_file(self._output_file, content)
+            try:
+                with open(self._output_file, "a", newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow(content)  # 'content' must be an iterable (e.g., list)
+            except Exception as e:
+                ErrorWindow.show_error_message(f"Could not write to file: {e}")
         else:
             ErrorWindow.show_error_message(
                 "No output file selected. Please select or create a file first."
@@ -211,6 +229,7 @@ class WidgetOutputFile(QWidget):
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
+    import numpy as np
     from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget
 
@@ -227,6 +246,14 @@ if __name__ == "__main__":
     # A helper function to demonstrate writing
     def write_some_content():
         widget.write_to_file("Hello from the test_widget_output_file!")
+        
+        modeled_data = {
+            'freq': np.array([1, 10, 100, 1000, 10000]),
+            'Z_real': np.array([90, 70, 50, 30, 10]),
+            'Z_imag': np.array([-45, -35, -25, -15, -5]),
+        }
+        
+        widget.write_to_file(modeled_data['freq'], modeled_data.keys())
     
     write_test_button.clicked.connect(write_some_content)
 
@@ -238,9 +265,12 @@ if __name__ == "__main__":
     container.setLayout(layout)
     container.show()
 
+
     # ----- STEP 1: Attempt writing with no file selected (should show error) -----
     QTimer.singleShot(1000, lambda: widget.write_to_file("Attempting to write with no file selected..."))
 
     # (The rest of the steps require manual interaction.)
+
+
 
     sys.exit(app.exec_())

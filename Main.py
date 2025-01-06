@@ -14,8 +14,10 @@ import numpy as np
 
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QSplitter
+    QSplitter,QShortcut
 )
+from PyQt5.QtGui import QKeySequence
+from PyQt5.QtCore import Qt
 from PyQt5.QtCore import Qt
 
 # Updated Imports with Renamed Classes
@@ -59,6 +61,7 @@ class MainWidget(QWidget):
             list(self.config.slider_configurations.keys()),
             self.config.slider_default_values
         )
+        
         self.model_calculator = ModelCalculator(
             list(self.config.slider_configurations.keys()),
             self.config.slider_default_values,
@@ -69,6 +72,8 @@ class MainWidget(QWidget):
         self._initialize_ui()
 
         # Connect signals
+        #Connecting hotkeays
+        self._initialize_hotkeys()
         
         #Updates dictionaries in main
         self.widget_input_file.file_data_updated.connect(self._update_file_data)
@@ -84,9 +89,12 @@ class MainWidget(QWidget):
         self.model_calculator.modeled_data_variables_updated.connect(self.widget_sliders.update_all_variables)
 
 
+        # Hot Keys
+        
+
 
     # -----------------------------------------------------------------------
-    #  Private Methods
+    #  Private UI Methods
     # -----------------------------------------------------------------------
 
     def _initialize_ui(self):
@@ -127,6 +135,53 @@ class MainWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         return self._create_widget_from_layout(layout)
 
+    def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:
+        """
+        Helper to wrap a given layout into a QWidget.
+        """
+        container = QWidget()
+        container.setLayout(layout)
+        return container
+    
+    # -----------------------------------------------------------------------
+    #  Private Conections Methods
+    # -----------------------------------------------------------------------
+    
+    def _initialize_hotkeys(self):
+        
+        shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
+        shortcut_f1.activated.connect(lambda: self.model_calculator._fit_model())
+        
+        shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
+        shortcut_f2.activated.connect(lambda: self.model_calculator._fit_model())
+        
+        #f3 is re-show hidden frequencies
+        
+        shortcut_f4 = QShortcut(QKeySequence(Qt.Key_F4), self)
+        shortcut_f4.activated.connect(lambda: self._print_model_parameters())
+        
+        shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
+        shortcut_f5.activated.connect(lambda: self._print_model_parameters())
+        
+        #f7 is to read values from outphut file
+        
+        #f8 default stats
+        
+        #pages up and down, deleting high and low frequencies
+        
+        #f11 and f12, the tailthing
+        
+        
+        
+    
+    def _print_model_parameters(self):
+        """
+        Called when Print is requested 
+        """
+        content, header= self.model_calculator.print_model_parameters()
+        self.widget_output_file.write_to_file(content, header)
+    
+    
     def _update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """
         Called when WidgetInputFile emits new file data.
@@ -142,14 +197,6 @@ class MainWidget(QWidget):
         """
         self.modeled_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
-
-    def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:
-        """
-        Helper to wrap a given layout into a QWidget.
-        """
-        container = QWidget()
-        container.setLayout(layout)
-        return container
 
 
 if __name__ == "__main__":

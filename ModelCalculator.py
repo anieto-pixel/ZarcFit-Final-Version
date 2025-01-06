@@ -4,6 +4,7 @@ Created on Fri Jan  3 15:42:43 2025
 
 @author: agarcian
 """
+
 import numpy as np
 import configparser
 
@@ -119,8 +120,6 @@ class ModelCalculator(Model):
         z_total_complex = z_0 + z_2 + z_3
         
         return z_total_complex
-    
-
 
     def _fit_model(self):
         """
