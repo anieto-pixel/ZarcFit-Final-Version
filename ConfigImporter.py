@@ -33,6 +33,7 @@ class ConfigImporter:
         self.config_file = config_file
         self.slider_configurations = {}
         self.slider_default_values = []
+        self.secondary_variables = []
         self.input_file_widget_config = {}
 
         self._read_config_file()
@@ -69,6 +70,13 @@ class ConfigImporter:
         # InputFileWidget
         if "InputFileWidget" in config:
             self.input_file_widget_config = dict(config["InputFileWidget"])
+            
+            
+        # SecondaryVariables as equations
+        if "SecondaryVariables" in config:
+            self.secondary_variables = {key.strip(): value.strip() for key, value in config["SecondaryVariables"].items()}
+            
+            
 
     @staticmethod
     def _safe_import(class_name: str):

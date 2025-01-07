@@ -12,6 +12,9 @@ import os
 import sys
 import numpy as np
 
+from sympy import sympify, symbols
+from sympy.core.sympify import SympifyError
+
 from PyQt5.QtWidgets import * #clean up with IA eventually
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import * #clean up with IA eventually
@@ -36,7 +39,6 @@ class MainWidget(QWidget):
 
         # Parse config settings
         self.config = ConfigImporter(config_file)
-        print(self.config.slider_configurations)#so, this has the bloody keys
 
         # Data placeholders for file & model outputs
         self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
@@ -73,8 +75,12 @@ class MainWidget(QWidget):
 #            self.file_data
 #        )
 
+        #calculate secondary variables
+        self._calculate_secondary_variables()
+
         # Layout the UI
         self._initialize_ui()
+        
 
         ### Connect signals ###
         #Connecting hotkeays
@@ -82,11 +88,12 @@ class MainWidget(QWidget):
         
         #Updates dictionaries in main
         self.widget_input_file.file_data_updated.connect(self._update_file_data)
-        self.model_manual.modeled_data_updated.connect(self._update_modeled_data)
+#        self.model_manual.modeled_data_updated.connect(self._update_modeled_data)
 #        self.model_calculator.modeled_data_updated.connect(self._update_modeled_data)
         
         #connects manual model to the values in the sliders
-        self.widget_sliders.slider_value_updated.connect(self.model_manual.update_variable)
+#        self.widget_sliders.slider_value_updated.connect(self.model_manual.update_variable)
+        self.widget_sliders.slider_value_updated.connect(self._update_variable)
         
         #connects both models to eachother and the sliders so vairables are consistent
 #        self.model_manual.modeled_data_variables_updated.connect(self.model_calculator.listen_change_variables_signal)
@@ -148,16 +155,23 @@ class MainWidget(QWidget):
         return self._create_widget_from_layout(layout)
     
     def _create_bottom_text_widget(self):
+        """
+        Creates the bottom text widget containing a label to display secondary variables.
+        """
         widget = QWidget()
-        label = QLabel("Default Text")
-        label.setAlignment(Qt.AlignLeft)
+        
+        # Store the label as an instance attribute for later access
+        for k in self.config.keys():
+            self.widget_at_bottom_label = QLabel(k +"") #Ensure that k displays in bold, but the later value does not
+            self.widget_at_bottom_label.setAlignment(Qt.AlignLeft)
         
         layout = QHBoxLayout()
-        layout.addWidget(label)
+        layout.addWidget(self.widget_at_bottom_label)
         widget.setLayout(layout)
         
-        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins to save space
-        layout.setSpacing(0)  # Remove spacing to save space
+        # Remove margins and spacing to save space
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
         
         return widget
 
@@ -170,9 +184,9 @@ class MainWidget(QWidget):
         return container
     
     # -----------------------------------------------------------------------
-    #  Private Conections Methods
+    #  Private Helper Methods
     # -----------------------------------------------------------------------
-    
+     
     def _initialize_hotkeys(self):
         
 #        shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
@@ -196,8 +210,54 @@ class MainWidget(QWidget):
         #pages up and down, deleting high and low frequencies
         
         #f11 and f12, the tailthing
-        
-        
+
+
+
+
+    def _calculate_secondary_variables(self):
+        """
+        Calculates secondary variables using equations defined in the .ini file.
+        """
+        # Ensure that there are equations to process
+        if not self.config.secondary_variables:
+            print("No equations defined in the configuration.")
+            return
+    
+        # Initialize the secondary variables dictionary
+        self.v_second = {}
+    
+        # Process each equation in order
+        for var, expr in self.config.secondary_variables.items():
+            try:
+                # Parse the expression using sympy
+                sympy_expr = sympify(expr)
+                
+                # Create a substitution dictionary combining v_sliders and already computed v_second
+                sym_dict = {**self.v_sliders, **self.v_second}
+                
+                # Evaluate the expression with substitutions
+                result = sympy_expr.evalf(subs=sym_dict)
+                
+                # Store the result in the secondary variables dictionary
+                self.v_second[var] = float(result)
+                
+            except SympifyError as e:
+                print(f"Error parsing equation for {var}: {e}")
+                self.v_second[var] = None
+                
+            except Exception as e:
+                print(f"Error evaluating equation for {var}: {e}")
+                self.v_second[var] = None
+
+        # Testing
+        #print("Secondary Variables:", self.v_second)
+    
+    
+    
+    # -----------------------------------------------------------------------
+    #  Private Conections Methods
+    # -----------------------------------------------------------------------
+   
         
     
     def _print_model_parameters(self):
@@ -223,6 +283,25 @@ class MainWidget(QWidget):
         """
         self.modeled_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
+        
+    
+    def _update_variable(self, key, value):
+        """
+        Updates the value of primary and secondary variables.
+        """
+        self.v_sliders[key] = value
+        self._calculate_secondary_variables()
+        
+        # Update the label with the updated secondary variables
+        formatted_lines = [
+        f"<b>{k}:</b> {v:.6g}" for k, v in self.v_second.items()
+        ]
+        #formatted_dictionary = '<br>'.join(formatted_lines)
+        #self.widget_at_bottom_label.setText(formatted_dictionary)
+        #actualize each one of the labels of self.widget_at_bottom_label with one of the values in the dictionary
+        
+        
+        
 
 
 if __name__ == "__main__":
