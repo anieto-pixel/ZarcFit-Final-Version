@@ -77,11 +77,11 @@ class MainWidget(QWidget):
 
         """Optimize Sliders Signaling"""
         # Initialize a timer for debouncing slider updates
-        self.update_timer = QTimer()
-        self.update_timer.setSingleShot(True)
-        self.update_timer.timeout.connect(self._process_slider_updates)
-        self.pending_updates = {}
-        self.value_labels = {}
+#        self.update_timer = QTimer()
+#        self.update_timer.setSingleShot(True)
+#        self.update_timer.timeout.connect(self._process_slider_updates)
+#        self.pending_updates = {}
+#        self.value_labels = {}
 
         """Methods"""
 
@@ -96,11 +96,14 @@ class MainWidget(QWidget):
         # Connecting hotkeys
         self._initialize_hotkeys()
 
-        # Updates dictionaries in main
+        # Listens for new input file data. Updates dictionaries in main 
         self.widget_input_file.file_data_updated.connect(self._update_file_data)
 
+        # Listens for changes in sliders. Updates all variables
+        self.widget_sliders.slider_value_updated.connect(self._update_variable)
         # Connects sliders to update handler with debouncing
-        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+#        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+
 
     # -----------------------------------------------------------------------
     #  Private UI Methods
