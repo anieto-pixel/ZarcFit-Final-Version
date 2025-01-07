@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QKeySequence
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QLabel, QSizePolicy
+from PyQt5.QtGui import QFontMetrics, QFont
 
 # Updated Imports with Renamed Classes
 from ConfigImporter import ConfigImporter
@@ -23,7 +25,7 @@ from WidgetInputFile import WidgetInputFile
 from WidgetSliders import WidgetSliders
 from WidgetButtonsRow import WidgetButtonsRow
 from WidgetGraphs import WidgetGraphs
-
+from WidgetTextBar import WidgetTextBar
 
 class MainWidget(QWidget):
 
@@ -62,7 +64,9 @@ class MainWidget(QWidget):
 
         self.widget_buttons = WidgetButtonsRow()
 
-        self.widget_at_bottom = self._create_bottom_text_widget()
+        self.widget_at_bottom = WidgetTextBar(self.config.series_secondary_variables.keys(), 
+                                              self.config.parallel_model_secondary_variables.keys()
+                                              )
 
         """Initialize Models"""
         # Model for manual and automatic computations
@@ -77,11 +81,13 @@ class MainWidget(QWidget):
         self.update_timer.setSingleShot(True)
         self.update_timer.timeout.connect(self._process_slider_updates)
         self.pending_updates = {}
+        self.value_labels = {}
 
         """Methods"""
 
         # Calculate secondary variables initially
         self._calculate_secondary_variables()
+        self.widget_at_bottom._update_text(self.v_second)
 
         # Layout the UI
         self._initialize_ui()
@@ -146,53 +152,6 @@ class MainWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         return self._create_widget_from_layout(layout)
 
-    def _create_bottom_text_widget(self):
-        """
-        Creates the bottom text widget containing labels to display secondary variables.
-        All variables are displayed in a single horizontal row with fixed positions.
-        """
-        widget = QWidget()
-
-        # Initialize the dictionary to store value labels for quick access
-        self.value_labels = {}
-
-        # Create a horizontal box layout
-        h_layout = QHBoxLayout()
-        h_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins for tight alignment
-
-        # Iterate over each secondary variable and create key and value labels
-        for var in list(self.config.series_secondary_variables.keys()) + list(self.config.parallel_model_secondary_variables.keys()):
-            # Create a container widget for each variable to group key and value labels
-            var_widget = QWidget()
-            var_layout = QHBoxLayout()
-            var_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
-            var_layout.setSpacing(2)  # Minimal spacing between key and value labels
-
-            # Key Label
-            key_label = QLabel(f"<b>{var}:</b>")
-            key_label.setAlignment(Qt.AlignCenter)
-
-            # Value Label
-            value_label = QLabel("0.0000")  # Initialize with default value
-            value_label.setAlignment(Qt.AlignCenter)
-
-            # Add labels to the variable layout
-            var_layout.addWidget(key_label)
-            var_layout.addWidget(value_label)
-
-            # Set the layout to the variable widget
-            var_widget.setLayout(var_layout)
-
-            # Add the variable widget to the main horizontal layout
-            h_layout.addWidget(var_widget)
-
-            # Store the value label in the dictionary for easy updates
-            self.value_labels[var] = value_label
-
-        # Set the layout to the bottom text widget
-        widget.setLayout(h_layout)
-
-        return widget
 
     def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:
         """
@@ -381,17 +340,9 @@ class MainWidget(QWidget):
         """
         self.v_sliders[key] = value
         self._calculate_secondary_variables()
+        self.widget_at_bottom._update_text(self.v_second)
 
-        # Iterate over each secondary variable and update its corresponding label
-        for var, val in self.v_second.items():
-            if var in self.value_labels:
-                if val is not None:
-                    # Format the value to 4 significant figures
-                    formatted_val = f"{val:.4g}"
-                    self.value_labels[var].setText(formatted_val)
-                else:
-                    # Display 'Error' if the value is None or invalid
-                    self.value_labels[var].setText("Error")
+
 
 
 if __name__ == "__main__":
