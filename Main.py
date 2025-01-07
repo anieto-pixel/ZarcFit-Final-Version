@@ -12,7 +12,7 @@ import os
 import sys
 import numpy as np
 
-from sympy import sympify, symbols
+from sympy import sympify, symbols, lambdify
 from sympy.core.sympify import SympifyError
 
 from PyQt5.QtWidgets import * #clean up with IA eventually
@@ -39,6 +39,10 @@ class MainWidget(QWidget):
 
         # Parse config settings
         self.config = ConfigImporter(config_file)
+        
+        # Pre-compile SymPy expressions
+        self.compiled_expressions = {}
+        self._compile_secondary_expressions()
 
         # Data placeholders for file & model outputs
         self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
@@ -153,25 +157,95 @@ class MainWidget(QWidget):
         layout.addWidget(self.widget_output_file)
         layout.setContentsMargins(0, 0, 0, 0)
         return self._create_widget_from_layout(layout)
-    
+    """
+    def _create_bottom_text_widget(self):
+        
+        widget = QWidget()
+        
+        # Initialize the dictionary to store value labels
+        self.value_labels = {}
+        
+        # Create a grid layout for alignment
+        grid_layout = QGridLayout()
+        grid_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+        #grid_layout.setSpacing(10)  # Space between labels
+        
+        # Iterate over each secondary variable and create labels
+        for row, (var, expr) in enumerate(self.config.secondary_variables.items()):
+            # Key Label
+            key_label = QLabel(f"<b>{var}:</b>")
+            key_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            
+            # Value Label
+            value_label = QLabel("0.000000")  # Initialize with default value
+            value_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            
+            # Optionally, set a fixed width for key labels for better alignment
+            key_label.setFixedWidth(100)
+            value_label.setFixedWidth(150)
+            
+            # Add labels to the grid
+            grid_layout.addWidget(key_label, row, 0)
+            grid_layout.addWidget(value_label, row, 1)
+            
+            # Store the value label in the dictionary for easy access
+            self.value_labels[var] = value_label
+        
+        # Set the grid layout to the widget
+        widget.setLayout(grid_layout)
+        
+        return widget
+    """
     def _create_bottom_text_widget(self):
         """
-        Creates the bottom text widget containing a label to display secondary variables.
+        Creates the bottom text widget containing labels to display secondary variables.
+        All variables are displayed in a single horizontal row with fixed positions.
         """
         widget = QWidget()
         
-        # Store the label as an instance attribute for later access
-        for k in self.config.keys():
-            self.widget_at_bottom_label = QLabel(k +"") #Ensure that k displays in bold, but the later value does not
-            self.widget_at_bottom_label.setAlignment(Qt.AlignLeft)
+        # Initialize the dictionary to store value labels for quick access
+        self.value_labels = {}
         
-        layout = QHBoxLayout()
-        layout.addWidget(self.widget_at_bottom_label)
-        widget.setLayout(layout)
+        # Create a horizontal box layout
+        h_layout = QHBoxLayout()
+        h_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins for tight alignment
         
-        # Remove margins and spacing to save space
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        # Iterate over each secondary variable and create key and value labels
+        for var in self.config.secondary_variables.keys():
+            # Create a container widget for each variable to group key and value labels
+            var_widget = QWidget()
+            var_layout = QHBoxLayout()
+            var_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins
+            var_layout.setSpacing(0)  # Space between key and value labels
+            
+            # Key Label
+            key_label = QLabel(f"<b>{var}:</b>")
+            key_label.setAlignment(Qt.AlignCenter)
+            #key_label.setFixedWidth(50)  # Fixed width for consistency
+            
+            # Value Label
+            value_label = QLabel("0.000000")  # Initialize with default value
+            value_label.setAlignment(Qt.AlignCenter)
+            #value_label.setFixedWidth(50)  # Fixed width to prevent shifting
+            
+            # Add labels to the variable layout
+            var_layout.addWidget(key_label)
+            var_layout.addWidget(value_label)
+            
+            # Set the layout to the variable widget
+            var_widget.setLayout(var_layout)
+            
+            # Add the variable widget to the main horizontal layout
+            h_layout.addWidget(var_widget)
+            
+            # Store the value label in the dictionary for easy updates
+            self.value_labels[var] = value_label
+        
+        # Add a stretch at the end to push all variable widgets to the left
+       # h_layout.addStretch()
+        
+        # Set the layout to the bottom text widget
+        widget.setLayout(h_layout)
         
         return widget
 
@@ -214,45 +288,51 @@ class MainWidget(QWidget):
 
 
 
-    def _calculate_secondary_variables(self):
+    def _compile_secondary_expressions(self):
         """
-        Calculates secondary variables using equations defined in the .ini file.
+        Compiles the SymPy expressions for secondary variables to speed up evaluations.
         """
-        # Ensure that there are equations to process
-        if not self.config.secondary_variables:
-            print("No equations defined in the configuration.")
-            return
-    
-        # Initialize the secondary variables dictionary
-        self.v_second = {}
-    
-        # Process each equation in order
+        self.compiled_expressions = {}
+        variables = symbols(list(self.config.slider_configurations.keys()))
+        
         for var, expr in self.config.secondary_variables.items():
+            
             try:
-                # Parse the expression using sympy
                 sympy_expr = sympify(expr)
-                
-                # Create a substitution dictionary combining v_sliders and already computed v_second
-                sym_dict = {**self.v_sliders, **self.v_second}
-                
-                # Evaluate the expression with substitutions
-                result = sympy_expr.evalf(subs=sym_dict)
-                
-                # Store the result in the secondary variables dictionary
-                self.v_second[var] = float(result)
-                
+                # Create a lambda function for faster evaluation
+                func = lambdify(variables, sympy_expr, 'numpy')
+                self.compiled_expressions[var] = func
+            
             except SympifyError as e:
                 print(f"Error parsing equation for {var}: {e}")
-                self.v_second[var] = None
-                
+                self.compiled_expressions[var] = None
             except Exception as e:
-                print(f"Error evaluating equation for {var}: {e}")
+                print(f"Unexpected error compiling equation for {var}: {e}")
+                self.compiled_expressions[var] = None
+
+    
+    def _calculate_secondary_variables(self):
+        """
+        Calculates secondary variables using pre-compiled equations.
+        """
+        if not self.compiled_expressions:
+            print("No compiled expressions available.")
+            return
+
+        self.v_second = {}
+        slider_values = [self.v_sliders[key] for key in self.config.slider_configurations.keys()]
+        
+        for var, func in self.compiled_expressions.items():
+            if func is not None:
+                try:
+                    result = func(*slider_values)
+                    self.v_second[var] = float(result)
+                except Exception as e:
+                    print(f"Error evaluating compiled equation for {var}: {e}")
+                    self.v_second[var] = None
+            else:
                 self.v_second[var] = None
 
-        # Testing
-        #print("Secondary Variables:", self.v_second)
-    
-    
     
     # -----------------------------------------------------------------------
     #  Private Conections Methods
@@ -292,14 +372,16 @@ class MainWidget(QWidget):
         self.v_sliders[key] = value
         self._calculate_secondary_variables()
         
-        # Update the label with the updated secondary variables
-        formatted_lines = [
-        f"<b>{k}:</b> {v:.6g}" for k, v in self.v_second.items()
-        ]
-        #formatted_dictionary = '<br>'.join(formatted_lines)
-        #self.widget_at_bottom_label.setText(formatted_dictionary)
-        #actualize each one of the labels of self.widget_at_bottom_label with one of the values in the dictionary
-        
+        # Iterate over each secondary variable and update its corresponding label
+        for var, val in self.v_second.items():
+            if var in self.value_labels:
+                if val is not None:
+                    # Format the value to 6 significant figures
+                    formatted_val = f"{val:.4g}"
+                    self.value_labels[var].setText(formatted_val)
+                else:
+                    # Display 'Error' if the value is None or invalid
+                    self.value_labels[var].setText("Error")
         
         
 
