@@ -46,6 +46,7 @@ class ConfigImporter:
         Internal: Reads and parses the .ini file, populating the class attributes.
         """
         config = configparser.ConfigParser()
+        config.optionxform = str  # Preserve the case of keys.
         config.read(self.config_file)
 
         # SliderConfigurations
@@ -59,6 +60,7 @@ class ConfigImporter:
                 color
             )
         self.slider_configurations = sliders
+
 
         # SliderDefaultValues
         defaults_str = config["SliderDefaultValues"]["defaults"]
@@ -93,8 +95,8 @@ def test_config_importer():
 
     # Sample .ini content for testing
     sample_ini_content = """[SliderConfigurations]
-slider1 = EPowerSliderWithTicks,0.0,100.0,red
-slider2 = DoubleSliderWithTicks,10.0,200.0,blue
+Slider1 = EPowerSliderWithTicks,0.0,100.0,red
+Slider2 = DoubleSliderWithTicks,10.0,200.0,blue
 
 [SliderDefaultValues]
 defaults = 50.0,20.0

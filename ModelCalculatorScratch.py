@@ -19,6 +19,17 @@ import numpy as np
 import configparser
 import scipy.optimize as opt
 
+import sys
+import numpy as np
+import scipy.optimize as opt
+
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QPushButton, QMessageBox
+)
+from PyQt5.QtCore import Qt
+
+import pyqtgraph as pg
+
 
 class FitCalculator:
     
@@ -88,7 +99,7 @@ class FitCalculator:
 ################################
 # TESTING
 ################################
-
+"""
 if __name__ == "__main__":
     
     # Fake data and arbitrary variables for testing
@@ -118,3 +129,144 @@ if __name__ == "__main__":
         print("Final cost:", final_cost)
     except (ValueError, RuntimeError) as e:
         print("An error occurred during fitting:", e)
+
+"""
+
+#this test is garbaje, I need to redo the entire thing
+class FitCalculatorTest(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Fit Calculator")
+        self.resize(800, 600)
+
+        # Initialize FitCalculator
+        self.calculator = FitCalculator()
+
+        # Initialize UI components
+        self.init_ui()
+
+        # Generate and set experimental data
+        self.generate_experimental_data()
+
+        # Perform initial fit and plot
+        self.perform_fit_and_plot()
+
+    def init_ui(self):
+        """
+        Initializes the user interface components.
+        """
+        layout = QVBoxLayout()
+
+        # Initialize PyQtGraph PlotWidget
+        self.plot_widget = pg.PlotWidget(title="Experimental Data vs. Fit Model")
+        self.plot_widget.setLabel('left', 'Experimental Data')
+        self.plot_widget.setLabel('bottom', 'Frequency')
+        self.plot_widget.addLegend()
+
+        # Add PlotWidget to the layout
+        layout.addWidget(self.plot_widget)
+
+        # Initialize Re-Fit button
+        self.refit_button = QPushButton("Re-Fit")
+        self.refit_button.setFixedHeight(40)
+        self.refit_button.clicked.connect(self.on_refit)
+
+        # Add button to the layout
+        layout.addWidget(self.refit_button, alignment=Qt.AlignCenter)
+
+        self.setLayout(layout)
+
+    def generate_experimental_data(self):
+        """
+        Generates synthetic experimental data for testing.
+        """
+        # True parameters
+        self.v1_true = 2
+        self.v2_true = 0.5
+        self.v3_true = 4
+
+        # Generate frequencies
+        self.frequencies = np.linspace(0, 10, 50)  # 50 frequency points
+
+        # Generate experimental data with noise
+        self.experimental_data = (
+            self.v1_true * np.sin(self.v2_true * self.frequencies) +
+            np.random.uniform(0, 2, 50) +
+            self.v3_true * np.random.randn(50)
+        )
+
+        # Set experimental values in FitCalculator
+        self.calculator.set_experimental_values(self.frequencies, self.experimental_data)
+
+        # Plot experimental data
+        self.plot_widget.plot(
+            self.frequencies, self.experimental_data,
+            pen=pg.mkPen(color='b', width=2),
+            name="Experimental Data"
+        )
+
+    def perform_fit_and_plot(self):
+        """
+        Performs the fitting process and plots the fit results.
+        """
+        # Initial guess for parameters (v0, v1, v2)
+        initial_guess = [1.0, 1.0, 1.0]
+
+        try:
+            # Perform the fit
+            best_fit_params = self.calculator.fit_model(initial_guess)
+            print("Optimized parameters:", best_fit_params)
+
+            # Compute final cost
+            final_cost = self.calculator._cost_function(best_fit_params)
+            print("Final cost:", final_cost)
+
+            # Generate fit data using the optimized parameters
+            fit_data = self.calculator._equation(best_fit_params, self.frequencies)
+
+            # Plot fit data
+            self.plot_widget.plot(
+                self.frequencies, fit_data,
+                pen=pg.mkPen(color='r', width=2),
+                name="Fit Model"
+            )
+
+        except (ValueError, RuntimeError) as e:
+            QMessageBox.critical(self, "Fitting Error", str(e))
+
+    def on_refit(self):
+        """
+        Slot for handling Re-Fit button clicks.
+        """
+        # Clear previous fit data (assuming it's the second plot)
+        self.plot_widget.clearPlots()
+
+        # Re-plot experimental data
+        self.plot_widget.plot(
+            self.frequencies, self.experimental_data,
+            pen=pg.mkPen(color='b', width=2),
+            name="Experimental Data"
+        )
+
+        # Perform fit and plot again
+        self.perform_fit_and_plot()
+
+
+################################
+# TESTING
+################################
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    # Instantiate and show the FitCalculatorWidget
+    window = FitCalculatorTest()
+    window.show()
+
+    sys.exit(app.exec_())
+
+
+
+
+
+
