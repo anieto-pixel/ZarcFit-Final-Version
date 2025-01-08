@@ -1,12 +1,12 @@
 """
 Optimized MainWidget and ConfigImporter Classes
 """
+# Main.py
 
 import os
 import sys
 import numpy as np
-from sympy import sympify, symbols, lambdify, pi
-from sympy.core.sympify import SympifyError
+from sympy import pi
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QSplitter, QLabel, QShortcut
@@ -33,13 +33,12 @@ class MainWidget(QWidget):
         super().__init__()
 
         """ini file related"""
-        # Parse config settings
+        # Initialize ConfigImporter
         self.config = ConfigImporter(config_file)
-
-        # Pre-compile SymPy expressions
-        self.compiled_expressions = {}
-        self.dependent_compiled_expressions = {}
-        self._compile_secondary_expressions()
+        
+        # Store local references to compiled expressions
+        self.compiled_expressions = self.config.compiled_expressions
+        self.dependent_compiled_expressions = self.config.dependent_compiled_expressions
 
         """Data attributes"""
         # Data placeholders for file & model outputs
@@ -64,9 +63,10 @@ class MainWidget(QWidget):
 
         self.widget_buttons = WidgetButtonsRow()
 
-        self.widget_at_bottom = WidgetTextBar(self.config.series_secondary_variables.keys(), 
-                                              self.config.parallel_model_secondary_variables.keys()
-                                              )
+        self.widget_at_bottom = WidgetTextBar(
+            self.config.series_secondary_variables.keys(), 
+            self.config.parallel_model_secondary_variables.keys()
+        )
 
         """Initialize Models"""
         # Model for manual and automatic computations
@@ -77,17 +77,18 @@ class MainWidget(QWidget):
 
         """Optimize Sliders Signaling"""
         # Initialize a timer for debouncing slider updates
-#        self.update_timer = QTimer()
-#        self.update_timer.setSingleShot(True)
-#        self.update_timer.timeout.connect(self._process_slider_updates)
-#        self.pending_updates = {}
-#        self.value_labels = {}
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self._update_sliders_data)
+        self.pending_updates = {}
+        self.value_labels = {}
 
         """Methods"""
 
         # Calculate secondary variables initially
         self._calculate_secondary_variables()
         self.widget_at_bottom._update_text(self.v_second)
+        self.this_is_a_frequency_loop()
 
         # Layout the UI
         self._initialize_ui()
@@ -99,11 +100,8 @@ class MainWidget(QWidget):
         # Listens for new input file data. Updates dictionaries in main 
         self.widget_input_file.file_data_updated.connect(self._update_file_data)
 
-        # Listens for changes in sliders. Updates all variables
-        self.widget_sliders.slider_value_updated.connect(self._update_variable)
         # Connects sliders to update handler with debouncing
-#        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
-
+        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
 
     # -----------------------------------------------------------------------
     #  Private UI Methods
@@ -180,82 +178,6 @@ class MainWidget(QWidget):
 
         shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
         shortcut_f5.activated.connect(self._print_model_parameters)
-
-    def _compile_secondary_expressions(self):
-        """
-        Compiles the SymPy expressions for secondary variables to speed up evaluations.
-        Processes independent and dependent variables based on configuration sections.
-        """
-        self.compiled_expressions = {}
-        self.dependent_compiled_expressions = {}
-
-        try:
-            # Define symbols for primary slider variables
-            primary_vars = list(self.config.slider_configurations.keys())
-            self.symbols_dict = symbols(primary_vars)
-            self.symbols_list = list(self.symbols_dict)
-        except Exception as e:
-            print(f"Error initializing symbols: {e}")
-            return
-
-        # Process SeriesSecondaryVariables (independent)
-        for var, expr in self.config.series_secondary_variables.items():
-            try:
-                sympy_expr = sympify(expr)
-                # Create a lambda function using 'numpy' for numerical operations
-                func = lambdify(self.symbols_list, sympy_expr, 'numpy')
-                self.compiled_expressions[var] = func
-            except SympifyError as e:
-                print(f"Error parsing equation for {var}: {e}")
-                self.compiled_expressions[var] = None
-            except Exception as e:
-                print(f"Unexpected error compiling equation for {var}: {e}")
-                self.compiled_expressions[var] = None
-
-        # Process ParallelModelSecondaryVariables (dependent) by compiling them
-        for var, expr in self.config.parallel_model_secondary_variables.items():
-            try:
-                sympy_expr = sympify(expr)
-                # Include both primary and secondary variables in symbols
-                all_vars = self.symbols_list + list(self.config.series_secondary_variables.keys())
-                func = lambdify(all_vars, sympy_expr, 'numpy')
-                self.dependent_compiled_expressions[var] = func
-            except SympifyError as e:
-                print(f"Error parsing equation for {var}: {e}")
-                self.dependent_compiled_expressions[var] = None
-            except Exception as e:
-                print(f"Unexpected error compiling equation for {var}: {e}")
-                self.dependent_compiled_expressions[var] = None
-
-    def _handle_slider_update(self, key, value):
-        """
-        Handles incoming slider updates by storing them and starting the debounce timer.
-        """
-        self.pending_updates[key] = value
-        self.update_timer.start(50)  # Adjust the timeout as needed
-
-    def _process_slider_updates(self):
-        """
-        Processes all pending slider updates at once.
-        """
-        # Update slider values
-        for key, value in self.pending_updates.items():
-            self.v_sliders[key] = value
-        self.pending_updates.clear()
-
-        # Recalculate secondary variables
-        self._calculate_secondary_variables()
-
-        # Update the UI labels
-        for var, val in self.v_second.items():
-            if var in self.value_labels:
-                if val is not None:
-                    # Format the value to 4 significant figures
-                    formatted_val = f"{val:.4g}"
-                    self.value_labels[var].setText(formatted_val)
-                else:
-                    # Display 'Error' if the value is None or invalid
-                    self.value_labels[var].setText("Error")
 
     def _calculate_secondary_variables(self):
         """
@@ -337,16 +259,35 @@ class MainWidget(QWidget):
         self.modeled_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
 
-    def _update_variable(self, key, value):
+    def _handle_slider_update(self, key, value):
         """
-        Updates the value of primary and secondary variables.
+        Handles incoming slider updates by storing them and starting the debounce timer.
         """
-        self.v_sliders[key] = value
+        self.pending_updates[key] = value
+        self.update_timer.start(10)  # Adjust the timeout as needed
+
+    def _update_sliders_data(self):
+        """
+        Processes all pending slider updates at once.
+        """
+        # Update slider values
+        for key, value in self.pending_updates.items():
+            self.v_sliders[key] = value
+        self.pending_updates.clear()
+
+        # Recalculate secondary variables
         self._calculate_secondary_variables()
         self.widget_at_bottom._update_text(self.v_second)
-
-
-
+        
+    def this_is_a_frequency_loop(self):
+        for freq in self.file_data['freq']:
+            # run the equation in [ManualModelFormula]
+            pass
+        
+        
+        
+        
+        
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
