@@ -40,6 +40,11 @@ class MainWidget(QWidget):
         self.compiled_expressions = self.config.compiled_expressions
         self.dependent_compiled_expressions = self.config.dependent_compiled_expressions
 
+        #self.compiled_manual_formula = self.config.compiled_manual_formula
+        #self.manual_formula_symbols = self.config.manual_formula_symbols
+
+
+
         """Data attributes"""
         # Data placeholders for file & model outputs
         self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
@@ -84,7 +89,6 @@ class MainWidget(QWidget):
         self.value_labels = {}
 
         """Methods"""
-
         # Calculate secondary variables initially
         self._calculate_secondary_variables()
         self.widget_at_bottom._update_text(self.v_second)
@@ -93,7 +97,7 @@ class MainWidget(QWidget):
         # Layout the UI
         self._initialize_ui()
 
-        ### Connect signals ###
+        """Connect signals """
         # Connecting hotkeys
         self._initialize_hotkeys()
 
@@ -280,11 +284,12 @@ class MainWidget(QWidget):
         self.widget_at_bottom._update_text(self.v_second)
         
     def this_is_a_frequency_loop(self):
-        for freq in self.file_data['freq']:
-            # run the equation in [ManualModelFormula]
-            pass
-        
-        
+        """
+        Here we will practice reading a formula form ini
+        That still uses some elements form the loop
+        """
+
+            
         
         
         
