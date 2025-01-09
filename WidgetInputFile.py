@@ -15,7 +15,6 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout
 )
 from PyQt5.QtCore import pyqtSignal, Qt
-
 from ConfigImporter import ConfigImporter
 
 
@@ -27,29 +26,11 @@ class WidgetInputFile(QWidget):
 
     file_data_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
-    def __init__(self, config_file: str):
-        """
-        Loads configuration from the specified .ini file and initializes
-        the UI for folder selection and file navigation.
-        
-        Parameters
-        ----------
-        config_file : str
-            The path to a .ini file. Must contain an 'InputFileWidget' section
-            with keys like 'supported_file_extension', 'skip_rows', etc.
-        """
+    def __init__(self, config_parameters, current_file=None):
+
         super().__init__()
-
-        # Load and parse configuration
-        self.config = ConfigImporter(config_file)
-        cfg_section = self.config.input_file_widget_config
-
-        # Extract required fields from config
-        self.supported_file_extension = cfg_section.get('supported_file_extension')
-        self.skip_rows = int(cfg_section.get('skip_rows'))
-        self.freq_column = int(cfg_section.get('freq_column'))
-        self.z_real_column = int(cfg_section.get('z_real_column'))
-        self.z_imag_column = int(cfg_section.get('z_imag_column'))
+        
+        self.config_p = config_parameters
 
         # Internal state
         self._folder_path = None
@@ -72,7 +53,76 @@ class WidgetInputFile(QWidget):
         self.file_label.setAlignment(Qt.AlignCenter)
 
         # Build the UI layout
-        self._initialize_ui()
+        self._initialize_ui() 
+        self._validate_parameters()
+
+    def _cast_config_parameters(self, config_parameters):
+        
+        try:
+            return {
+                'supported_file_extension': config_parameters['supported_file_extension'].lower(),
+                'skip_rows': int(config_parameters['skip_rows']),
+                'freq_column': int(config_parameters['freq_column']),
+                'z_real_column': int(config_parameters['z_real_column']),
+                'z_imag_column': int(config_parameters['z_imag_column'])
+            }
+        except (KeyError, ValueError) as e:
+            raise ValueError(f"Invalid configuration parameters: {e}")
+
+    def _validate_parameters(self):
+        """
+        Validates that all required configuration parameters are present.
+        Raises a ValueError if any are missing.
+        """
+        needed_parameters = [
+            'supported_file_extension',
+            'skip_rows',
+            'freq_column',
+            'z_real_column',
+            'z_imag_column'
+        ]
+        missing_params = [param for param in needed_parameters if param not in self.config_p]
+        if missing_params:
+            missing = ', '.join(missing_params)
+            raise ValueError(f"Configuration must include parameters: {missing}")
+        else:
+            self.config_p=self._cast_config_parameters(self.config_p)
+            
+            
+
+    def setup_current_file(self, current_file):
+        """
+        Sets up the current file by verifying its existence, loading the files
+        in its directory, and updating the current index if found.
+        
+        Parameters
+        ----------
+        current_file : str, optional
+            The full path to a .z file to be initially selected, by default None.
+        """
+        if current_file and os.path.isfile(current_file):
+            folder_path = os.path.dirname(current_file)
+            self._folder_path = folder_path
+            self._load_files()
+            
+            file_name = os.path.basename(current_file)
+            if file_name in self._files:
+                self._current_index = self._files.index(file_name)
+                self._update_file_display()
+                self._update_navigation_buttons()
+                
+            else:
+                print(f"File '{file_name}' was not found in the folder '{self._folder_path}'.")
+        
+        elif current_file:
+            folder_path = os.path.dirname(current_file)
+            
+            if os.path.isdir(folder_path):
+                self._folder_path = folder_path
+                self._load_files()
+                print(f"File '{os.path.basename(current_file)}' was not found in the folder '{self._folder_path}'.")
+            else:
+                print(f"Path '{current_file}' was not found.")
 
     def _initialize_ui(self):
         """
@@ -102,19 +152,18 @@ class WidgetInputFile(QWidget):
         resets the current file index, and updates the UI.
         """
         if self._folder_path:
-            # Only include files whose names end with the extension (case-insensitive)
+            supported_ext = self.config_p["supported_file_extension"]
             self._files = [
                 f for f in os.listdir(self._folder_path)
-                if f.lower().endswith(self.supported_file_extension)
+                if f.lower().endswith(supported_ext)
             ]
             if self._files:
                 self._current_index = 0
                 self._update_file_display()
-                self.previous_button.setEnabled(False)
-                self.next_button.setEnabled(len(self._files) > 1)
+                self._update_navigation_buttons()
             else:
                 self.file_label.setText(
-                    f"No {self.supported_file_extension} files found in the selected folder."
+                    f'No {self.config_p["supported_file_extension"]} files found in the selected folder.'
                 )
                 self.previous_button.setEnabled(False)
                 self.next_button.setEnabled(False)
@@ -128,13 +177,16 @@ class WidgetInputFile(QWidget):
             current_file = self._files[self._current_index]
             self.file_label.setText(current_file)
 
-            # Adjust buttons based on position
-            self.previous_button.setEnabled(self._current_index > 0)
-            self.next_button.setEnabled(self._current_index < len(self._files) - 1)
-
             # Build full path and extract the file's content
             file_path = os.path.join(self._folder_path, current_file)
             self._extract_content(file_path)
+
+    def _update_navigation_buttons(self):
+        """
+        Enables or disables navigation buttons based on the current index.
+        """
+        self.previous_button.setEnabled(self._current_index > 0)
+        self.next_button.setEnabled(self._current_index < len(self._files) - 1)
 
     def _show_previous_file(self):
         """
@@ -143,6 +195,7 @@ class WidgetInputFile(QWidget):
         if self._current_index > 0:
             self._current_index -= 1
             self._update_file_display()
+            self._update_navigation_buttons()
 
     def _show_next_file(self):
         """
@@ -151,30 +204,42 @@ class WidgetInputFile(QWidget):
         if self._current_index < len(self._files) - 1:
             self._current_index += 1
             self._update_file_display()
+            self._update_navigation_buttons()
 
     def _extract_content(self, file_path: str):
+        print("_extract_content")
         """
-        Carefully reads the file at file_path. Uses skip_rows, freq_column,
-        z_real_column, and z_imag_column to parse the data. Emits a signal
-        with the arrays or empty arrays on error.
+        Reads the file at file_path using the specified configuration,
+        and emits a signal with the extracted data.
+        
+        Parameters
+        ----------
+        file_path : str
+            The absolute path to the file to be read.
         """
         try:
             df = pd.read_csv(
                 file_path,
                 sep='\t',
-                skiprows=self.skip_rows,
+                skiprows=self.config_p["skip_rows"],
                 header=None
             )
 
             # Ensure columns exist
-            if max(self.freq_column, self.z_real_column, self.z_imag_column) >= len(df.columns):
+            freq_col = self.config_p["freq_column"]
+            z_real_col = self.config_p["z_real_column"]
+            z_imag_col = self.config_p["z_imag_column"]
+            max_col = max(freq_col, z_real_col, z_imag_col)
+            
+            if max_col >= len(df.columns):
                 raise ValueError("File does not contain the required columns.")
 
-            freq = df[self.freq_column].to_numpy()
-            z_real = df[self.z_real_column].to_numpy()
-            z_imag = df[self.z_imag_column].to_numpy()
+            freq = df[freq_col].to_numpy()
+            z_real = df[z_real_col].to_numpy()
+            z_imag = df[z_imag_col].to_numpy()
 
             self.file_data_updated.emit(freq, z_real, z_imag)
+            print("emitted signal")
         except Exception as e:
             print(f"Error reading file '{file_path}': {e}")
             self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
@@ -184,18 +249,22 @@ class WidgetInputFile(QWidget):
     # -----------------------------------------------------------------------
     def get_folder_path(self) -> str:
         """
+        Returns the currently selected folder path.
+        
         Returns
         -------
-        str :
+        str
             The currently selected folder path, or None if none selected.
         """
         return self._folder_path
 
     def get_current_file_path(self) -> str:
         """
+        Returns the absolute path of the currently displayed file.
+        
         Returns
         -------
-        str :
+        str
             The absolute path of the currently displayed file, or None if invalid.
         """
         if 0 <= self._current_index < len(self._files):
@@ -204,9 +273,11 @@ class WidgetInputFile(QWidget):
 
     def get_current_file_name(self) -> str:
         """
+        Returns the name of the currently displayed file.
+        
         Returns
         -------
-        str :
+        str
             The name of the currently displayed file, or None if invalid.
         """
         if 0 <= self._current_index < len(self._files):
