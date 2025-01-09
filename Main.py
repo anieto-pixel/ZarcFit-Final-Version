@@ -102,14 +102,19 @@ class MainWidget(QWidget):
         # Connecting hotkeys
         self._initialize_hotkeys()
 
-        # Listens for new input file data. Updates dictionaries in main 
+        # Listens for new input file selected. Updates dictionaries, graphs and config.ini
         self.widget_input_file.file_data_updated.connect(self._update_file_data)
+
+        #Listens for new output file selected.Updates config.ini
+        self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
+        
 
         # Connects sliders to update handler with debouncing
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
 
         "initialization 2.0 I guess? No fucking idea of how to roganize this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
+        self.widget_output_file.setup_current_file(self.config.output_file)
 
     # -----------------------------------------------------------------------
     #  Private UI Methods
@@ -161,7 +166,6 @@ class MainWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         return self._create_widget_from_layout(layout)
 
-
     def _create_widget_from_layout(self, layout: QHBoxLayout) -> QWidget:
         """
         Helper to wrap a given layout into a QWidget.
@@ -186,7 +190,6 @@ class MainWidget(QWidget):
 
         shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
         shortcut_f5.activated.connect(self._print_model_parameters)
-
 
     def _calculate_secondary_variables(self):
         """
@@ -248,7 +251,7 @@ class MainWidget(QWidget):
         #self.model_manual.initialize_frequencies(freq)
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
-        # Assuming model_manual triggers necessary updates
+
 
     def _update_modeled_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """

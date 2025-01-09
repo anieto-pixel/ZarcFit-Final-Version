@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel,
     QFileDialog, QHBoxLayout, QMessageBox
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal, Qt
 
 
 class ErrorWindow:
@@ -119,6 +119,8 @@ class WidgetOutputFile(QWidget):
     A widget for creating or selecting a .csv output file and writing data to it.
     Renamed from 'OutputFileWidget' to 'WidgetOutputFile'.
     """
+    
+    output_file_selected = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -160,7 +162,7 @@ class WidgetOutputFile(QWidget):
         """
         FileSelector.create_new_file(
             self._desired_type,
-            self._set_file_label,
+            self._set_output_file,
             self._set_file_message
         )
 
@@ -171,16 +173,18 @@ class WidgetOutputFile(QWidget):
         FileSelector.open_file_dialog(
             self._search_parameters,
             lambda path: FileSelector.validate(path, self._desired_type),
-            self._set_file_label,
+            self._set_output_file,
             self._set_file_message
         )
 
-    def _set_file_label(self, file_path):
+    def _set_output_file(self, file_path):
         """
         Updates the widget's label and internal state with the chosen file path.
         """
         self._output_file = file_path
         self._file_label.setText(os.path.basename(file_path))
+        
+        self.output_file_selected.emit(self._output_file)
 
     def _set_file_message(self, message):
         """
@@ -196,6 +200,9 @@ class WidgetOutputFile(QWidget):
         Returns the path of the currently selected output file, or None if none.
         """
         return self._output_file
+    
+    def setup_current_file(self, new_imput_file):
+        self._set_output_file(new_imput_file)
 
     def write_to_file(self, content, header=None):
         """
