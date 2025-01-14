@@ -1,5 +1,6 @@
 import os
 import configparser
+import logging
 from sympy import sympify, symbols, lambdify, SympifyError
 
 # Assuming these classes are defined in your CustomSliders module.
@@ -225,51 +226,47 @@ class ConfigImporter:
 
     def _compile_serial_model(self):
         """
-        Compiles the SerialModelFormula expressions.
+        Compiles the SerialModelFormula expression, dynamically collecting all valid symbols
+        from the configuration.
         """
-        config = configparser.ConfigParser()
-        config.optionxform = str
-        config.read(self.config_file)
-
-        if "SerialModelFormula" not in config:
+        if "SerialModelFormula" not in self.config:
             raise ValueError("Missing 'SerialModelFormula' section in the config file.")
-
-        formula_str = config["SerialModelFormula"].get("formula", "").strip()
+    
+        formula_str = self.config["SerialModelFormula"].get("formula", "").strip()
         if not formula_str:
             raise ValueError("No formula defined under 'SerialModelFormula' section.")
-
+    
         try:
-            # Define symbols needed for the serial model formula
-            # Assuming the formula uses pQh, Ql, Ph, and freq
-            serial_symbols = symbols("pQh Ql Ph freq")
-
-            # Combine with existing symbols to check for undefined symbols
-            all_defined_symbols = set(self.symbols_list + list(serial_symbols))
-
+            # Gather all possible symbols from sliders and secondary variables
+            primary_vars = list(self.slider_configurations.keys())
+            series_vars = list(self.series_secondary_variables.keys())
+            parallel_vars = list(self.parallel_model_secondary_variables.keys())
+            all_vars = primary_vars + series_vars + parallel_vars + ["freq"]
+    
+            all_symbols = symbols(all_vars)
+    
+            # Parse and validate the formula
             sympy_expr = sympify(formula_str)
-
+    
             # Check for undefined symbols
             expr_symbols = sympy_expr.free_symbols
-            missing_symbols = expr_symbols - all_defined_symbols
+            missing_symbols = expr_symbols - set(all_symbols)
             if missing_symbols:
                 missing = ", ".join(str(s) for s in missing_symbols)
                 raise ValueError(f"SerialModelFormula contains undefined symbols: {missing}")
-
+    
             # Compile the formula
-            self.serial_model_compiled_formula = lambdify(serial_symbols, sympy_expr, "numpy")
-
-            # Validate the number of arguments (should be 4: pQh, Ql, Ph, freq)
-            expected_args = len(serial_symbols)
-            if self.serial_model_compiled_formula.__code__.co_argcount != expected_args:
-                raise ValueError(
-                    f"SerialModelFormula expects {expected_args} arguments, "
-                    f"but got {self.serial_model_compiled_formula.__code__.co_argcount}."
-                )
-
+            self.serial_model_compiled_formula = lambdify(all_symbols, sympy_expr, "numpy")
+    
+            logging.info("SerialModelFormula compiled successfully.")
+    
         except SympifyError as e:
             raise ValueError(f"Error parsing SerialModelFormula: {e}")
+    
         except Exception as e:
-            raise ValueError(f"Unexpected error compiling SerialModelFormula: {e}")   
+            raise ValueError(f"Unexpected error compiling SerialModelFormula: {e}")
+    
+
 
     def _compile_parallel_model(self):
         pass

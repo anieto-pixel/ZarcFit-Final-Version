@@ -48,8 +48,7 @@ class MainWidget(QWidget):
 
         """Data atributes"""
         # Data placeholders for file & model outputs
-        self.file_data = {"freq": [1,2,3,4], "Z_real": None, "Z_imag": None}
-        self.modeled_data = {"freq": None, "Z_real": None, "Z_imag": None}
+        self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
 
         # Dictionary of variables
         self.v_sliders = dict(zip(self.config.slider_configurations.keys(),
@@ -77,10 +76,8 @@ class MainWidget(QWidget):
 
         """Initialize Models"""
         # Model for manual and automatic computations
-        self.model_manual = ModelManual(
-            list(self.config.slider_configurations.keys()),
-            self.config.slider_default_values
-        )
+        #self.model_manual = ModelManual(self.serial_model_compiled_formula)
+        self.model_manual = ModelManual()
 
         """Optimize Sliders Signaling"""
         # Initialize a timer for debouncing slider updates
@@ -107,10 +104,12 @@ class MainWidget(QWidget):
 
         #Listens for new output file selected.Updates config.ini
         self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
-        
 
         # Connects sliders to update handler with debouncing
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+        
+        # Connects model manual with handler (for now)
+        self.model_manual.model_manual_updated.connect(self.widget_graphs.update_manual_plot)
 
         "initialization 2.0 I guess? No fucking idea of how to roganize this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
@@ -230,15 +229,8 @@ class MainWidget(QWidget):
         # At this point, self.v_second contains all secondary variables with computed values
 
     # -----------------------------------------------------------------------
-    #  Private Connections Methods
+    #  Private Connections Methods. Listeners and Handlers
     # -----------------------------------------------------------------------
-
-    def _print_model_parameters(self):
-        """
-        Called when Print is requested 
-        """
-        content, header = self.model_manual.print_model_parameters()
-        self.widget_output_file.write_to_file(content, header)
 
     def _update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """
@@ -248,7 +240,7 @@ class MainWidget(QWidget):
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
-        #self.model_manual.initialize_frequencies(freq)
+        self.model_manual.initialize_frequencies('freq',freq)
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
@@ -257,7 +249,6 @@ class MainWidget(QWidget):
         """
         Called when ModelManual finishes recalculating with new slider values.
         """
-        self.modeled_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_manual_plot(freq, Z_real, Z_imag)
 
     def _handle_slider_update(self, key, value):
@@ -279,65 +270,19 @@ class MainWidget(QWidget):
         # Recalculate secondary variables
         self._calculate_secondary_variables()
         self.widget_at_bottom._update_text(self.v_second)
-        
-  
-        
-    
-    
-    def this_is_a_frequency_loop(self):
-        """
-        Iterates over all frequencies and evaluates the SerialModelFormula for each.
-        Stores the results in a numpy array.
-        """
-        if self.file_data["freq"] is None:
-            logging.warning("No frequency data available to iterate over.")
-            return
-    
-        # Ensure that the serial_model_compiled_formula is available
-        if self.serial_model_compiled_formula is None:
-            logging.error("SerialModelFormula is not compiled.")
-            return
-    
-        # Retrieve the parameter names from the compiled formula
-        try:
-            param_names = inspect.signature(self.serial_model_compiled_formula).parameters.keys()
-        except Exception as e:
-            logging.error(f"Error retrieving parameters from SerialModelFormula: {e}")
-            return
-    
-        # Initialize a list to store results
-        serial_model_results = []
-    
-        # Iterate over each frequency
-        for freq in self.file_data["freq"]:
-            try:
-                # Prepare the arguments by fetching from self.v_sliders and self.v_second
-                args = []
-                for param in param_names:
-                    if param == 'freq':
-                        args.append(freq)
-                    elif param in self.v_sliders:
-                        args.append(self.v_sliders[param])
-                    elif param in self.v_second:
-                        args.append(self.v_second[param])
-                    else:
-                        # If the variable is not found, log an error and use np.nan
-                        logging.error(f"Variable '{param}' not found in v_sliders or v_second.")
-                        args.append(np.nan)
-    
-                # Evaluate the formula
-                result = self.serial_model_compiled_formula(*args)
-                serial_model_results.append(result)
-    
-            except Exception as e:
-                logging.error(f"Error evaluating SerialModelFormula for freq={freq}: {e}")
-                serial_model_results.append(np.nan)  # Use np.nan to indicate failure
-    
-        # Convert the list to a numpy array
-        self.modeled_data['SerialModel'] = np.array(serial_model_results)
-        logging.info("SerialModelFormula evaluated for all frequencies.")
 
-        
+        #self.model_manual.run_model(self.v_sliders, self.v_second) #for version of ManualModelIni       
+        v_total=self.v_sliders|self.v_second
+        self.model_manual.run_model(v_total)
+
+
+    def _print_model_parameters(self):
+        """
+        Called when Print is requested 
+        """
+        content, header = self.model_manual.print_model_parameters()
+        self.widget_output_file.write_to_file(content, header)
+
         
 
 if __name__ == "__main__":
@@ -349,7 +294,6 @@ if __name__ == "__main__":
     main_widget = MainWidget(config_file)
     window.setCentralWidget(main_widget)
     window.setWindowTitle("Slider with Ticks and Labels (Optimized)")
-    main_widget.this_is_a_frequency_loop()
     
     window.setGeometry(0, 0, 800, 600)  # Set the initial size and position (x=0, y=0, width=800, height=600)
     window.show()

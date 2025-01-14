@@ -121,6 +121,10 @@ class WidgetSliders(QWidget):
     def get_slider(self, key):
         """Retrieves a slider by its key."""
         return self.sliders.get(key)
+    
+    def get_sliders_keys(self):
+        """Retrieves a slider by its key."""
+        return self.sliders.keys()
 
     def set_default_values(self):
         """Resets all sliders to their default positions."""

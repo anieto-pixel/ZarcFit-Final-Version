@@ -271,106 +271,175 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         return self._base_power ** n
 
 
-  # -----------------------------------------------------------------------
-  #  TEST
-  # -----------------------------------------------------------------------
-
-
-def test_custom_sliders():
-    """
-    A comprehensive manual test for CustomSliders, DoubleSliderWithTicks, 
-    and EPowerSliderWithTicks. Demonstrates:
-      1. Instantiation of multiple sliders with different ranges and colors.
-      2. Printing slider values in real time (connect to the .value_changed() signals).
-      3. Programmatically setting slider values via buttons.
-      4. Observing tick labels and displayed values for edge cases.
-      5. (Optional) A demonstration of exponent-based slider usage with EPowerSliderWithTicks.
-
-    HOW TO USE:
-      - Run this function. A window appears with multiple sliders side by side.
-      - Each slider logs its changes (float or int) to the console.
-      - Buttons below the sliders allow you to jump each slider to particular test values.
-      - Interact with the sliders to see real-time console output and label updates.
-    """
+# -----------------------------------------------------------------------
+#  TEST FOR UPDATED ModelManual with CustomSliders
+# -----------------------------------------------------------------------
+if __name__ == "__main__":
     import sys
+    import numpy as np
+    
     from PyQt5.QtWidgets import (
-        QApplication, QWidget, QHBoxLayout, QVBoxLayout, QPushButton, QLabel
+        QApplication, QWidget, QVBoxLayout,
+        QTableWidget, QTableWidgetItem, QHBoxLayout
+    )
+    from PyQt5.QtCore import Qt
+    
+    import pyqtgraph as pg
+
+    # Import your classes
+    from ModelManual import ModelManual
+    from WidgetSliders import WidgetSliders
+    # Make sure these sliders are imported or accessible:
+    # from CustomSliders import CustomSliders, DoubleSliderWithTicks, EPowerSliderWithTicks
+
+    # ---------------------------
+    # 1. Define a sample model_formula
+    # ---------------------------
+    def my_model_formula(freq, R=10.0, L=1e-3, alpha=1.0):
+        """
+        Example formula combining a resistor and an inductor in series,
+        plus a factor (1 + alpha) for demonstration.
+        
+        Z = R + j*(2*pi*freq*L)*(1 + alpha)
+        """
+        omega = 2.0 * np.pi * freq
+        Z_complex = R + 1j * omega * L * (1 + alpha)
+        return Z_complex
+
+    # ---------------------------
+    # 2. Create the ModelManual instance
+    # ---------------------------
+    model_manual = ModelManual(model_formula=my_model_formula)
+
+    # ---------------------------
+    # 3. Setup Frequency Data
+    # ---------------------------
+    # Example: 50 logarithmically spaced points between 1 Hz and 100 kHz
+    freqs = np.logspace(0, 5, 50)
+    model_manual.initialize_frequencies("freq", freqs)
+
+    # -------------------------------------------------------------------
+    # 4. Define slider configurations
+    #
+    # Each entry must be (slider_type, min_val, max_val, color),
+    # matching the signature in your "WidgetSliders::_create_sliders"
+    # -------------------------------------------------------------------
+    slider_configurations = {
+        "R": ("DoubleSliderWithTicks", 0.0, 100.0, "blue"),    # Resistances: 0 to 100
+        "L": ("DoubleSliderWithTicks", 1e-5, 1e-1, "green"),   # Inductance: 1e-5 to 1e-1
+        "alpha": ("DoubleSliderWithTicks", 0.0, 2.0, "red"),   # Dimensionless factor: 0 to 2
+    }
+
+    # Default values for each slider (matching the range above)
+    slider_defaults = {
+        "R": 10.0,
+        "L": 1e-3,
+        "alpha": 1.0
+    }
+
+    # ---------------------------
+    # 5. Create the QApplication and main window
+    # ---------------------------
+    app = QApplication(sys.argv)
+    main_window = QWidget()
+    main_window.setWindowTitle("ModelManual Test - Real-time Sliders & Plot")
+    main_window.setGeometry(100, 100, 1200, 600)
+
+    main_layout = QVBoxLayout(main_window)
+
+    # ---------------------------
+    # 6. Create the sliders widget
+    # ---------------------------
+    sliders_widget = WidgetSliders(slider_configurations, slider_defaults)
+    main_layout.addWidget(sliders_widget)
+
+    # ---------------------------
+    # 7. Create a table to display numeric results
+    #    (freq, Z_real, Z_imag)
+    # ---------------------------
+    freq_array = model_manual._modeled_data["freq"]
+    table_imp = QTableWidget(len(freq_array), 3)
+    table_imp.setHorizontalHeaderLabels(["Frequency (Hz)", "Z_real", "Z_imag"])
+
+    for i, f in enumerate(freq_array):
+        table_imp.setItem(i, 0, QTableWidgetItem(str(f)))
+        table_imp.setItem(i, 1, QTableWidgetItem(str(model_manual._modeled_data["Z_real"][i])))
+        table_imp.setItem(i, 2, QTableWidgetItem(str(model_manual._modeled_data["Z_imag"][i])))
+
+    # ---------------------------
+    # 8. Create a pyqtgraph plot for Real vs Imag
+    # ---------------------------
+    plot_widget = pg.PlotWidget(title="Nyquist Plot (Z_real vs. Z_imag)")
+    plot_widget.setLabel("bottom", "Z_real")
+    plot_widget.setLabel("left", "Z_imag")
+
+    curve = plot_widget.plot(
+        model_manual._modeled_data["Z_real"],
+        model_manual._modeled_data["Z_imag"],
+        pen=None, symbol='o', symbolSize=6, symbolBrush='b'
     )
 
-    app = QApplication(sys.argv)
+    # ---------------------------
+    # 9. Lay out table and plot side-by-side
+    # ---------------------------
+    h_layout = QHBoxLayout()
+    h_layout.addWidget(table_imp)
+    h_layout.addWidget(plot_widget)
+    main_layout.addLayout(h_layout)
 
-    # Create a main container widget
-    main_widget = QWidget()
-    main_widget.setWindowTitle("CustomSliders Comprehensive Manual Test")
+    # ---------------------------
+    # 10. Define update functions
+    # ---------------------------
+    def update_impedance_table_and_plot(freqs, z_reals, z_imags):
+        """
+        Update the table and the pyqtgraph plot
+        with the latest impedance data.
+        """
+        # Update table size in case freq array length changed
+        table_imp.setRowCount(len(freqs))
 
-    # Instantiate various sliders with different ranges
-    slider_int_0_100 = CustomSliders(0, 100, "blue")
-    slider_float_neg2_2 = DoubleSliderWithTicks(-2.0, 2.0, "green")
-    slider_exp_0_10 = EPowerSliderWithTicks(0, 10, "red")
+        for i in range(len(freqs)):
+            table_imp.setItem(i, 0, QTableWidgetItem(f"{freqs[i]:.4g}"))
+            table_imp.setItem(i, 1, QTableWidgetItem(f"{z_reals[i]:.4g}"))
+            table_imp.setItem(i, 2, QTableWidgetItem(f"{z_imags[i]:.4g}"))
 
-    # Connect each slider's signal to print the current value in console
-    slider_int_0_100.value_changed().connect(lambda: print(
-        f"[CustomSliders INT 0–100] Value: {slider_int_0_100.get_value()}"
-    ))
-    slider_float_neg2_2.value_changed().connect(lambda val: print(
-        f"[DoubleSliderWithTicks FLOAT -2–2] Value: {val:.3f}"
-    ))
-    slider_exp_0_10.value_changed().connect(lambda val: print(
-        f"[EPowerSliderWithTicks 10^x 0–10] Value: {val:.3e}"
-    ))
+        # Update the Nyquist plot (Real on X, Imag on Y)
+        curve.setData(z_reals, z_imags)
 
-    # Layout for the sliders in a horizontal row
-    sliders_layout = QHBoxLayout()
-    sliders_layout.addWidget(slider_int_0_100)
-    sliders_layout.addWidget(slider_float_neg2_2)
-    sliders_layout.addWidget(slider_exp_0_10)
+    def on_model_manual_updated(freqs, z_reals, z_imags):
+        """
+        Slot for model_manual.model_manual_updated signal.
+        Triggered when run_model completes.
+        """
+        update_impedance_table_and_plot(freqs, z_reals, z_imags)
 
-    # Buttons to demonstrate programmatic set_value()
-    button_layout = QHBoxLayout()
-    label_help = QLabel("Click a button to set each slider to a test value:")
+    # ---------------------------
+    # 11. Connect signals
+    # ---------------------------
+    model_manual.model_manual_updated.connect(on_model_manual_updated)
 
-    # Example test buttons for each slider
-    btn_set_mid = QPushButton("Set to midpoint")
-    btn_set_min = QPushButton("Set to min")
-    btn_set_max = QPushButton("Set to max")
+    def on_slider_value_updated(key, new_value):
+        """
+        Called whenever a slider changes its value.
+        We gather all sliders' current values into dictionaries and
+        re-run the model.
+        """
+        # Get current parameter values for all sliders
+        slider_values = sliders_widget.get_current_values()
 
-    def set_to_midpoint():
-        # Midpoints for each slider
-        slider_int_0_100.set_value(50)
-        slider_float_neg2_2.set_value(0.0)
-        slider_exp_0_10.set_value(5)  # 10^5 = 100000
+        # The ModelManual.run_model interface:
+        #   run_model(v_sliders, v_second)
+        # v_second can be empty if you only use `v_sliders`.
+        model_manual.run_model(slider_values, {})
 
-    def set_to_min():
-        slider_int_0_100.set_value(0)
-        slider_float_neg2_2.set_value(-2.0)
-        slider_exp_0_10.set_value(0)  # 10^0 = 1
+    sliders_widget.slider_value_updated.connect(on_slider_value_updated)
 
-    def set_to_max():
-        slider_int_0_100.set_value(100)
-        slider_float_neg2_2.set_value(2.0)
-        slider_exp_0_10.set_value(10)  # 10^10 = 10000000000
+    # ---------------------------
+    # 12. Show the main window and run
+    # ---------------------------
+    # Perform an initial run of the model with the default slider values
+    default_values = sliders_widget.get_current_values()
+    model_manual.run_model(default_values, {})
 
-    btn_set_mid.clicked.connect(set_to_midpoint)
-    btn_set_min.clicked.connect(set_to_min)
-    btn_set_max.clicked.connect(set_to_max)
-
-    button_layout.addWidget(label_help)
-    button_layout.addWidget(btn_set_min)
-    button_layout.addWidget(btn_set_mid)
-    button_layout.addWidget(btn_set_max)
-
-    # Combine everything in a vertical layout
-    main_layout = QVBoxLayout(main_widget)
-    main_layout.addLayout(sliders_layout)
-    main_layout.addLayout(button_layout)
-
-    # Show the main widget
-    main_widget.resize(600, 400)
-    main_widget.show()
-
+    main_window.show()
     sys.exit(app.exec_())
-
-if __name__ == "__main__":
-    # Possibly some other logic
-    # ...
-    test_custom_sliders() 
