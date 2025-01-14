@@ -57,7 +57,7 @@ class MainWidget(QWidget):
         self.v_second = {}  # variables secondary 
 
         """Initialize core widgets"""
-        print(self.config.input_file)
+        #print(self.config.input_file)
         self.widget_input_file = WidgetInputFile(self.config.input_file_widget_config)
         self.widget_output_file = WidgetOutputFile()
 
@@ -244,7 +244,7 @@ class MainWidget(QWidget):
         """
         Called when WidgetInputFile emits new file data.
         """
-        print("signal was received")
+        #print("signal was received")
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
@@ -350,6 +350,8 @@ if __name__ == "__main__":
     window.setCentralWidget(main_widget)
     window.setWindowTitle("Slider with Ticks and Labels (Optimized)")
     main_widget.this_is_a_frequency_loop()
+    
+    window.setGeometry(0, 0, 800, 600)  # Set the initial size and position (x=0, y=0, width=800, height=600)
     window.show()
 
     sys.exit(app.exec_())

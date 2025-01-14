@@ -207,7 +207,7 @@ class WidgetInputFile(QWidget):
             self._update_navigation_buttons()
 
     def _extract_content(self, file_path: str):
-        print("_extract_content")
+        #print("_extract_content")
         """
         Reads the file at file_path using the specified configuration,
         and emits a signal with the extracted data.
@@ -239,7 +239,9 @@ class WidgetInputFile(QWidget):
             z_imag = df[z_imag_col].to_numpy()
 
             self.file_data_updated.emit(freq, z_real, z_imag)
-            print("emitted signal")
+            
+            #print("emitted signal")
+        
         except Exception as e:
             print(f"Error reading file '{file_path}': {e}")
             self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
