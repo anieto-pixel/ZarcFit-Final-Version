@@ -69,7 +69,7 @@ class MainWidget(QWidget):
         self.widget_buttons = WidgetButtonsRow()
 
         self.widget_at_bottom = WidgetTextBar(
-            self.config.series_secondary_variables.keys(), 
+            #self.config.series_secondary_variables.keys(), 
             self.config.parallel_model_secondary_variables.keys()
         )
 
