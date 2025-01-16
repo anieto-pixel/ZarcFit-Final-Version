@@ -62,7 +62,11 @@ class ParentGraph(pg.PlotWidget):
         Updates a single plot (static or dynamic) with new data.
         data_dict must contain 'freq', 'Z_real', 'Z_imag'.
         """
-        x, y = self._prepare_xy(data_dict['freq'], data_dict['Z_real'], data_dict['Z_imag'])
+        x, y = self._prepare_xy(
+            data_dict['freq'],
+            data_dict['Z_real'],
+            data_dict['Z_imag']
+        )
         if plot_item:
             plot_item.setData(x, y)
 
@@ -70,16 +74,22 @@ class ParentGraph(pg.PlotWidget):
         """Clears and re-displays both the static and dynamic plots."""
         self.clear()
 
-        # Static plot (base data)
+        # Static plot
         self._static_plot = self.plot(
-            pen=None, symbol='o', symbolSize=8, symbolBrush='g'
-        )  # green dots
+            pen='g',             # green line connecting points
+            symbol='o',          # circle marker
+            symbolSize=7,        # smaller points
+            symbolBrush='g'      # green fill for markers
+        )
         self._refresh_plot(self._base_data, self._static_plot)
 
-        # Dynamic plot (manual data)
+        # Dynamic plot
         self._dynamic_plot = self.plot(
-            pen=None, symbol='x', symbolSize=8, symbolBrush='b'
-        )  # blue x
+            pen='b',             # blue line connecting points
+            symbol='o',          # circle marker
+            symbolSize=7,        # smaller points
+            symbolBrush='b'      # blue fill
+        )
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
     def filter_frequency_range(self, f_min, f_max):
@@ -133,21 +143,25 @@ class ParentGraph(pg.PlotWidget):
 
 class PhaseGraph(ParentGraph):
     """
-    Plots phase (in degrees) vs. frequency.
+    Plots log10(|phase|) vs. frequency, 
+    instead of the raw phase in degrees.
     """
 
     def __init__(self):
         super().__init__()
-        self.setTitle("Phase")
+        self.setTitle("Phase (Log Scale of Degrees)")
         self.setLabel('bottom', "Frequency [Hz]")
-        self.setLabel('left', "Phase [degrees]")
+        self.setLabel('left', "log10(|Phase|)")
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
-        Convert impedance to phase (arctan(Z_imag / Z_real)), in degrees, vs. freq.
+        Convert to phase in degrees, then take log10(|phase|).
         """
         phase_deg = np.degrees(np.arctan2(Z_imag, Z_real))
-        return freq, phase_deg
+        # log10 of the absolute value, with a small offset to avoid log(0)
+        phase_log = np.log10(np.abs(phase_deg) + 1e-10)
+        
+        return freq, phase_log
 
 
 class BodeGraph(ParentGraph):
@@ -159,7 +173,7 @@ class BodeGraph(ParentGraph):
         super().__init__()
         self.setTitle("Bode Graph")
         self.setLabel('bottom', "Frequency [Hz]")
-        self.setLabel('left', "Magnitude [dB]")
+        self.setLabel('left', "Log Magnitude [dB]")
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
@@ -177,6 +191,9 @@ class ColeColeGraph(ParentGraph):
 
     def __init__(self):
         super().__init__()
+        
+        self.getPlotItem().setAspectLocked(True, 1)
+        
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
         self.setLabel('left', "-Z'' [Ohms]")
@@ -249,11 +266,119 @@ class WidgetGraphs(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    widget = WidgetGraphs()
-    widget.resize(600, 400)
-    widget.show()
+    # Create a main widget to hold the graphs + sliders
+    main_widget = QWidget()
+    main_layout = QVBoxLayout(main_widget)
 
-    # Example: set new base data or apply a frequency filter
-    # widget.apply_filter_frequency_range(10, 100)
+    # 1) The composite widget with ColeCole, Bode, Phase
+    graph_widget = WidgetGraphs()
+    main_layout.addWidget(graph_widget)
+
+    # ---------------------------------------------------------------------
+    # Create our original data for the "base" (green) line:
+    # ---------------------------------------------------------------------
+    base_freq = np.array([1, 10, 100, 1000, 10000])
+    base_real = np.array([100, 80, 60, 40, 20])
+    base_imag = np.array([-50, -40, -30, -20, -10])
+
+    # Create data for the "manual" (blue) line:
+    manual_freq = np.array([1, 10, 100, 1000, 10000])
+    manual_real = np.array([90, 70, 50, 30, 10])
+    manual_imag = np.array([-45, -35, -25, -15, -5])
+
+    # Initialize the graphs with these as the base + manual data
+    graph_widget.update_graphs(base_freq, base_real, base_imag)    # green line
+    graph_widget.update_manual_plot(manual_freq, manual_real, manual_imag)  # blue line
+
+    # ---------------------------------------------------------------------
+    # 2) Create five sliders:
+    #    1) Frequency scale (black)
+    #    2) Green Real scale
+    #    3) Green Imag scale
+    #    4) Blue Real scale
+    #    5) Blue Imag scale
+    # ---------------------------------------------------------------------
+    sliders_layout = QGridLayout()
+    main_layout.addLayout(sliders_layout)
+
+    # -- (1) Frequency scale (black) --
+    freq_label = QLabel("Freq Scale (black):")
+    freq_slider = QSlider(Qt.Horizontal)
+    freq_slider.setRange(1, 300)   # maps to 0.01..3.00
+    freq_slider.setValue(100)      # 1.0 scale initially
+    sliders_layout.addWidget(freq_label, 0, 0)
+    sliders_layout.addWidget(freq_slider, 0, 1)
+
+    # -- (2) Green Real scale --
+    green_real_label = QLabel("Green Z_real:")
+    green_real_slider = QSlider(Qt.Horizontal)
+    green_real_slider.setRange(1, 300)
+    green_real_slider.setValue(100)
+    sliders_layout.addWidget(green_real_label, 1, 0)
+    sliders_layout.addWidget(green_real_slider, 1, 1)
+
+    # -- (3) Green Imag scale --
+    green_imag_label = QLabel("Green Z_imag:")
+    green_imag_slider = QSlider(Qt.Horizontal)
+    green_imag_slider.setRange(1, 300)
+    green_imag_slider.setValue(100)
+    sliders_layout.addWidget(green_imag_label, 2, 0)
+    sliders_layout.addWidget(green_imag_slider, 2, 1)
+
+    # -- (4) Blue Real scale --
+    blue_real_label = QLabel("Blue Z_real:")
+    blue_real_slider = QSlider(Qt.Horizontal)
+    blue_real_slider.setRange(1, 300)
+    blue_real_slider.setValue(100)
+    sliders_layout.addWidget(blue_real_label, 3, 0)
+    sliders_layout.addWidget(blue_real_slider, 3, 1)
+
+    # -- (5) Blue Imag scale --
+    blue_imag_label = QLabel("Blue Z_imag:")
+    blue_imag_slider = QSlider(Qt.Horizontal)
+    blue_imag_slider.setRange(1, 300)
+    blue_imag_slider.setValue(100)
+    sliders_layout.addWidget(blue_imag_label, 4, 0)
+    sliders_layout.addWidget(blue_imag_slider, 4, 1)
+
+    def on_any_slider_changed():
+        """
+        Callback when any of the 5 sliders moves:
+          - Recompute scaled freq, real, imag for both green (base) and blue (manual),
+          - Then update the graphs in real time.
+        """
+        freq_scale = freq_slider.value() / 100.0
+
+        green_r_scale = green_real_slider.value() / 100.0
+        green_i_scale = green_imag_slider.value() / 100.0
+
+        blue_r_scale = blue_real_slider.value() / 100.0
+        blue_i_scale = blue_imag_slider.value() / 100.0
+
+        # Scale base (green) data
+        base_freq_scaled = base_freq * freq_scale
+        base_real_scaled = base_real * green_r_scale
+        base_imag_scaled = base_imag * green_i_scale
+
+        # Scale manual (blue) data
+        manual_freq_scaled = manual_freq * freq_scale
+        manual_real_scaled = manual_real * blue_r_scale
+        manual_imag_scaled = manual_imag * blue_i_scale
+
+        # Update both lines across ColeCole, Bode, and Phase
+        graph_widget.update_graphs(base_freq_scaled, base_real_scaled, base_imag_scaled)
+        graph_widget.update_manual_plot(manual_freq_scaled, manual_real_scaled, manual_imag_scaled)
+
+    # Connect all sliders to the same handler
+    freq_slider.valueChanged.connect(on_any_slider_changed)
+    green_real_slider.valueChanged.connect(on_any_slider_changed)
+    green_imag_slider.valueChanged.connect(on_any_slider_changed)
+    blue_real_slider.valueChanged.connect(on_any_slider_changed)
+    blue_imag_slider.valueChanged.connect(on_any_slider_changed)
+
+    main_widget.setLayout(main_layout)
+    main_widget.resize(900, 700)
+    main_widget.setWindowTitle("Test - 5 Sliders (Green & Blue lines + Black freq)")
+    main_widget.show()
 
     sys.exit(app.exec_())
