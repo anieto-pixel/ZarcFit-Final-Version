@@ -42,8 +42,7 @@ class MainWidget(QWidget):
         self.compiled_expressions = self.config.compiled_expressions
         self.dependent_compiled_expressions = self.config.dependent_compiled_expressions
 
-        self.serial_model_compiled_formula = self.config.serial_model_compiled_formula
-        #self.manual_formula_symbols = self.config.manual_formula_symbols
+        self.final_compiled_formula = self.config.model_final_formula        #self.manual_formula_symbols = self.config.manual_formula_symbols
 
 
         """Data atributes"""
@@ -76,8 +75,8 @@ class MainWidget(QWidget):
 
         """Initialize Models"""
         # Model for manual and automatic computations
-        #self.model_manual = ModelManual(self.serial_model_compiled_formula)
-        self.model_manual = ModelManual()
+        self.model_manual = ModelManual(self.config)
+        #self.model_manual = ModelManual()
 
         """Optimize Sliders Signaling"""
         # Initialize a timer for debouncing slider updates
@@ -208,8 +207,8 @@ class MainWidget(QWidget):
             try:
                 self.v_second[var] = func(*slider_values)
             except Exception as e:
-                logging.error(f"Error evaluating '{var}': {e}")
-                self.v_second[var] = None  # Continue processing other expressions
+                logging.error(f"Error evaluating '{var}': {e}. Assigned 0")
+                self.v_second[var] = 0  # Continue processing other expressions
 
         # Prepare arguments for dependent expressions
         dependent_args = slider_values + [
@@ -222,11 +221,12 @@ class MainWidget(QWidget):
             try:
                 self.v_second[var] = func(*dependent_args)
             except Exception as e:
-                logging.error(f"Error evaluating '{var}': {e}")
-                self.v_second[var] = None  # Continue processing other expressions
+                logging.error(f"Error evaluating '{var}': {e}. Assigned 0")
+                self.v_second[var] = 0  # Continue processing other expressions
 
         logging.info("Secondary variables calculated successfully.")
         # At this point, self.v_second contains all secondary variables with computed values
+        print(self.v_second)
 
     # -----------------------------------------------------------------------
     #  Private Connections Methods. Listeners and Handlers
@@ -240,7 +240,7 @@ class MainWidget(QWidget):
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
-        self.model_manual.initialize_frequencies('freq',freq)
+        self.model_manual.initialize_frequencies(freq)
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
@@ -256,7 +256,7 @@ class MainWidget(QWidget):
         Handles incoming slider updates by storing them and starting the debounce timer.
         """
         self.pending_updates[key] = value
-        self.update_timer.start(10)  # Adjust the timeout as needed
+        self.update_timer.start(5)  # Adjust the timeout as needed
 
     def _update_sliders_data(self):
         """
@@ -271,9 +271,9 @@ class MainWidget(QWidget):
         self._calculate_secondary_variables()
         self.widget_at_bottom._update_text(self.v_second)
 
-        #self.model_manual.run_model(self.v_sliders, self.v_second) #for version of ManualModelIni       
-        v_total=self.v_sliders|self.v_second
-        self.model_manual.run_model(v_total)
+        self.model_manual.run_model(self.v_sliders, self.v_second) #for version of ManualModelIni       
+        #v_total=self.v_sliders|self.v_second
+        #self.model_manual.run_model(v_total)
 
 
     def _print_model_parameters(self):

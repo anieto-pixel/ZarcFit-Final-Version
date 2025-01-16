@@ -19,23 +19,35 @@ class ConfigImporter:
         self.config.optionxform = str  # Maintain case sensitivity for keys
         self.config.read(config_file)
 
-        # Attributes initialized
+        # Paths
         self.input_file = None
         self.output_file = None
-        #
+
+        # Widget config
         self.input_file_widget_config = {}
-        #
+
+        # Slider info
         self.slider_configurations = {}
         self.slider_default_values = []
-        #
+
+        # Secondary vars
         self.series_secondary_variables = {}
         self.parallel_model_secondary_variables = {}
-        #
-        self.compiled_expressions = {}
-        self.dependent_compiled_expressions = {}
-        self.symbols_list = []
-        self.serial_model_compiled_formula = None  # Updated to hold a single function
 
+        # NEW: additional expressions
+        self.model_secondary_formulas = {}
+        self.model_terciary_formulas = {}
+
+        # Compiled Lambdas
+        self.compiled_expressions = {}          # from SeriesSecondaryVariables
+        self.dependent_compiled_expressions = {}# from ParallelModelSecondaryVariables
+        self.compiled_model_secondary = {}       # from ModelSecondaryFormulas
+        self.compiled_model_terciary = {}        # from ModelTerciaryFormulas
+
+        self.model_final_formula = None          # single lambda from [ModelFormula]
+
+        # A list of primary slider symbols
+        self.symbols_list = []
 
         self._read_config_file()
 
@@ -86,9 +98,11 @@ class ConfigImporter:
 
         self._extract_mandatory_parameters()
         self._extract_optional_parameters()
-        self._compile_secondary_expressions()
-        self._compile_serial_model()
+        self._compile_secondary_expressions()     # Series + Parallel
+        self._compile_model_sections()            # ModelSecondaryFormulas + ModelTerciaryFormulas
+        self._compile_final_formula()             # [ModelFormula]
         
+
 
     def _extract_mandatory_parameters(self):
         required_sections = [
@@ -97,28 +111,149 @@ class ConfigImporter:
             "InputFileWidget",
             "SeriesSecondaryVariables",
             "ParallelModelSecondaryVariables",
-            "SerialModelFormula"
+            "ModelSecondaryFormulas",
+            "ModelTerciaryFormulas",
+            "ModelFormula"
         ]
 
         for section in required_sections:
             if section not in self.config:
-                # Fixed the exception message to include 'section'
                 raise ValueError(f"Missing '{section}' section in the config file.")
 
+        # Sliders
         self._extract_sliders_configurations()
 
+        # Defaults
         defaults_str = self.config["SliderDefaultValues"]["defaults"]
         self.slider_default_values = [float(val.strip()) for val in defaults_str.split(",")]
 
+        # InputFileWidget
         self.input_file_widget_config = {
-            key.strip(): value.strip() for key, value in self.config["InputFileWidget"].items()
+            key.strip(): value.strip() 
+            for key, value in self.config["InputFileWidget"].items()
         }
+
+        # Series & Parallel expressions
         self.series_secondary_variables = {
-            key.strip(): value.strip() for key, value in self.config["SeriesSecondaryVariables"].items()
+            k.strip(): v.strip() 
+            for k, v in self.config["SeriesSecondaryVariables"].items()
         }
         self.parallel_model_secondary_variables = {
-            key.strip(): value.strip() for key, value in self.config["ParallelModelSecondaryVariables"].items()
+            k.strip(): v.strip()
+            for k, v in self.config["ParallelModelSecondaryVariables"].items()
         }
+
+        # Additional model sections
+        self.model_secondary_formulas = {
+            k.strip(): v.strip()
+            for k, v in self.config["ModelSecondaryFormulas"].items()
+        }
+        self.model_terciary_formulas = {
+            k.strip(): v.strip()
+            for k, v in self.config["ModelTerciaryFormulas"].items()
+        }
+
+
+
+    def _compile_secondary_expressions(self):
+        """
+        Compiles the expressions from Series and Parallel sections
+        into lambdas. 
+        (Same logic as your original approach)
+        """
+        # 1) Primary slider symbols
+        primary_vars = list(self.slider_configurations.keys())
+        primary_symbols = symbols(primary_vars)
+        self.symbols_list = list(primary_symbols)
+
+        # 2) Series expressions
+        self._compile_expressions(
+            self.series_secondary_variables,
+            self.compiled_expressions,  # store here
+            self.symbols_list
+        )
+
+        # 3) Parallel expressions need extended vars
+        extended_vars = primary_vars + list(self.series_secondary_variables.keys())
+        extended_symbols = symbols(extended_vars)
+
+        self._compile_expressions(
+            self.parallel_model_secondary_variables,
+            self.dependent_compiled_expressions,  # store here
+            extended_symbols
+        )
+
+    def _compile_model_sections(self):
+        """
+        Compiles the formulas in [ModelSecondaryFormulas] and [ModelTerciaryFormulas].
+        Both might need the full extended set of symbols: 
+        primary slider vars + series + parallel vars + freq.
+        """
+        primary_vars = list(self.slider_configurations.keys())
+        series_vars  = list(self.series_secondary_variables.keys())
+        parallel_vars= list(self.parallel_model_secondary_variables.keys())
+
+        # We also need `freq` in these expressions
+        all_vars = primary_vars + series_vars + parallel_vars + ["freq"]
+        all_symbols = symbols(all_vars)
+
+        # 1) Compile [ModelSecondaryFormulas]
+        self._compile_expressions(
+            self.model_secondary_formulas,
+            self.compiled_model_secondary,  # store here
+            all_symbols
+        )
+
+        # 2) Compile [ModelTerciaryFormulas]
+        #    They might refer to the variables from [ModelSecondaryFormulas] as well.
+        extended_vars2 = all_vars + list(self.model_secondary_formulas.keys())
+        extended_symbols2 = symbols(extended_vars2)
+
+        self._compile_expressions(
+            self.model_terciary_formulas,
+            self.compiled_model_terciary,  # store here
+            extended_symbols2
+        )
+
+    def _compile_final_formula(self):
+        """
+        Compiles the single formula from [ModelFormula].
+        For example: formula = Z0 + (Zh*Zrock)/(Zh+Zrock) + ...
+        """
+        section = "ModelFormula"
+        if section not in self.config:
+            raise ValueError("Missing [ModelFormula] section.")
+        formula_str = self.config[section].get("formula", "").strip()
+        if not formula_str:
+            raise ValueError("No 'formula' key under [ModelFormula].")
+
+        # Gather all possible symbols
+        primary_vars    = list(self.slider_configurations.keys())
+        series_vars     = list(self.series_secondary_variables.keys())
+        parallel_vars   = list(self.parallel_model_secondary_variables.keys())
+        secondary_vars  = list(self.model_secondary_formulas.keys())
+        terciary_vars   = list(self.model_terciary_formulas.keys())
+
+        all_vars = primary_vars + series_vars + parallel_vars + secondary_vars + terciary_vars + ["freq"]
+        all_symbols = symbols(all_vars)
+
+        try:
+            expr = sympify(formula_str)
+            # Check undefined
+            missing = expr.free_symbols - set(all_symbols)
+            if missing:
+                raise ValueError(f"Undefined symbols in [ModelFormula]: {missing}")
+
+            # Lambdify
+            self.model_final_formula = lambdify(all_symbols, expr, "numpy")
+            logging.info("[ModelFormula] compiled successfully.")
+        except SympifyError as e:
+            raise ValueError(f"Error parsing [ModelFormula]: {e}")
+        except Exception as e:
+            raise ValueError(f"Unexpected error: {e}")
+
+
+
 
     #Aux for _extratc_mandatory_parameters
     def _extract_sliders_configurations(self):
@@ -268,8 +403,7 @@ class ConfigImporter:
     
 
 
-    def _compile_parallel_model(self):
-        pass
+
     
     #################
     # General Helper Methods
@@ -294,11 +428,10 @@ class ConfigImporter:
 
         output_dir = os.path.dirname(path) or '.'
         if not os.path.isdir(output_dir):
-            raise ValueError(f"Invalid file path. Teh directory does nto exist.")
+            raise ValueError(f"Invalid file path. The directory does nto exist.")
         return True
 
     
-
 
 #####################################
 #Testing
