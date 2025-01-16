@@ -30,6 +30,9 @@ class CustomSliders(QWidget):
         # Connect slider value changes to an internal update
         self._slider.valueChanged.connect(self._update_label)
 
+        # Number of intervals for the paint event
+        self.number_of_tick_intervals=10
+
         # Configure slider appearance and functionality
         self._setup_slider(colour)
 
@@ -76,7 +79,6 @@ class CustomSliders(QWidget):
         # Provide enough width so ticks and label don't overlap
         self.setMinimumWidth(75)
 
-
     def _update_label(self):
         """
         Update the on-screen label whenever the slider value changes.
@@ -96,7 +98,7 @@ class CustomSliders(QWidget):
         """
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.setFont(QFont("Arial", 6))
+        painter.setFont(QFont("Arial", 7))
         painter.setPen(QColor(0, 0, 0))
 
         # Gather slider range/tick info
@@ -174,7 +176,7 @@ class DoubleSliderWithTicks(CustomSliders):
         self._slider.setRange(int_min, int_max)
         self._slider.setTickPosition(QSlider.TicksBothSides)
 
-        interval = max(1, (int_max - int_min) // 10)
+        interval = max(1, (int_max - int_min) // self.number_of_tick_intervals)
         self._slider.setTickInterval(interval)
 
         self._slider.setStyleSheet(f"""
@@ -243,6 +245,8 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
 
     def __init__(self, min_value, max_value, colour):
         self._base_power = 10
+        
+        
         super().__init__(min_value, max_value, colour)
         
 
@@ -256,7 +260,8 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         Show each tick label as "1E<exponent>" based on the scaled integer.
         """
-        exponent = int(i / self._scale_factor)
+        #exponent = int(i / self._scale_factor)
+        exponent = i / self._scale_factor
         return f"1E{exponent}"
     
     # -----------------------------------------------------------------------
@@ -536,10 +541,6 @@ class TestSliders(QWidget):
 
         # Insert the new slider at index 0 in the layout
         layout.insertWidget(0, new_slider)
-
-
-
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
