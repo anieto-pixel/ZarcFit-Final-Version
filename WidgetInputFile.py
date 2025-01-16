@@ -290,61 +290,104 @@ class WidgetInputFile(QWidget):
 # -----------------------------------------------------------------------
 #  TEST
 # -----------------------------------------------------------------------
-def test_input_file_widget():
-    """
-    Basic test that creates a temporary .ini file, verifies that
-    WidgetInputFile loads config fields, and shows the UI.
-    """
-    import os
-    config_file = "test_config.ini"
 
-    # Create sample config
-    with open(config_file, "w") as file:
-        file.write("""
-[SliderConfigurations]
-slider1 = EPowerSliderWithTicks,0.0,100.0,red
-slider2 = DoubleSliderWithTicks,10.0,200.0,blue
+import sys
+import numpy as np
 
-[SliderDefaultValues]
-defaults = 50.0,20.0
+from PyQt5.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton
+)
+from PyQt5.QtCore import Qt
 
-[InputFileWidget]
-SUPPORTED_FILE_EXTENSION = .z
-SKIP_ROWS = 128
-FREQ_COLUMN = 0
-Z_REAL_COLUMN = 4
-Z_IMAG_COLUMN = 5
-        """)
 
-    try:
-        app = QApplication([])
-        widget = WidgetInputFile(config_file)
+class TestWindow(QWidget):
+    def __init__(self, config_parameters):
+        super().__init__()
+        self.setWindowTitle("Test for WidgetInputFile")
 
-        # Verify config
-        assert widget.supported_file_extension == ".z", "SUPPORTED_FILE_EXTENSION mismatch."
-        assert widget.skip_rows == 128, "SKIP_ROWS mismatch."
-        assert widget.freq_column == 0, "FREQ_COLUMN mismatch."
-        assert widget.z_real_column == 4, "Z_REAL_COLUMN mismatch."
-        assert widget.z_imag_column == 5, "Z_IMAG_COLUMN mismatch."
+        # 1) Create the WidgetInputFile instance
+        self.widget_input_file = WidgetInputFile(config_parameters)
 
-        print("Configuration values loaded successfully!")
-        widget.show()
-        app.exec_()
-        print("\nTest passed: WidgetInputFile loaded configuration correctly.")
+        # 2) Connect its signal to see incoming data in console
+        self.widget_input_file.file_data_updated.connect(self.handle_file_data_updated)
 
-    except Exception as e:
-        print(f"Test failed: {e}")
+        # 3) Build a layout: the widget + some test buttons
+        main_layout = QVBoxLayout()
+        main_layout.addWidget(self.widget_input_file)
 
-    finally:
-        if os.path.exists(config_file):
-            os.remove(config_file)
+        # Buttons to test the public methods
+        button_layout = QHBoxLayout()
+
+        btn_folder_path = QPushButton("Get Folder Path")
+        btn_folder_path.clicked.connect(self.show_folder_path)
+        button_layout.addWidget(btn_folder_path)
+
+        btn_current_file_path = QPushButton("Get Current File Path")
+        btn_current_file_path.clicked.connect(self.show_current_file_path)
+        button_layout.addWidget(btn_current_file_path)
+
+        btn_current_file_name = QPushButton("Get Current File Name")
+        btn_current_file_name.clicked.connect(self.show_current_file_name)
+        button_layout.addWidget(btn_current_file_name)
+
+        # Optional: a button to demonstrate setup_current_file
+        btn_setup_file = QPushButton("Setup Current File")
+        btn_setup_file.clicked.connect(self.test_setup_current_file)
+        button_layout.addWidget(btn_setup_file)
+
+        main_layout.addLayout(button_layout)
+        self.setLayout(main_layout)
+
+    # -----------------------------------------------------------------------
+    #  Button Handlers
+    # -----------------------------------------------------------------------
+    def show_folder_path(self):
+        print("Folder path:", self.widget_input_file.get_folder_path())
+
+    def show_current_file_path(self):
+        print("Current file path:", self.widget_input_file.get_current_file_path())
+
+    def show_current_file_name(self):
+        print("Current file name:", self.widget_input_file.get_current_file_name())
+
+    def test_setup_current_file(self):
+        """
+        Example usage:
+        Suppose we have some file like 'C:/data/test.z'.
+        If it exists, WidgetInputFile will load that folder and set that file.
+        """
+        dummy_file = "C:/path/to/your/test.z"
+        self.widget_input_file.setup_current_file(dummy_file)
+
+    # -----------------------------------------------------------------------
+    #  Slot for file_data_updated
+    # -----------------------------------------------------------------------
+    def handle_file_data_updated(self, freq, z_real, z_imag):
+        print("Received file_data_updated signal:")
+        print("  freq:", freq)
+        print("  z_real:", z_real)
+        print("  z_imag:", z_imag)
 
 
 if __name__ == "__main__":
-    test_input_file_widget()
 
-    # Optionally, run the widget using a known config.ini
-    # app = QApplication([])
-    # widget = WidgetInputFile("config.ini")
-    # widget.show()
-    # app.exec_()
+    # Sample config dict. Normally you might read these from a ConfigImporter or JSON
+    config = {
+        'supported_file_extension': '.z',
+        'skip_rows': 1,
+        'freq_column': 0,
+        'z_real_column': 1,
+        'z_imag_column': 2
+    }
+
+    app = QApplication(sys.argv)
+
+    test_window = TestWindow(config)
+    test_window.resize(800, 100)
+    test_window.show()
+
+    sys.exit(app.exec_())

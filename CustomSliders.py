@@ -59,7 +59,7 @@ class CustomSliders(QWidget):
         self._slider.setTickPosition(QSlider.TicksBothSides)
 
         # Safely set a tick interval (avoid division by zero if ranges are small)
-        interval = max(1, (self._max_value - self._min_value) // 10)
+        interval = max(1, (self._max_value - self._min_value) // self.number_of_tick_intervals)
         self._slider.setTickInterval(interval)
 
         # Style the slider handle and track
@@ -243,11 +243,22 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
     for base-10. For example, if the slider is set to 2, the actual value is 10^2.
     """
 
+class EPowerSliderWithTicks(DoubleSliderWithTicks):
     def __init__(self, min_value, max_value, colour):
         self._base_power = 10
-        
-        
+        self._tick_count = 8
         super().__init__(min_value, max_value, colour)
+
+    def _setup_slider(self, colour):
+        # 1) Let the parent do most of the setup:
+        super()._setup_slider(colour)
+
+        # 2) Then override the tick interval using _tick_count:
+        int_min = int(self._min_value * self._scale_factor)
+        int_max = int(self._max_value * self._scale_factor)
+        total_range = max(1, int_max - int_min)
+        interval = max(1, total_range // self._tick_count)
+        self._slider.setTickInterval(interval)
         
 
     def _update_label(self):
@@ -545,5 +556,7 @@ class TestSliders(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = TestSliders()
+    window.setWindowTitle("CustomSliders Manual Testing")  # Set the window title
     window.show()
     sys.exit(app.exec_())
+
