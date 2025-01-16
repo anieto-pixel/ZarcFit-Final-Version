@@ -98,7 +98,7 @@ class CustomSliders(QWidget):
         """
         super().paintEvent(event)
         painter = QPainter(self)
-        painter.setFont(QFont("Arial", 7))
+        painter.setFont(QFont("Arial", 7))#if changed you may want to change WidgetSliders as well to allow extra space between sliders
         painter.setPen(QColor(0, 0, 0))
 
         # Gather slider range/tick info
