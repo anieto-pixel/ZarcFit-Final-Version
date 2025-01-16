@@ -10,6 +10,7 @@ class ModelManual(QObject):
     """
     This class replicates the circuit calculation by evaluating
     formulas from config.ini (compiled by ConfigImporter).
+    Now it also calculates 'secondary variables' that used to be in Main.
     """
 
     model_manual_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
@@ -19,7 +20,6 @@ class ModelManual(QObject):
         :param config_importer: an instance of ConfigImporter
         """
         super().__init__()
-
         self.config_importer = config_importer
 
         # We'll store frequencies and results in these arrays
@@ -29,71 +29,48 @@ class ModelManual(QObject):
             "Z_imag": np.zeros(5),
         }
 
+        # We'll keep a copy of the secondary variables from the last run
+        self._latest_secondaries = {}
+
     def initialize_frequencies(self, freq_array: np.ndarray):
+        """
+        Initializes the frequency array used for model calculations.
+        """
         self._modeled_data['freq'] = freq_array
         self._modeled_data['Z_real'] = np.zeros_like(freq_array)
         self._modeled_data['Z_imag'] = np.zeros_like(freq_array)
 
     def run_model(self, v_sliders, v_second=None):
         """
-        Evaluate all expressions for each freq. 
-        v_sliders = {sliderName: floatValue} from the UI
-        v_second  = additional secondary variables (if any) 
-                    - often we recalc them ourselves though
+        Evaluate all expressions for each freq using the slider dictionary.
+        If v_second is None, we compute the secondary variables ourselves.
+        Then we do the final model formula for each freq.
+        Finally, we emit model_manual_updated(...) with new Z_real/Z_imag.
         """
+        # 1) Compute or update secondary variables
         if v_second is None:
-            v_second = {}
+            v_second = self._calculate_secondary_variables(v_sliders)
+
+        # Save for external reference
+        self._latest_secondaries = dict(v_second)
 
         freqs = self._modeled_data["freq"]
         Zr_list = []
         Zi_list = []
 
-        # We'll combine the user’s slider dictionary with v_second
-        # into one big local dictionary so everything is accessible by name.
-        # (Though typically we can recalc the secondaries from scratch too.)
+        # Combine the user’s slider dictionary with v_second
         base_vars = dict(v_sliders)
         base_vars.update(v_second)
 
         for f in freqs:
-            # Each frequency requires re-evaluation:
             local_vars = dict(base_vars)
             local_vars["freq"] = float(f)
 
-            # 1) Evaluate SeriesSecondaryVariables
-            for var_name, func in self.config_importer.compiled_expressions.items():
-                if func is None:
-                    continue
-                local_vars[var_name] = self._eval_lambda(func, local_vars)
+            # Evaluate Series, Parallel, Model Secondary, Model Tertiary
+            self._evaluate_all_expressions(local_vars)
 
-            # 2) Evaluate ParallelModelSecondaryVariables
-            for var_name, func in self.config_importer.dependent_compiled_expressions.items():
-                if func is None:
-                    continue
-                local_vars[var_name] = self._eval_lambda(func, local_vars)
-
-            # 3) Evaluate ModelSecondaryFormulas (Z0, Zh, Zm, Zl, Ze)
-            for var_name, func in self.config_importer.compiled_model_secondary.items():
-                if func is None:
-                    continue
-                local_vars[var_name] = self._eval_lambda(func, local_vars)
-
-            # 4) Evaluate ModelTerciaryFormulas (Z_m_l, Zrock, etc.)
-            for var_name, func in self.config_importer.compiled_model_terciary.items():
-                if func is None:
-                    continue
-                local_vars[var_name] = self._eval_lambda(func, local_vars)
-
-            # 5) Evaluate final formula
-            if self.config_importer.model_final_formula is None:
-                logging.error("No final formula compiled!")
-                Zr_list.append(np.nan)
-                Zi_list.append(np.nan)
-                continue
-
-            Z_total = self._eval_lambda(
-                self.config_importer.model_final_formula, 
-                local_vars
-            )
+            # Evaluate final formula
+            Z_total = self._evaluate_final_formula(local_vars)
 
             Zr_list.append(Z_total.real)
             Zi_list.append(Z_total.imag)
@@ -102,20 +79,101 @@ class ModelManual(QObject):
         self._modeled_data["Z_real"] = np.array(Zr_list)
         self._modeled_data["Z_imag"] = np.array(Zi_list)
 
-        # Emit
+        # Emit the new impedance data
         self.model_manual_updated.emit(
             self._modeled_data["freq"],
             self._modeled_data["Z_real"],
             self._modeled_data["Z_imag"]
         )
 
+    def get_latest_secondaries(self):
+        """
+        Return the most recent dictionary of secondary variables
+        that was computed in run_model.
+        """
+        return dict(self._latest_secondaries)
 
+    # ----------------------------------------------------
+    # Private Helpers
+    # ----------------------------------------------------
+    def _calculate_secondary_variables(self, v_sliders):
+        """
+        Computes 'series' and 'parallel' secondary variables
+        using the expressions from config.ini.
+        Returns a dict of newly calculated secondary variables.
+        """
+        v_second = {}
+        config = self.config_importer
 
+        # Convert the slider dict into an ordered list of values
+        slider_keys = config.slider_configurations.keys()
+        slider_values = [v_sliders[k] for k in slider_keys]
 
+        # 1) Evaluate Series expressions
+        for var, func in config.compiled_expressions.items():
+            try:
+                v_second[var] = func(*slider_values)
+            except Exception as e:
+                logging.error(f"Error evaluating '{var}': {e}. Assigned 0")
+                v_second[var] = 0
 
-    #---------------------------------------------------------
-    #   Helper Methods
-    #---------------------------------------------------------
+        # 2) Evaluate Parallel expressions
+        #    Combine slider_values + newly computed series secondaries
+        dep_args = slider_values + [
+            v_second.get(svar, 0)
+            for svar in config.series_secondary_variables.keys()
+        ]
+
+        for var, func in config.dependent_compiled_expressions.items():
+            try:
+                v_second[var] = func(*dep_args)
+            except Exception as e:
+                logging.error(f"Error evaluating '{var}': {e}. Assigned 0")
+                v_second[var] = 0
+
+        return v_second
+
+    def _evaluate_all_expressions(self, local_vars):
+        """
+        For the given local_vars dict,
+        run the series, parallel, model secondary, and model tertiary expressions
+        so that final formula can reference them.
+        """
+        config = self.config_importer
+
+        # 1) Series
+        for var_name, func in config.compiled_expressions.items():
+            if func is None: 
+                continue
+            local_vars[var_name] = self._eval_lambda(func, local_vars)
+
+        # 2) Parallel
+        for var_name, func in config.dependent_compiled_expressions.items():
+            if func is None:
+                continue
+            local_vars[var_name] = self._eval_lambda(func, local_vars)
+
+        # 3) Model Secondary
+        for var_name, func in config.compiled_model_secondary.items():
+            if func is None:
+                continue
+            local_vars[var_name] = self._eval_lambda(func, local_vars)
+
+        # 4) Model Tertiary
+        for var_name, func in config.compiled_model_terciary.items():
+            if func is None:
+                continue
+            local_vars[var_name] = self._eval_lambda(func, local_vars)
+
+    def _evaluate_final_formula(self, local_vars):
+        """
+        Evaluate the final compiled model formula using local_vars.
+        """
+        config = self.config_importer
+        if config.model_final_formula is None:
+            logging.error("No final formula compiled!")
+            return np.nan + 1j*np.nan
+        return self._eval_lambda(config.model_final_formula, local_vars)
 
     def _eval_lambda(self, func, var_dict):
         """
@@ -124,13 +182,15 @@ class ModelManual(QObject):
         """
         arg_values = []
         for param_name in inspect.signature(func).parameters.keys():
-            val = var_dict.get(param_name, None)
-            if val is None:
-                # Could be an error or just 0
-                val = 0
+            val = var_dict.get(param_name, 0)
             arg_values.append(val)
-
         return func(*arg_values)
+
+
+
+
+
+
 
 #---------------------------------------------------------
 #   TEST
