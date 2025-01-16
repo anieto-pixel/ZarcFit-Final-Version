@@ -263,10 +263,11 @@ class WidgetGraphs(QWidget):
 # -----------------------------------------------------------------------
 #  Quick test
 # -----------------------------------------------------------------------
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # Create a main widget to hold the graphs + sliders
+    # Create a main widget to hold the graphs + sliders + test buttons
     main_widget = QWidget()
     main_layout = QVBoxLayout(main_widget)
 
@@ -287,7 +288,7 @@ if __name__ == "__main__":
     manual_imag = np.array([-45, -35, -25, -15, -5])
 
     # Initialize the graphs with these as the base + manual data
-    graph_widget.update_graphs(base_freq, base_real, base_imag)    # green line
+    graph_widget.update_graphs(base_freq, base_real, base_imag)     # green line
     graph_widget.update_manual_plot(manual_freq, manual_real, manual_imag)  # blue line
 
     # ---------------------------------------------------------------------
@@ -376,9 +377,34 @@ if __name__ == "__main__":
     blue_real_slider.valueChanged.connect(on_any_slider_changed)
     blue_imag_slider.valueChanged.connect(on_any_slider_changed)
 
+    # ---------------------------------------------------------------------
+    # 3) Optional: Add test buttons to filter frequency range
+    # ---------------------------------------------------------------------
+    button_layout = QHBoxLayout()
+    main_layout.addLayout(button_layout)
+
+    # Button to filter data to [10, 100] range
+    btn_filter_10_100 = QPushButton("Filter 10..100 Hz")
+    def filter_10_100():
+        graph_widget.apply_filter_frequency_range(10, 100)
+    btn_filter_10_100.clicked.connect(filter_10_100)
+    button_layout.addWidget(btn_filter_10_100)
+
+    # Button to show full freq range again
+    btn_show_all = QPushButton("Show All Freq")
+    def show_all():
+        # We simply reset the original data to undo any prior filtering
+        graph_widget.update_graphs(base_freq, base_real, base_imag)
+        graph_widget.update_manual_plot(manual_freq, manual_real, manual_imag)
+    btn_show_all.clicked.connect(show_all)
+    button_layout.addWidget(btn_show_all)
+
+    # ---------------------------------------------------------------------
+    # Final Setup
+    # ---------------------------------------------------------------------
     main_widget.setLayout(main_layout)
     main_widget.resize(900, 700)
-    main_widget.setWindowTitle("Test - 5 Sliders (Green & Blue lines + Black freq)")
+    main_widget.setWindowTitle("Test - Full Coverage of Public Methods")
     main_widget.show()
 
     sys.exit(app.exec_())
