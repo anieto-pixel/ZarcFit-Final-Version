@@ -133,7 +133,8 @@ class CustomSliders(QWidget):
         """
         Programmatically sets the slider to a given integer value.
         """
-        self._slider.setValue(value)
+        
+        self._slider.setValue(int(value))
 
     def value_changed(self):
         """
@@ -275,80 +276,273 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
 #  Test
 # -----------------------------------------------------------------------
 #######################################################################
-
 import sys
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QSlider, QLabel, QHBoxLayout
+    QApplication, QWidget, QVBoxLayout, QSlider, QLabel,
+    QHBoxLayout, QLineEdit
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QSize
-from PyQt5.QtGui import QPainter, QFont, QColor, QFontMetrics
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class TestSliders(QWidget):
     """
-    Main widget to display and manually test all slider types.
+    Main widget to display and manually test all slider types
+    in a less repetitive way, with properly captured QLineEdit
+    text.
     """
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Slider Manual Test")
-        self.setGeometry(100, 100, 800, 400)
+        self.setGeometry(100, 100, 1200, 400)
+
+        # Store [Set Value, Min, Max] inputs for each slider type
+        self.slider_values = {
+            'custom': [None, None, None],
+            'double': [None, None, None],
+            'epower': [None, None, None],
+        }
+
+        # Keep references to slider objects for set_value calls
+        self.sliders = {}
+
+        # Keep all info needed to rebuild a slider if Min changes
+        self.slider_info = {}
 
         # Main layout
         main_layout = QHBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(10, 10, 10, 10)
 
-        # ----------------------------
-        # Custom Slider
-        # ----------------------------
-        custom_slider = CustomSliders(
-            min_value=-100,
-            max_value=100,
-            colour="blue",
+        # 1) Custom Slider
+        custom_section = self.add_slider_section(
+            slider_type='custom',
+            slider_class=CustomSliders,
+            label_text='Custom Slider',
+            min_val=-100, max_val=100, colour='blue',
+            is_float=False
         )
-        custom_slider.value_changed().connect(
-            lambda val: print(f"Custom Slider Value Changed: {val}")
-        )
+        main_layout.addLayout(custom_section)
 
-        # ----------------------------
-        # Double Slider
-        # ----------------------------
-        double_slider = DoubleSliderWithTicks(
-            min_value=-1.0,
-            max_value=1.0,
-            colour="green",
+        # 2) Double Slider
+        double_section = self.add_slider_section(
+            slider_type='double',
+            slider_class=DoubleSliderWithTicks,
+            label_text='Double Slider',
+            min_val=-1.0, max_val=1.0, colour='green',
+            is_float=True
         )
-        double_slider.value_changed().connect(
-            lambda val: print(f"Double Slider Value Changed: {val:.3f}")
-        )
+        main_layout.addLayout(double_section)
 
-        # ----------------------------
-        # E-Power Slider
-        # ----------------------------
-        epower_slider = EPowerSliderWithTicks(
-            min_value=-3,
-            max_value=3,
-            colour="red"
+        # 3) E-Power Slider
+        epower_section = self.add_slider_section(
+            slider_type='epower',
+            slider_class=EPowerSliderWithTicks,
+            label_text='E-Power Slider',
+            min_val=-3, max_val=3, colour='red',
+            is_float=True
         )
-        epower_slider.value_changed().connect(
-            lambda val: print(f"E-Power Slider Value Changed: {val:.3f}")
-        )
-
-        # Add sliders to the main layout
-        for slider in [custom_slider, double_slider, epower_slider]:
-            slider_container = QVBoxLayout()
-            slider_container.addWidget(slider)
-            main_layout.addLayout(slider_container)
+        main_layout.addLayout(epower_section)
 
         self.setLayout(main_layout)
 
+    def add_slider_section(self, slider_type, slider_class,
+                           label_text, min_val, max_val, colour,
+                           is_float=False):
+        """
+        Creates a slider+label+input-box section.
+        slider_type: a string identifier ('custom', 'double', etc.)
+        slider_class: the QWidget-based slider class to instantiate
+        label_text: text to display above the slider
+        min_val, max_val, colour: parameters to pass to slider_class
+        is_float: whether inputs should be float or int
+        """
+        # Outer vertical container
+        container = QVBoxLayout()
+        container.setSpacing(5)
+        container.setContentsMargins(0, 0, 0, 0)
 
-# -----------------------------------------------------------------------
-#  Test Execution
-# -----------------------------------------------------------------------
+        # Label
+        main_label = QLabel(label_text)
+        main_label.setAlignment(Qt.AlignLeft)
+        container.addWidget(main_label)
+
+        # Create the slider
+        slider = slider_class(min_val, max_val, colour)
+        self.sliders[slider_type] = slider
+
+        # Store info so we can rebuild if Min changes
+        # Note that "layout" is the horizontal layout that holds the slider
+        # so we can remove/insert the slider widget there.
+        self.slider_info[slider_type] = {
+            "slider_class": slider_class,
+            "min_val": min_val,
+            "max_val": max_val,
+            "colour": colour,
+            "is_float": is_float,
+            "layout": None,       # We'll fill this in a moment
+            "slider_widget": slider,
+            "label_text": label_text
+        }
+
+        # Connect to print changes
+        slider.value_changed().connect(
+            lambda val: print(f"{label_text} Changed: {val}")
+        )
+
+        # Horizontal layout: slider on the left, input fields on the right
+        h_layout = QHBoxLayout()
+        h_layout.setSpacing(10)
+        h_layout.setContentsMargins(0, 0, 0, 0)
+        h_layout.addWidget(slider)
+
+        # Remember the layout in slider_info so we can manipulate it later
+        self.slider_info[slider_type]["layout"] = h_layout
+
+        # A vertical layout for the three input boxes
+        input_layout = QVBoxLayout()
+        input_layout.setSpacing(2)
+        input_layout.setContentsMargins(0, 0, 0, 0)
+
+        # "Set Value", "Min", "Max"
+        input_labels = ["Set Value", "Min", "Max"]
+        for i, lbl in enumerate(input_labels):
+            single_input_layout = QVBoxLayout()
+            single_input_layout.setSpacing(1)
+            single_input_layout.setContentsMargins(0, 0, 0, 0)
+            single_input_layout.setAlignment(Qt.AlignLeft)  # Align left
+
+            small_label = QLabel(lbl)
+            small_label.setAlignment(Qt.AlignLeft)  # Ensure the label is aligned left
+            small_label.setFixedHeight(15)
+
+            input_box = QLineEdit()
+            input_box.setPlaceholderText(lbl)
+            input_box.setFixedWidth(60)
+
+            input_box.returnPressed.connect(
+                lambda box=input_box, idx=i: self.save_slider_input(
+                    slider_type, idx, box, is_float
+                )
+            )
+
+            single_input_layout.addWidget(small_label)
+            single_input_layout.addWidget(input_box)
+            input_layout.addLayout(single_input_layout)
+
+        h_layout.addLayout(input_layout)
+        container.addLayout(h_layout)
+
+        return container
+
+    def save_slider_input(self, slider_type, input_index, input_box, is_float):
+        """
+        Called when user hits 'Enter' in one of the input fields.
+        Attempts to convert the text to float or int depending on
+        is_float, stores it, and prints the value or error message.
+        
+        Additional rules:
+          - If this is the "Set Value" field (index=0), call slider.set_value(value)
+          - If this is the "Min" field (index=1), replace the old slider with
+            a new one using the new min and the old max.
+        """
+        text = input_box.text()
+        try:
+            value = float(text) if is_float else int(text)
+            self.slider_values[slider_type][input_index] = value
+            print(f"{slider_type.capitalize()} input {input_index} saved: {value}")
+
+            # If index=0 ("Set Value"), also apply it to the slider
+            if input_index == 0:
+                self.sliders[slider_type].set_value(value)
+
+            # If index=1 ("Min"), rebuild slider
+            elif input_index == 1:
+                self.replace_slider_min(slider_type, value)
+                
+            elif input_index == 2:
+                self.replace_slider_max(slider_type, value)
+
+        except ValueError:
+            print(f"Invalid input for '{slider_type}' at index {input_index}: {text}")
+
+    def replace_slider_min(self, slider_type, new_min):
+        """
+        Remove the old slider, create a new one with 'new_min'
+        as the minimum, and the old slider's maximum, then add
+        the new slider to the layout in the same place.
+        """
+        info = self.slider_info[slider_type]
+        old_slider = info["slider_widget"]
+        layout = info["layout"]
+
+        old_max = info["max_val"]
+        colour = info["colour"]
+        slider_class = info["slider_class"]
+        label_text = info["label_text"]
+        is_float = info["is_float"]
+
+        # Update stored min_val
+        info["min_val"] = new_min
+
+        # Remove old slider from layout
+        layout.removeWidget(old_slider)
+        old_slider.setParent(None)  # optional; helps Python GC
+
+        # Create the new slider
+        new_slider = slider_class(new_min, old_max, colour)
+        self.sliders[slider_type] = new_slider
+        info["slider_widget"] = new_slider
+
+        # Connect the same printing logic
+        new_slider.value_changed().connect(
+            lambda val: print(f"{label_text} Changed: {val}")
+        )
+
+        # Insert the new slider at index 0 in the layout
+        layout.insertWidget(0, new_slider)
+        
+    def replace_slider_max(self, slider_type, new_max):
+        """
+        Remove the old slider, create a new one with 'new_min'
+        as the minimum, and the old slider's maximum, then add
+        the new slider to the layout in the same place.
+        """
+        info = self.slider_info[slider_type]
+        old_slider = info["slider_widget"]
+        layout = info["layout"]
+
+        old_min = info["min_val"]
+        colour = info["colour"]
+        slider_class = info["slider_class"]
+        label_text = info["label_text"]
+        is_float = info["is_float"]
+
+        # Update stored min_val
+        info["max_val"] = new_max
+
+        # Remove old slider from layout
+        layout.removeWidget(old_slider)
+        old_slider.setParent(None)  # optional; helps Python GC
+
+        # Create the new slider
+        new_slider = slider_class(old_min, new_max, colour)
+        self.sliders[slider_type] = new_slider
+        info["slider_widget"] = new_slider
+
+        # Connect the same printing logic
+        new_slider.value_changed().connect(
+            lambda val: print(f"{label_text} Changed: {val}")
+        )
+
+        # Insert the new slider at index 0 in the layout
+        layout.insertWidget(0, new_slider)
+
+
+
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
-    test_window = TestSliders()
-    test_window.show()
-
+    window = TestSliders()
+    window.show()
     sys.exit(app.exec_())
