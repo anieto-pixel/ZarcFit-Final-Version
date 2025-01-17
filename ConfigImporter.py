@@ -108,6 +108,7 @@ class ConfigImporter:
         required_sections = [
             "SliderConfigurations",
             "SliderDefaultValues",
+            "VariablesToPrint",
             "InputFileWidget",
             "SeriesSecondaryVariables",
             "ParallelModelSecondaryVariables",
@@ -126,6 +127,11 @@ class ConfigImporter:
         # Defaults
         defaults_str = self.config["SliderDefaultValues"]["defaults"]
         self.slider_default_values = [float(val.strip()) for val in defaults_str.split(",")]
+
+        # Print Variables
+        vars_str = self.config["VariablesToPrint"]["variables"]
+        # Convert to a list, stripping whitespace
+        self.variables_to_print = [v.strip() for v in vars_str.split(",") if v.strip()]
 
         # InputFileWidget
         self.input_file_widget_config = {

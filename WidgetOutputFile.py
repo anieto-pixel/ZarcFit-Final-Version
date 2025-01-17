@@ -3,10 +3,9 @@ import csv
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel,
-    QFileDialog, QHBoxLayout, QMessageBox
+    QFileDialog, QHBoxLayout, QMessageBox, QVBoxLayout
 )
-from PyQt5.QtCore import Qt, pyqtSignal, Qt
-
+from PyQt5.QtCore import Qt, pyqtSignal
 
 class ErrorWindow:
     """
@@ -21,29 +20,44 @@ class ErrorWindow:
         msg.setText(message)
         msg.exec_()
 
-
 class FileWriter:
     """
-    Handles writing text content to files in a safe manner.
+    Handles writing rows of data to CSV files in a safe manner.
     """
-
     @staticmethod
-    def write_to_file(file_path, content):
+    def write_to_file(file_path, rows, header=None):
         """
-        Appends 'content' to the file at 'file_path'.
-        If 'file_path' is invalid or the write fails, an error is shown.
+        Appends rows to 'file_path' as CSV lines.
+        If 'header' is given, writes that first (in append mode).
+        
+        :param file_path: path to the CSV file
+        :param rows: a single row or a list of rows (iterables) to write
+        :param header: (ignored in this version, but kept for backward compatibility)
         """
         if not file_path:
             ErrorWindow.show_error_message("No file selected for writing.")
             return
 
         try:
-            with open(file_path, "a") as f:  # Append mode
-                f.write(f"{content}\n")
+            with open(file_path, "a", newline='') as f:
+                writer = csv.writer(f)
+
+                # If 'header' is present, we are ignoring it
+                # but you could remove or adapt this if truly unnecessary:
+                if header is not None and False:  # 'False' ensures it's never used
+                    writer.writerow(header)
+
+                # If 'rows' is a single row, wrap it in a list
+                if isinstance(rows[0], (int, float, str)):
+                    writer.writerow(rows)
+                else:
+                    for row in rows:
+                        writer.writerow(row)
+
         except Exception as e:
             ErrorWindow.show_error_message(f"Could not write to file: {e}")
-
-
+            
+            
 class FileSelector:
     """
     Handles file creation, selection, and validation.
@@ -64,15 +78,13 @@ class FileSelector:
         )
 
         if file_path:
-            # Ensure it has the correct extension
             if not file_path.lower().endswith(desired_type):
                 file_path += desired_type
 
-            # Create the file if it doesn't exist yet
             if not os.path.exists(file_path):
                 try:
                     with open(file_path, 'w', newline='') as f:
-                        pass  # Just create an empty file
+                        pass  # create empty file
                     set_file_callback(file_path)
                 except IOError as e:
                     ErrorWindow.show_error_message(f"Failed to create file: {str(e)}")
@@ -105,30 +117,25 @@ class FileSelector:
 
     @staticmethod
     def validate(file_path, desired_type):
-        """
-        Ensures the file ends with the specified extension.
-        Raises ValueError if it does not.
-        """
         if not file_path.lower().endswith(desired_type):
             raise ValueError(f"The selected file must end with '{desired_type}'")
         return True
 
-
 class WidgetOutputFile(QWidget):
     """
     A widget for creating or selecting a .csv output file and writing data to it.
-    Renamed from 'OutputFileWidget' to 'WidgetOutputFile'.
+    Now write_to_file(...) expects a dictionary and builds a single row from it.
     """
-    
+
     output_file_selected = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, variables_to_print=[]):
         super().__init__()
 
+        self.variables_to_print = variables_to_print  # list of keys to look for
         self._desired_type = ".csv"
         self._search_parameters = "CSV Files (*.csv);;All Files (*)"
         self._output_file = None
-        self._output_header = None
 
         # Create UI elements
         self._newfile_button = QPushButton("New File")
@@ -144,9 +151,6 @@ class WidgetOutputFile(QWidget):
         self._initialize_ui()
 
     def _initialize_ui(self):
-        """
-        Places buttons and label into a horizontal layout.
-        """
         layout = QHBoxLayout()
         self._newfile_button.setFixedSize(100, 30)
         layout.addWidget(self._newfile_button)
@@ -157,9 +161,6 @@ class WidgetOutputFile(QWidget):
         self.setLayout(layout)
 
     def _handle_create_new_file(self):
-        """
-        Invokes 'FileSelector.create_new_file' to create or overwrite a CSV file.
-        """
         FileSelector.create_new_file(
             self._desired_type,
             self._set_output_file,
@@ -167,9 +168,6 @@ class WidgetOutputFile(QWidget):
         )
 
     def _handle_open_file_dialog(self):
-        """
-        Invokes 'FileSelector.open_file_dialog' to select an existing CSV file.
-        """
         FileSelector.open_file_dialog(
             self._search_parameters,
             lambda path: FileSelector.validate(path, self._desired_type),
@@ -179,105 +177,131 @@ class WidgetOutputFile(QWidget):
 
     def _set_output_file(self, file_path):
         """
-        Updates the widget's label and internal state with the chosen file path.
+        Called whenever user picks or creates a file.
+        We store file_path and immediately print the variables in one row.
         """
         self._output_file = file_path
         self._file_label.setText(os.path.basename(file_path))
-        
+
         self.output_file_selected.emit(self._output_file)
 
+        # Print the single row of variables if available
+        if self.variables_to_print:
+            self.print_variables_list()
+
     def _set_file_message(self, message):
-        """
-        Sets a text message on the widget's label (e.g., "File already exists").
-        """
         self._file_label.setText(message)
 
     # -----------------------------------------------------------------------
-    #  Public Methods
+    #  Public methods
     # -----------------------------------------------------------------------
     def get_output_file(self):
-        """
-        Returns the path of the currently selected output file, or None if none.
-        """
         return self._output_file
-    
-    def setup_current_file(self, new_imput_file):
-        self._set_output_file(new_imput_file)
 
-    def write_to_file(self, content, header=None):
+    def setup_current_file(self, new_input_file):
+        self._set_output_file(new_input_file)
+
+    def print_variables_list(self):
         """
-        Writes iterable 'content' to the selected output file. If none is selected, shows an error.
-        """ 
-        if self._output_file:
-            if(self._output_header==None and header != None):
-                self._output_header=header
-                try:
-                    with open(self._output_file, "a", newline='') as f:
-                        writer = csv.writer(f)
-                        writer.writerow(header)  # 'content' must be an iterable (e.g., list)
-                except Exception as e:
-                    ErrorWindow.show_error_message(f"Could not write to file: {e}")
-
-            #FileWriter.write_to_file(self._output_file, content)
-            try:
-                with open(self._output_file, "a", newline='') as f:
-                    writer = csv.writer(f)
-                    writer.writerow(content)  # 'content' must be an iterable (e.g., list)
-            except Exception as e:
-                ErrorWindow.show_error_message(f"Could not write to file: {e}")
-        else:
+        Writes 'variables_to_print' in a single row to the CSV file.
+        Called whenever a new file is created or selected.
+        """
+        if not self._output_file:
             ErrorWindow.show_error_message(
                 "No output file selected. Please select or create a file first."
             )
+            return
+
+        if self.variables_to_print:
+            FileWriter.write_to_file(
+                file_path=self._output_file,
+                rows=self.variables_to_print  # single row
+            )
+
+    def write_to_file(self, dictionary):
+        """
+        Expects a dictionary. 
+        We build a single row by checking each key in 'variables_to_print' (in order):
+          - If the key is in 'content', we append the value
+          - Otherwise, we append an empty string
+
+        Then we pass that row to FileWriter.write_to_file(...) 
+        to be appended as one line in the CSV.
+        """
+        if not self._output_file:
+            ErrorWindow.show_error_message(
+                "No output file selected. Please select or create a file first."
+            )
+            return
+
+        if not isinstance(dictionary, dict):
+            ErrorWindow.show_error_message(
+                "write_to_file requires a dictionary. Received something else."
+            )
+            return
+
+        row = []
+        for key in self.variables_to_print:
+            # If key is present, use its value; else an empty string
+            value = dictionary.get(key, "")
+            row.append(value)
+
+        # Now pass this single row to FileWriter
+        FileWriter.write_to_file(
+            file_path=self._output_file,
+            rows=row,
+            header=None  # ignoring header now
+        )
 
 
 # -----------------------------------------------------------------------
-#  TEST
+#  TEST (Manually adapted)
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
-    import numpy as np
     from PyQt5.QtCore import QTimer
     from PyQt5.QtWidgets import QApplication, QPushButton, QVBoxLayout, QWidget
 
-    
     app = QApplication(sys.argv)
 
-    # Create an instance of WidgetOutputFile
-    widget = WidgetOutputFile()
-    widget.setWindowTitle("WidgetOutputFile - Comprehensive Manual Test")
+    # In a real app, you'd do something like:
+    # config_importer = ConfigImporter("config.ini")
+    # vars_to_print = config_importer.variables_to_print
+    # But here, we'll hardcode a simple list of variables:
+    vars_to_print = ["A", "B", "C", "D", "E"]
 
-    # Optional: Add a button or two to test writing in real time
-    write_test_button = QPushButton("Write Something")
-    
-    # A helper function to demonstrate writing
-    def write_some_content():
-        widget.write_to_file("Hello from the test_widget_output_file!")
-        
-        modeled_data = {
-            'freq': np.array([1, 10, 100, 1000, 10000]),
-            'Z_real': np.array([90, 70, 50, 30, 10]),
-            'Z_imag': np.array([-45, -35, -25, -15, -5]),
-        }
-        
-        widget.write_to_file(modeled_data['freq'], modeled_data.keys())
-    
-    write_test_button.clicked.connect(write_some_content)
+    widget = WidgetOutputFile(variables_to_print=vars_to_print)
+    widget.setWindowTitle("WidgetOutputFile - Dictionary Test")
 
-    # Layout for the test window
     container = QWidget()
     layout = QVBoxLayout(container)
     layout.addWidget(widget)
+
+    # A button to test writing a dictionary
+    write_test_button = QPushButton("Write Test Dictionary")
     layout.addWidget(write_test_button)
     container.setLayout(layout)
     container.show()
 
+    def on_write_test_button():
+        """
+        We'll simulate a dictionary that:
+         - includes some variables from vars_to_print (A, C),
+         - excludes others (B, D, E),
+         - and possibly has extra keys not in vars_to_print (e.g. 'Z').
+        """
+        data_dict = {
+            "A": 100,
+            "C": 300,
+            "Z": 999  # not in vars_to_print
+        }
+        # This will produce a row: [100, "", 300, "", ""] for A, B, C, D, E
+        widget.write_to_file(data_dict)
 
-    # ----- STEP 1: Attempt writing with no file selected (should show error) -----
-    QTimer.singleShot(1000, lambda: widget.write_to_file("Attempting to write with no file selected..."))
+    write_test_button.clicked.connect(on_write_test_button)
 
-    # (The rest of the steps require manual interaction.)
-
-
+    # Attempt writing with no file to see the error after 1s
+    # This dictionary only has "A" => the row would be [42, "", "", "", ""]
+    QTimer.singleShot(1000, lambda: widget.write_to_file({"A": 42}))
 
     sys.exit(app.exec_())
