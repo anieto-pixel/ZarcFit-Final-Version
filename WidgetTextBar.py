@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt
 import sys
 
 class WidgetTextBar(QWidget):
-    def __init__(self, keys_1=[], keys_2=[]):
+    def __init__(self, keys_1=[]):
         super().__init__()
         self.value_labels = {}   # Dictionary to store key-to-label mapping
         self.key_colors = {}     # Store each key's HTML color for use in _update_text
@@ -97,7 +97,7 @@ class WidgetTextBar(QWidget):
                 )
                 self.value_labels[key].setText(formatted_string)
             else:
-                print(f"Warning: Key '{key}' not found in value_labels.")
+                print(f"WidgetTectBar Warning: Key '{key}' not found in value_labels.")
                 
 #########################
 # Testing
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     window = QMainWindow()
 
     # Create the WidgetTextBar with keys from both dictionaries
-    text_bar = WidgetTextBar(dic_1.keys(), dic_2.keys())
+    text_bar = WidgetTextBar(dic_1.keys()| dic_2.keys())
     text_bar._update_text(dic_3)
 
     # Create sliders that modify dic_3 and update text_bar
