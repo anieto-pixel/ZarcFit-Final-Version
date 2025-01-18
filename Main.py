@@ -67,7 +67,7 @@ class MainWidget(QWidget):
 
         """Initialize Models"""
         # Model for manual and automatic computations
-        self.model_manual = ModelManual(self.config)
+        self.model_manual = ModelManual()
 
 
         """Optimize Sliders Signaling"""
