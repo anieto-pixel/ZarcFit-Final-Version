@@ -41,7 +41,9 @@ class ModelManual(QObject):
         self._modeled_data['Z_real'] = np.zeros_like(freq_array)
         self._modeled_data['Z_imag'] = np.zeros_like(freq_array)
 
-    def run_model(self, v):
+
+    # Mostly for testing purposes
+    def run_model_series(self, v):
         
         #v is v_sliders, shortene dname for readability
         """
@@ -56,16 +58,16 @@ class ModelManual(QObject):
         for freq in self._modeled_data["freq"]:
             zinf = self._inductor(freq, v["Linf"]) + v["Rinf"]
             
-            z_cpeh = self._cpe(freq, v["Rh"], self._q["Qh"], v["Ph"], v["Ph"])
+            z_cpeh = self._cpe(freq, self._q["Qh"], v["Ph"], v["Ph"])
             zarch = self._parallel(z_cpeh, v["Rh"])
             
-            z_cpem = self._cpe(freq, v["Rm"], self._q["Qm"], v["Pm"], v["Pm"])
+            z_cpem = self._cpe(freq, self._q["Qm"], v["Pm"], v["Pm"])
             zarcm =  self._parallel(z_cpem, v["Rm"])
             
-            z_cpel = self._cpe(freq, v["Rl"], self._q["Ql"], v["Pl"], v["Pl"])
+            z_cpel = self._cpe(freq, self._q["Ql"], v["Pl"], v["Pl"])
             zarcl = self._parallel(z_cpel, v["Rl"])
             
-            z_cpee = self._cpe(freq, v["Re"], v["Qe"], v["Pef"], v["Pei"])
+            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
             zarce = self._parallel(z_cpee, v["Re"])
 
             # Evaluate final formula
@@ -77,6 +79,58 @@ class ModelManual(QObject):
         # Update the arrays
         self._modeled_data["Z_real"] = np.array(Zr_list)
         self._modeled_data["Z_imag"] = np.array(Zi_list)
+
+        # Emit the new impedance data
+        self.model_manual_updated.emit(
+            self._modeled_data["freq"],
+            self._modeled_data["Z_real"],
+            self._modeled_data["Z_imag"]
+        )    
+
+
+    def run_model(self, v):
+        
+        #v is v_sliders, shortene dname for readability
+        """
+        """
+        # 1) Compute or update secondary variables
+        self._calculate_secondary_variables(v)
+        v2= self._v_second
+
+        zr_list = []
+        zi_list = []
+
+        # Combine the user’s slider dictionary with v_seco
+        for freq in self._modeled_data["freq"]:
+            #inductor
+            zinf = self._inductor(freq, v["Linf"])
+
+            #parallel system
+            #surface
+            z_line_h = v2["pRh"] + self._cpe(freq, v2["pQh"], v["Ph"], v["Ph"])
+
+            #rock sample            
+            z_line_m = v2["pRm"] + self._cpe(freq, v2["pQm"], v["Pm"], v["Pm"])
+            z_line_l = v2["pRl"] + self._cpe(freq, v2["pQl"], v["Pl"], v["Pl"])
+            z_lines = self._parallel(z_line_m, z_line_l)
+            z_rock = self._parallel(z_lines, v2["R0"])
+            
+            #rock+surface
+            zparallel= self._parallel(z_line_h, z_rock)
+
+            #modified zarc
+            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
+            zarce = self._parallel(z_cpee, v["Re"])
+
+            # Evaluate final formula
+            z_total = zinf + zparallel + zarce
+
+            zr_list.append(z_total.real)
+            zi_list.append(z_total.imag)
+
+        # Update the arrays
+        self._modeled_data["Z_real"] = np.array(zr_list)
+        self._modeled_data["Z_imag"] = np.array(zi_list)
 
         # Emit the new impedance data
         self.model_manual_updated.emit(
@@ -102,18 +156,16 @@ class ModelManual(QObject):
         Returns a dict of newly calculated secondary variables.
         """
         
-        print(v)
-        
+        #print(v)
         Qh = self._q_from_f0( v["Rh"], v["Fh"], v["Ph"])
         Qm = self._q_from_f0( v["Rm"], v["Fm"], v["Pm"])
         Ql = self._q_from_f0( v["Rl"], v["Fl"], v["Pl"])
         
-        print(self._q)
-        
         self._q["Qh"]=Qh
         self._q["Qm"]=Qm
         self._q["Ql"]=Ql
-
+        #print(self._q)
+        
         self._v_second["R0"] = v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]
         self._v_second["pRh"] = v["Rinf"]*(v["Rinf"] + v["Rh"])/v["Rh"]
         self._v_second["pQh"] = Qh*(v["Rh"]/(v["Rinf"] + v["Rh"]))**2
@@ -121,6 +173,8 @@ class ModelManual(QObject):
         self._v_second["pQm"] = Qm*(v["Rm"]/(v["Rinf"] + v["Rh"] + v["Rm"]))**2
         self._v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"])*(v["Rinf"] + v["Rh"] + v["Rm"] +v["Rl"])/v["Rl"]
         self._v_second["pQl"] = Ql*(v["Rl"]/(v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
+        #print(self._v_second)
+        
         
     # ----------------------------------------------------
     # Circuit Methods
@@ -132,7 +186,7 @@ class ModelManual(QObject):
     def _q_from_f0(self, r , f0, p):
         return 1.0 / (r * (2.0 * np.pi * f0)**p)
         
-    def _cpe(self, freq, r , q, pf, pi):
+    def _cpe(self, freq , q, pf, pi):
         phase_factor = (1j)**pi
         omega_exp = (2.0 * np.pi * freq)**pf
         return 1.0 / (q * phase_factor * omega_exp)
