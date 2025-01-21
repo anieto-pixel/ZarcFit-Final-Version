@@ -71,8 +71,8 @@ class WidgetSliders(QWidget):
         #    and so the text won't get cut off if we go slightly bigger
         needed_width = text_width
 
-        for key, (slider_type, min_value, max_value, color) in slider_configurations.items():
-            slider_widget = slider_type(min_value, max_value, color)
+        for key, (slider_type, min_value, max_value, color, number_of_tick_intervals) in slider_configurations.items():
+            slider_widget = slider_type(min_value, max_value, color, number_of_tick_intervals)
 
             # 4) Force the slider's minimum width so labels/ticks won't be truncated
             slider_widget.setMinimumWidth(needed_width)

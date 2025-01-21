@@ -51,13 +51,11 @@ class ConfigImporter:
 
         self._read_config_file()
 
+    ####################
+    # Public Methods
+    ###################
         
-####################
-# Public Methods
-###################
-    
     def set_input_file(self, new_input_file: str):
-        
         if self._validate_path(new_input_file):
             # Update the config and write back to file
             if 'InputFile' not in self.config:
@@ -73,7 +71,6 @@ class ConfigImporter:
     def set_output_file(self, new_output_file: str):
         if self._validate_path(new_output_file):
             # Update the config and write back to file
-            
             if 'OutputFile' not in self.config:
                 self.config['OutputFile'] = {}
             
@@ -88,9 +85,6 @@ class ConfigImporter:
     # Private Methods
     ###################
 
-    # MM not sure I like this design. Is it worth it to make a method for
-    # optional variables so things look cleaner?
-
     def _read_config_file(self):
         self.config = configparser.ConfigParser()
         self.config.optionxform = str
@@ -102,7 +96,6 @@ class ConfigImporter:
         self._compile_model_sections()            # ModelSecondaryFormulas + ModelTerciaryFormulas
         self._compile_final_formula()             # [ModelFormula]
         
-
 
     def _extract_mandatory_parameters(self):
         required_sections = [
@@ -260,15 +253,15 @@ class ConfigImporter:
 
 
 
-
-    #Aux for _extratc_mandatory_parameters
     def _extract_sliders_configurations(self):
         sliders = {}
         for key, value in self.config["SliderConfigurations"].items():
             parts = value.split(",")
-            if len(parts) != 4:
-                raise ValueError(f"Invalid slider configuration for '{key}'. Expected 4 comma-separated values.")
-            slider_type_str, min_val_str, max_val_str, color = parts
+            # *** Updated Line: Expect 5 parts now ***
+            if len(parts) != 5:
+                raise ValueError(f"Invalid slider configuration for '{key}'. Expected 5 comma-separated values.")
+            # *** Extract the fifth parameter: number_of_tick_intervals ***
+            slider_type_str, min_val_str, max_val_str, color, tick_interval_str = parts
             slider_class = self._safe_import(slider_type_str.strip())
             if slider_class is None:
                 raise ValueError(f"Unrecognized slider type '{slider_type_str}' for slider '{key}'.")
@@ -277,6 +270,7 @@ class ConfigImporter:
                 float(min_val_str.strip()),
                 float(max_val_str.strip()),
                 color.strip(),
+                int(tick_interval_str.strip()),  # *** Store the fifth parameter as int ***
             )
         self.slider_configurations = sliders
 
@@ -292,7 +286,7 @@ class ConfigImporter:
             path = self.config['OutputFile'].get('path')
             if path and self._validate_path(path):
                 self.output_file = path
-           
+               
 
     def _compile_secondary_expressions(self):
         """
@@ -344,20 +338,21 @@ class ConfigImporter:
                 if missing_symbols:
                     missing = ", ".join(str(s) for s in missing_symbols)
                     raise ValueError(f"Expression for '{variable}' contains undefined symbols: {missing}")
-
+    
                 # Create a lambda function for the expression
                 func = lambdify(symbol_list, sympy_expr, "numpy")
-
-                # Validate the number of arguments
+    
+                # Check if func has the correct number of arguments
                 expected_args = len(symbol_list)
-                if func.__code__.co_argcount != expected_args:
+                actual_args = func.__code__.co_argcount
+                if actual_args != expected_args:
                     raise ValueError(
                         f"Function for '{variable}' expects {expected_args} arguments, "
-                        f"but got {func.__code__.co_argcount}."
+                        f"but got {actual_args}."
                     )
-
+    
                 compiled_dict[variable] = func
-
+    
             except SympifyError as e:
                 print(f"Error parsing equation for '{variable}': {e}")
                 compiled_dict[variable] = None
@@ -409,8 +404,6 @@ class ConfigImporter:
     
 
 
-
-    
     #################
     # General Helper Methods
     ###############
@@ -428,16 +421,13 @@ class ConfigImporter:
         return classes.get(class_name)
     
     def _validate_path(self, path):
-
         if not isinstance(path, str):
             raise TypeError("Path must be a string.")
 
         output_dir = os.path.dirname(path) or '.'
         if not os.path.isdir(output_dir):
-            raise ValueError(f"Invalid file path. The directory does nto exist.")
+            raise ValueError(f"Invalid file path. The directory does not exist.")
         return True
-
-    
 
 #####################################
 #Testing
