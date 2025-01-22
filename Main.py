@@ -184,10 +184,10 @@ class MainWidget(QWidget):
         shortcut_f5.activated.connect(self._print_model_parameters)
         
         shortcut_f6 = QShortcut(QKeySequence(Qt.Key_F6), self)
-        shortcut_f6.activated.connect(self.widget_input_file._show_previous_file())
+        shortcut_f6.activated.connect(self.widget_input_file._show_previous_file)
         
         shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
-        shortcut_f7.activated.connect(self.widget_input_file._show_next_file())
+        shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
 
         #page down should reduce high frequencies
         #page up should reduce low frequencies
