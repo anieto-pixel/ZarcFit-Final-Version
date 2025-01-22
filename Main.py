@@ -169,15 +169,28 @@ class MainWidget(QWidget):
         """
         Initializes keyboard shortcuts.
         """
+        shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
+        shortcut_f1.activated.connect(lambda: self.model_manual.fit_model(self.v_sliders))
+        
         shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
-        shortcut_f2.activated.connect(lambda: self.model_manual._fit_model())
+        shortcut_f2.activated.connect(lambda: self.model_manual.fit_model(self.v_sliders))
+
+        #f3 is supposed to reset to "all frequencies"
 
         shortcut_f4 = QShortcut(QKeySequence(Qt.Key_F4), self)
         shortcut_f4.activated.connect(self._print_model_parameters)
 
         shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
         shortcut_f5.activated.connect(self._print_model_parameters)
+        
+        shortcut_f6 = QShortcut(QKeySequence(Qt.Key_F6), self)
+        shortcut_f6.activated.connect(self.widget_input_file._show_previous_file())
+        
+        shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
+        shortcut_f7.activated.connect(self.widget_input_file._show_next_file())
 
+        #page down should reduce high frequencies
+        #page up should reduce low frequencies
 
     # -----------------------------------------------------------------------
     #  Private Connections Methods. Listeners and Handlers
@@ -191,7 +204,7 @@ class MainWidget(QWidget):
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
-        self.model_manual.initialize_frequencies(freq)
+        self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
         
@@ -205,6 +218,7 @@ class MainWidget(QWidget):
         self.pending_updates[key] = value
         self.update_timer.start(5)  # Adjust the timeout as needed
 
+
     def _update_sliders_data(self):
         """
         Processes all pending slider updates at once.
@@ -215,7 +229,7 @@ class MainWidget(QWidget):
         self.pending_updates.clear()
 
         # Run the model, which also calculates secondaries
-        self.model_manual.run_model(self.v_sliders)
+        self.model_manual.run_model_manual(self.v_sliders)
 
         # Grab the newly calculated secondaries to display in bottom text
         v_second = self.model_manual.get_latest_secondaries()
@@ -228,6 +242,8 @@ class MainWidget(QWidget):
     def _print_model_parameters(self):
         """
         Called when Print is requested 
+        
+        (will have to figure out how to get all the dictionaries called, etc)
         """
         content, header = self.model_manual.print_model_parameters()
         self.widget_output_file.write_to_file(content, header)
