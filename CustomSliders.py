@@ -48,7 +48,7 @@ class CustomSliders(QWidget):
         self._layout.addWidget(self._slider)
         self._layout.addWidget(self._value_label)
         self.setLayout(self._layout)
-
+        
     def _setup_slider(self, colour):
         """
         Configure the slider's properties (range, ticks, color).
@@ -231,11 +231,6 @@ class DoubleSliderWithTicks(CustomSliders):
 
 ##############################################################################
 
-class EPowerSliderWithTicks(DoubleSliderWithTicks):
-    """
-    A floating-point slider that interprets its numeric range as an exponent
-    for base-10. For example, if the slider is set to 2, the actual value is 10^2.
-    """
 
 class EPowerSliderWithTicks(DoubleSliderWithTicks):
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
