@@ -57,14 +57,14 @@ class RangeSlider(QtWidgets.QSlider):
     def setHigh(self, high: int):
         self._high = high
         self.update()
-        
+            
     def paintEvent(self, event):
         """
         Reimplementation of the QSlider paint event to handle:
           1) Drawing the groove
           2) Drawing the 'span' rectangle between self._low and self._high
           3) Drawing each of the two slider handles
-          4) Drawing numeric labels (NOT ticks) at self.number_of_ticks intervals
+          4) Drawing numeric labels and ticks at self.number_of_ticks intervals
         """
         painter = QtGui.QPainter(self)
         style = QtWidgets.QApplication.style()
@@ -147,7 +147,7 @@ class RangeSlider(QtWidgets.QSlider):
             style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
     
         #
-        # 4) Draw numeric labels at self.number_of_ticks intervals
+        # 4) Draw numeric labels and ticks at self.number_of_ticks intervals
         #
         if self.number_of_ticks > 1:
             # Initialize the style option
@@ -158,7 +158,8 @@ class RangeSlider(QtWidgets.QSlider):
             )
     
             # Tick thickness adjustment
-            tick_thickness = 7  # Define the tick thickness explicitly
+            tick_length = 7  # Length of the tick line
+            head_thickness= 5
     
             painter.setPen(QtGui.QPen(QtCore.Qt.black))
             painter.setFont(QtGui.QFont("Arial", 7))
@@ -168,13 +169,15 @@ class RangeSlider(QtWidgets.QSlider):
                 slider_min = groove_rect.x()
                 slider_max = groove_rect.right()
                 available = slider_max - slider_min
-                text_offset = groove_rect.bottom() + tick_thickness + 5
+                text_offset = groove_rect.bottom() + 15  # Position below the groove
+                tick_offset = groove_rect.bottom() + 2  # Ticks directly below the groove
                 upside_down = False
             else:  # Vertical
-                slider_min = groove_rect.y()+ tick_thickness 
-                slider_max = groove_rect.bottom() - tick_thickness 
+                slider_min = groove_rect.y() + head_thickness
+                slider_max = groove_rect.bottom() - head_thickness
                 available = slider_max - slider_min
-                text_offset = groove_rect.right() -15
+                text_offset = groove_rect.right() -18  # Position to the right of the groove
+                tick_offset = groove_rect.right() -28  # Ticks directly beside the groove
                 upside_down = True  # If highest numbers appear at the top
     
             # Calculate numeric label positions
@@ -193,19 +196,26 @@ class RangeSlider(QtWidgets.QSlider):
                     val_int, available, upside_down
                 )
     
-                # Place the text depending on the orientation
+                # Draw ticks
                 if opt.orientation == QtCore.Qt.Horizontal:
                     x = slider_min + pixel_off
+                    painter.drawLine(x, tick_offset, x, tick_offset + tick_length)
+    
+                    # Draw text labels
                     text_rect = QtCore.QRect(
                         x - 15, text_offset, 30, 12
-                    )  # Adjusted to include tick thickness
+                    )
                     painter.drawText(text_rect, QtCore.Qt.AlignCenter, str(val_int))
-                else:
+                else:  # Vertical
                     y = slider_min + pixel_off
+                    painter.drawLine(tick_offset, y, tick_offset + tick_length, y)
+    
+                    # Draw text labels
                     text_rect = QtCore.QRect(
-                        text_offset, y -5, 40, 12
-                    )  # Adjusted to include tick thickness
+                        text_offset, y - 6, 40, 12
+                    )
                     painter.drawText(text_rect, QtCore.Qt.AlignVCenter, str(val_int))
+
 
     ##########################
     # Private Methods
