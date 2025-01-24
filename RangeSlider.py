@@ -57,7 +57,7 @@ class RangeSlider(QtWidgets.QSlider):
     def setHigh(self, high: int):
         self._high = high
         self.update()
-
+        
     def paintEvent(self, event):
         """
         Reimplementation of the QSlider paint event to handle:
@@ -67,33 +67,32 @@ class RangeSlider(QtWidgets.QSlider):
           4) Drawing numeric labels (NOT ticks) at self.number_of_ticks intervals
         """
         painter = QtGui.QPainter(self)
-        style   = QtWidgets.QApplication.style()
-
+        style = QtWidgets.QApplication.style()
+    
         #
         # 1) Draw the groove ONLY (no built-in tickmarks)
         #
         opt = QtWidgets.QStyleOptionSlider()
         self.initStyleOption(opt)
-        opt.sliderValue    = 0
+        opt.sliderValue = 0
         opt.sliderPosition = 0
-        # *** CHANGED *** Do NOT include SC_SliderTickmarks:
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
-
+        opt.subControls = QtWidgets.QStyle.SC_SliderGroove  # Groove only, no tickmarks
+    
         style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
-
+    
         # Retrieve the bounding rectangle of the groove
         groove_rect = style.subControlRect(
             QtWidgets.QStyle.CC_Slider, opt,
             QtWidgets.QStyle.SC_SliderGroove, self
         )
-
+    
         #
         # 2) Draw the 'span' rectangle between self._low and self._high
         #
         self.initStyleOption(opt)
-        opt.subControls   = QtWidgets.QStyle.SC_SliderGroove
-        opt.sliderValue   = 0
-
+        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
+        opt.sliderValue = 0
+    
         # Compute positions of the two handles in pixels:
         opt.sliderPosition = self._low
         low_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
@@ -101,118 +100,112 @@ class RangeSlider(QtWidgets.QSlider):
         opt.sliderPosition = self._high
         high_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
                                          QtWidgets.QStyle.SC_SliderHandle, self)
-
-        # __pick() presumably picks x or y based on orientation
-        low_pos  = self.__pick(low_rect.center())
+    
+        low_pos = self.__pick(low_rect.center())
         high_pos = self.__pick(high_rect.center())
-
-        min_pos  = min(low_pos, high_pos)
-        max_pos  = max(low_pos, high_pos)
-
+    
+        min_pos = min(low_pos, high_pos)
+        max_pos = max(low_pos, high_pos)
+    
         center_pt = QtCore.QRect(low_rect.center(), high_rect.center()).center()
-
+    
         if opt.orientation == QtCore.Qt.Horizontal:
             span_rect = QtCore.QRect(
                 QtCore.QPoint(min_pos, center_pt.y() - 2),
                 QtCore.QPoint(max_pos, center_pt.y() + 1)
             )
-            groove_rect.adjust(0, 0, -1, 0)  # keep highlight inside
+            groove_rect.adjust(0, 0, -1, 0)  # Keep highlight inside
         else:  # Vertical
             span_rect = QtCore.QRect(
                 QtCore.QPoint(center_pt.x() - 2, min_pos),
                 QtCore.QPoint(center_pt.x() + 1, max_pos)
             )
             groove_rect.adjust(0, 0, 0, 1)
-
+    
         highlight = self.palette().color(QtGui.QPalette.Highlight)
         painter.setBrush(QtGui.QBrush(highlight))
         painter.setPen(QtGui.QPen(highlight, 0))
         painter.drawRect(span_rect.intersected(groove_rect))
-
+    
         #
         # 3) Draw the two slider handles ONLY (no built-in tickmarks)
         #
         for value in [self._low, self._high]:
             opt = QtWidgets.QStyleOptionSlider()
             self.initStyleOption(opt)
-            # *** CHANGED ***  Do NOT add SC_SliderTickmarks
             opt.subControls = QtWidgets.QStyle.SC_SliderHandle
-
+    
             # If this handle is actively being dragged, highlight it
             if self.pressed_control:
                 opt.activeSubControls = self.pressed_control
             else:
                 opt.activeSubControls = self.hover_control
-
+    
             opt.sliderPosition = value
-            opt.sliderValue    = value
-
+            opt.sliderValue = value
+    
             style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
-
+    
         #
         # 4) Draw numeric labels at self.number_of_ticks intervals
-        #    *** CHANGED *** (No "tickmarks" lines, just text)
         #
         if self.number_of_ticks > 1:
-            # We'll map slider values to pixel offsets, then place text
+            # Initialize the style option
             self.initStyleOption(opt)
             groove_rect = style.subControlRect(
                 QtWidgets.QStyle.CC_Slider, opt,
                 QtWidgets.QStyle.SC_SliderGroove, self
             )
-
+    
+            # Tick thickness adjustment
+            tick_thickness = 7  # Define the tick thickness explicitly
+    
             painter.setPen(QtGui.QPen(QtCore.Qt.black))
             painter.setFont(QtGui.QFont("Arial", 7))
-
-            # Figure out orientation
+    
+            # Determine slider orientation
             if opt.orientation == QtCore.Qt.Horizontal:
-                slider_min  = groove_rect.x()
-                slider_max  = groove_rect.right()
-                available   = slider_max - slider_min
+                slider_min = groove_rect.x()
+                slider_max = groove_rect.right()
+                available = slider_max - slider_min
+                text_offset = groove_rect.bottom() + tick_thickness + 5
                 upside_down = False
             else:  # Vertical
-            
-                slider_min  = groove_rect.y() 
-                slider_max  = groove_rect.bottom()
-                available   = slider_max - slider_min
-                # If we want the highest number at the TOP, set True:
-                upside_down = True
-
-            # Distribute self.number_of_ticks from [minimum..maximum]
+                slider_min = groove_rect.y()+ tick_thickness 
+                slider_max = groove_rect.bottom() - tick_thickness 
+                available = slider_max - slider_min
+                text_offset = groove_rect.right() -15
+                upside_down = True  # If highest numbers appear at the top
+    
+            # Calculate numeric label positions
             total_range = self.maximum() - self.minimum()
-            step        = (total_range / (self.number_of_ticks - 1)
-                           if self.number_of_ticks > 1 else 0)
-
+            step = (total_range / (self.number_of_ticks - 1)
+                    if self.number_of_ticks > 1 else 0)
+    
             for i in range(self.number_of_ticks):
-                # The "actual" slider-value for this label
+                # Calculate the slider value for this label
                 val_float = self.minimum() + i * step
-                # Convert to int for sliderPositionFromValue
-                val_int   = int(round(val_float))
-
-                # Convert value -> pixel offset inside the groove
+                val_int = int(round(val_float))
+    
+                # Map the slider value to a pixel offset
                 pixel_off = style.sliderPositionFromValue(
                     self.minimum(), self.maximum(),
-                    val_int,
-                    available,
-                    upside_down
+                    val_int, available, upside_down
                 )
-
-                # Place the text to the right (vertical) or below (horizontal)
+    
+                # Place the text depending on the orientation
                 if opt.orientation == QtCore.Qt.Horizontal:
                     x = slider_min + pixel_off
-                    text_rect = QtCore.QRect(x - 15, groove_rect.bottom() + 5,
-                                             30, 12)
-                    painter.drawText(text_rect,
-                                     QtCore.Qt.AlignCenter,
-                                     str(val_int))
+                    text_rect = QtCore.QRect(
+                        x - 15, text_offset, 30, 12
+                    )  # Adjusted to include tick thickness
+                    painter.drawText(text_rect, QtCore.Qt.AlignCenter, str(val_int))
                 else:
-                    y = slider_min + pixel_off 
-                    text_rect = QtCore.QRect(groove_rect.right()-5, y - 6,
-                                             40, 12)
-                    painter.drawText(text_rect,
-                                     QtCore.Qt.AlignVCenter,
-                                     str(val_int))
-
+                    y = slider_min + pixel_off
+                    text_rect = QtCore.QRect(
+                        text_offset, y -5, 40, 12
+                    )  # Adjusted to include tick thickness
+                    painter.drawText(text_rect, QtCore.Qt.AlignVCenter, str(val_int))
 
     ##########################
     # Private Methods
