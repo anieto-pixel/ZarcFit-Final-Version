@@ -29,6 +29,7 @@ class RangeSlider(QtWidgets.QSlider):
         self.setMinimum(10)
         self.setMaximum(10000)
         self.setOrientation(QtCore.Qt.Vertical)  # Vertical slider
+        self.setTickPosition(QtWidgets.QSlider.TicksBelow)
 
         # Internal tracking for our two handles:
         self._low = self.minimum()
@@ -37,8 +38,10 @@ class RangeSlider(QtWidgets.QSlider):
         self.pressed_control = QtWidgets.QStyle.SC_None
         self.hover_control   = QtWidgets.QStyle.SC_None
         self.click_offset    = 0
+        
+        self.setMinimumWidth(100)
 
-        self.number_of_ticks = 4  # *** CHANGED *** Number of label intervals
+        self.number_of_ticks = 20  # *** CHANGED *** Number of label intervals
         self.active_slider   = 0
 
         # We do NOT use built-in ticks at all, so ignore these:
@@ -59,36 +62,72 @@ class RangeSlider(QtWidgets.QSlider):
         self.update()
             
     def paintEvent(self, event):
-        """
-        Reimplementation of the QSlider paint event to handle:
-          1) Drawing the groove
-          2) Drawing the 'span' rectangle between self._low and self._high
-          3) Drawing each of the two slider handles
-          4) Drawing numeric labels and ticks at self.number_of_ticks intervals
-        """
+        
         painter = QtGui.QPainter(self)
         style = QtWidgets.QApplication.style()
     
-        #
-        # 1) Draw the groove ONLY (no built-in tickmarks)
-        #
+        # 1. Draw the groove
         opt = QtWidgets.QStyleOptionSlider()
         self.initStyleOption(opt)
         opt.sliderValue = 0
         opt.sliderPosition = 0
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove  # Groove only, no tickmarks
-    
+        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
         style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
     
-        # Retrieve the bounding rectangle of the groove
         groove_rect = style.subControlRect(
-            QtWidgets.QStyle.CC_Slider, opt,
-            QtWidgets.QStyle.SC_SliderGroove, self
+            QtWidgets.QStyle.CC_Slider, opt, QtWidgets.QStyle.SC_SliderGroove, self
         )
     
-        #
-        # 2) Draw the 'span' rectangle between self._low and self._high
-        #
+        # 2. Draw the ticks and labels
+        self._draw_ticks_and_labels(painter, groove_rect, style, opt)
+    
+        # 3. Draw the span rectangle
+        self._draw_span(painter, style, groove_rect, opt)
+    
+        # 4. Draw the handles
+        self._draw_handles(painter, style, opt)
+        
+    def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
+        tick_length = 8
+        head_thickness= 5
+        painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        painter.setFont(QtGui.QFont("Arial", 7))
+    
+        if opt.orientation == QtCore.Qt.Horizontal:
+            slider_min = groove_rect.x()
+            slider_max = groove_rect.right()
+            available = slider_max - slider_min
+            text_offset = groove_rect.bottom() + 15  # Adjust label position
+            tick_offset = groove_rect.bottom() + 2
+        else:  # Vertical
+            slider_min = groove_rect.y() + head_thickness
+            slider_max = groove_rect.bottom() - head_thickness
+            available = slider_max - slider_min
+            text_offset = groove_rect.right() - 20  # Adjust label position
+            tick_offset = groove_rect.right() - 35
+    
+        step = (self.maximum() - self.minimum()) / (self.number_of_ticks - 1)
+    
+        for i in range(self.number_of_ticks):
+            value = self.minimum() + i * step
+            value=int(round(value))
+            pixel_offset = style.sliderPositionFromValue(
+                self.minimum(), self.maximum(), value, available, opt.upsideDown
+            )
+    
+            if opt.orientation == QtCore.Qt.Horizontal:
+                x = slider_min + pixel_offset
+                painter.drawLine(x, tick_offset, x, tick_offset + tick_length)
+                text_rect = QtCore.QRect(x - 15, text_offset, 30, 12)
+                painter.drawText(text_rect, QtCore.Qt.AlignCenter, str(int(value)))
+            else:
+                y = slider_min + pixel_offset
+                painter.drawLine(tick_offset, y, tick_offset + tick_length, y)
+                text_rect = QtCore.QRect(text_offset, y - 6, 40, 12)
+                painter.drawText(text_rect, QtCore.Qt.AlignVCenter, str(int(value)))
+        
+    def _draw_span(self, painter, style, groove_rect, opt):
+        
         self.initStyleOption(opt)
         opt.subControls = QtWidgets.QStyle.SC_SliderGroove
         opt.sliderValue = 0
@@ -126,95 +165,18 @@ class RangeSlider(QtWidgets.QSlider):
         painter.setBrush(QtGui.QBrush(highlight))
         painter.setPen(QtGui.QPen(highlight, 0))
         painter.drawRect(span_rect.intersected(groove_rect))
+        
     
-        #
-        # 3) Draw the two slider handles ONLY (no built-in tickmarks)
-        #
+    def _draw_handles(self, painter, style, opt):
         for value in [self._low, self._high]:
-            opt = QtWidgets.QStyleOptionSlider()
-            self.initStyleOption(opt)
-            opt.subControls = QtWidgets.QStyle.SC_SliderHandle
-    
-            # If this handle is actively being dragged, highlight it
-            if self.pressed_control:
-                opt.activeSubControls = self.pressed_control
-            else:
-                opt.activeSubControls = self.hover_control
-    
             opt.sliderPosition = value
             opt.sliderValue = value
-    
+            opt.subControls = QtWidgets.QStyle.SC_SliderHandle
             style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
     
-        #
-        # 4) Draw numeric labels and ticks at self.number_of_ticks intervals
-        #
-        if self.number_of_ticks > 1:
-            # Initialize the style option
-            self.initStyleOption(opt)
-            groove_rect = style.subControlRect(
-                QtWidgets.QStyle.CC_Slider, opt,
-                QtWidgets.QStyle.SC_SliderGroove, self
-            )
+
     
-            # Tick thickness adjustment
-            tick_length = 7  # Length of the tick line
-            head_thickness= 5
-    
-            painter.setPen(QtGui.QPen(QtCore.Qt.black))
-            painter.setFont(QtGui.QFont("Arial", 7))
-    
-            # Determine slider orientation
-            if opt.orientation == QtCore.Qt.Horizontal:
-                slider_min = groove_rect.x()
-                slider_max = groove_rect.right()
-                available = slider_max - slider_min
-                text_offset = groove_rect.bottom() + 15  # Position below the groove
-                tick_offset = groove_rect.bottom() + 2  # Ticks directly below the groove
-                upside_down = False
-            else:  # Vertical
-                slider_min = groove_rect.y() + head_thickness
-                slider_max = groove_rect.bottom() - head_thickness
-                available = slider_max - slider_min
-                text_offset = groove_rect.right() -18  # Position to the right of the groove
-                tick_offset = groove_rect.right() -28  # Ticks directly beside the groove
-                upside_down = True  # If highest numbers appear at the top
-    
-            # Calculate numeric label positions
-            total_range = self.maximum() - self.minimum()
-            step = (total_range / (self.number_of_ticks - 1)
-                    if self.number_of_ticks > 1 else 0)
-    
-            for i in range(self.number_of_ticks):
-                # Calculate the slider value for this label
-                val_float = self.minimum() + i * step
-                val_int = int(round(val_float))
-    
-                # Map the slider value to a pixel offset
-                pixel_off = style.sliderPositionFromValue(
-                    self.minimum(), self.maximum(),
-                    val_int, available, upside_down
-                )
-    
-                # Draw ticks
-                if opt.orientation == QtCore.Qt.Horizontal:
-                    x = slider_min + pixel_off
-                    painter.drawLine(x, tick_offset, x, tick_offset + tick_length)
-    
-                    # Draw text labels
-                    text_rect = QtCore.QRect(
-                        x - 15, text_offset, 30, 12
-                    )
-                    painter.drawText(text_rect, QtCore.Qt.AlignCenter, str(val_int))
-                else:  # Vertical
-                    y = slider_min + pixel_off
-                    painter.drawLine(tick_offset, y, tick_offset + tick_length, y)
-    
-                    # Draw text labels
-                    text_rect = QtCore.QRect(
-                        text_offset, y - 6, 40, 12
-                    )
-                    painter.drawText(text_rect, QtCore.Qt.AlignVCenter, str(val_int))
+
 
 
     ##########################
@@ -324,154 +286,7 @@ class RangeSlider(QtWidgets.QSlider):
                                              pos-slider_min, slider_max-slider_min,
                                              opt.upsideDown)
     
-    
-########################################################  
-    
-    
-import sys
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QSlider, QLabel
-)
-from PyQt5.QtCore import Qt, pyqtSignal, QRect, QSize
-from PyQt5.QtGui import QPainter, QFont, QColor, QFontMetrics
 
-
-class CustomRangeSliders(QWidget):
-    """
-    A basic vertical slider with labeled ticks and a value label.
-    This class provides:
-      - A slider from min_value to max_value.
-      - Tick markings displayed on the widget's paint event.
-      - A label showing the current slider value.
-    """
-
-    def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
-        super().__init__()
-        self._min_value = min_value
-        self._max_value = max_value
-        self.number_of_tick_intervals = number_of_tick_intervals
-
-        # Main slider and label
-        self._slider = RangeSlider(Qt.Vertical, self)
-        self._value_label = QLabel(str(self._slider.value()), self)
-
-        # Overall widget layout
-        self._layout = QVBoxLayout()
-
-        # Connect slider value changes to an internal update
-        self._slider.valueChanged.connect(self._update_label)
-
-        # Configure slider appearance and functionality
-        self._setup_slider(colour)
-
-        # Assemble the layout
-        self._setup_layout()
-        
-    # -----------------------------------------------------------------------
-    #  Private Methods
-    # -----------------------------------------------------------------------
-
-    def _setup_layout(self):
-        """
-        Create and assign a layout containing the slider and the value label.
-        """
-        self._layout.addWidget(self._slider)
-        self._layout.addWidget(self._value_label)
-        self.setLayout(self._layout)
-        
-    def _setup_slider(self, colour):
-        """
-        Configure the slider's properties (range, ticks, color).
-        """
-        self._slider.setRange(self._min_value, self._max_value)
-        self._slider.setTickPosition(QSlider.TicksBothSides)
-
-        # Safely set a tick interval (avoid division by zero if ranges are small)
-        interval = max(1, (self._max_value - self._min_value) // self.number_of_tick_intervals)
-        self._slider.setTickInterval(interval)
-
-        # Style the slider handle and track
-        self._slider.setStyleSheet(f"""
-            QSlider::handle:vertical {{
-                background: {colour};
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-            }}
-            QSlider::add-page:vertical {{
-                background: #d3d3d3;
-                border-radius: 5px;
-            }}
-        """)
-
-        # Provide enough width so ticks and label don't overlap
-        self.setMinimumWidth(75)
-
-    def _update_label(self):
-        """
-        Update the on-screen label whenever the slider value changes.
-        """
-        self._value_label.setText(f"Slider: {self.get_value()}")
-
-    def _string_by_tick(self, i):
-        """
-        Return the string to display next to each tick mark.
-        In this default implementation, it's just the integer value.
-        """
-        return str(i)
-
-    def paintEvent(self, event):
-        """
-        Draw tick labels for the range of values at fixed intervals.
-        """
-        super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setFont(QFont("Arial", 7))#if changed you may want to change WidgetSliders as well to allow extra space between sliders
-        painter.setPen(QColor(0, 0, 0))
-
-        # Gather slider range/tick info
-        min_val = self._slider.minimum()
-        max_val = self._slider.maximum()
-        tick_interval = self._slider.tickInterval()
-
-        # Calculate available space for drawing
-        height = self._slider.height()
-        top_off = 5
-        bottom_off = 5
-        effective_height = height - top_off - bottom_off
-
-        # For each tick step, compute its position and draw text
-        for i in range(min_val, max_val + 1, tick_interval):
-            tick_pos = (
-                height - bottom_off - (effective_height * (i - min_val)) // (max_val - min_val)
-            )
-            text_rect = QRect(25, tick_pos, 50, 20)
-            painter.drawText(text_rect, Qt.AlignCenter, self._string_by_tick(i))
-
-    # -----------------------------------------------------------------------
-    #  Public Methods
-    # -----------------------------------------------------------------
-    
-    def get_value(self):
-        """
-        Returns the current integer value of the slider.
-        """
-        return self._slider.value()
-
-    def set_value(self, value):
-        """
-        Programmatically sets the slider to a given integer value.
-        """
-        
-        self._slider.setValue(int(value))
-
-    def value_changed(self):
-        """
-        Exposes the slider's valueChanged signal for external listeners.
-        """
-        return self._slider.sliderMoved
-
-    
     
 ##############################
 # Test
@@ -482,28 +297,18 @@ def echo(low_value, high_value):
 
 def test(argv):
     app = QtWidgets.QApplication(sys.argv)
-    slider = RangeSlider(QtCore.Qt.Horizontal)
+    slider = RangeSlider()
     slider.setMinimumHeight(30)
 #    slider.setMinimum(0)
 #    slider.setMaximum(255)
     slider.setLow(15)
     slider.setHigh(300)
-    slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
+#    slider.setTickPosition(QtWidgets.QSlider.TicksBelow)
     slider.sliderMoved.connect(echo)
     #QtCore.QObject.connect(slider, QtCore.SIGNAL('sliderMoved(int)'), echo)
     slider.show()
     slider.raise_()
     app.exec_()
-"""
-def test(argv):
-        app = QtWidgets.QApplication(sys.argv)
-        slider = CustomRangeSliders(0,100,"red")
-        slider.value_changed().connect(echo)
-        #QtCore.QObject.connect(slider, QtCore.SIGNAL('sliderMoved(int)'), echo)
-        slider.show()
-        slider.raise_()
-        app.exec_()
-"""
 
 
 if __name__ == "__main__":

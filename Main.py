@@ -21,6 +21,7 @@ from PyQt5.QtGui import QFontMetrics, QFont
 # Updated Imports with Renamed Classes
 from ConfigImporter import ConfigImporter
 from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+from RangeSlider import RangeSlider
 from ModelManual import ModelManual
 from WidgetOutputFile import WidgetOutputFile
 from WidgetInputFile import WidgetInputFile
@@ -52,6 +53,7 @@ class MainWidget(QWidget):
         self.widget_output_file = WidgetOutputFile(self.config.variables_to_print)
 
         self.widget_graphs = WidgetGraphs()
+        self.freq_slider=RangeSlider()
 
         self.widget_sliders = WidgetSliders(
             self.config.slider_configurations,
@@ -108,43 +110,58 @@ class MainWidget(QWidget):
     # -----------------------------------------------------------------------
     #  Private UI Methods
     # -----------------------------------------------------------------------
-
     def _initialize_ui(self):
         """
         Assembles the main layout, placing the top bar and bottom splitter.
         """
         # Top bar with input/output widgets
         top_bar_widget = self._create_file_options_widget()
-
+    
         # Bottom area: sliders + buttons side by side
         bottom_half_layout = QHBoxLayout()
         bottom_half_layout.addWidget(self.widget_sliders)
         bottom_half_layout.addWidget(self.widget_buttons)
         bottom_half_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins to save space
         bottom_half_layout.setSpacing(0)  # Remove spacing to save space
+    
         bottom_half_widget = QWidget()
         bottom_half_widget.setLayout(bottom_half_layout)
-
+    
         # Bottom-most area: bottom area + text
         bottom_and_text_layout = QVBoxLayout()
         bottom_and_text_layout.addWidget(bottom_half_widget)
         bottom_and_text_layout.addWidget(self.widget_at_bottom)
         bottom_and_text_widget = QWidget()
         bottom_and_text_widget.setLayout(bottom_and_text_layout)
-
+    
+        # Middle: Frequency sliders + graphs
+        freq_slider_layout = QVBoxLayout()
+        freq_slider_layout.addWidget(self.freq_slider)
+        freq_slider_layout.setContentsMargins(0, 0, 0, 0)  # Ensure no extra margins
+        freq_slider_layout.setSpacing(5)  # Adjust spacing if needed for better visual appeal
+    
+        middle_layout = QHBoxLayout()
+        middle_layout.addLayout(freq_slider_layout)  # Add the frequency slider layout
+        middle_layout.addWidget(self.widget_graphs)
+        middle_layout.setContentsMargins(0, 0, 0, 0)  # Ensure no additional left margin
+    
+        middle_widget = QWidget()
+        middle_widget.setLayout(middle_layout)
+    
         # Splitter: top for graphs, bottom for sliders+buttons
         splitter = QSplitter(Qt.Vertical)
-        splitter.addWidget(self.widget_graphs)
+        splitter.addWidget(middle_widget)
         splitter.addWidget(bottom_and_text_widget)
         splitter.setSizes([500, 300])
-
+    
         # Main layout
         main_layout = QVBoxLayout()
         main_layout.addWidget(top_bar_widget)
         main_layout.addWidget(splitter)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Overall margins for the main layout
+    
         self.setLayout(main_layout)
+
 
     def _create_file_options_widget(self) -> QWidget:
         """
