@@ -88,6 +88,36 @@ class RangeSlider(QtWidgets.QSlider):
         """Get the upper handle’s value in float."""
         return self._intToFloat(self._high)
 
+    def upMin(self):
+        """
+        When called, sets the position of the lower handle to:current lower float value + 156,150.71
+        Then emits 'sliderMoved'.
+        """
+        step = 156150.71
+        new_low = self.floatLow() + step
+        self.setFloatLow(new_low)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+    def downMax(self):
+        """
+        When called, sets the position of the upper handle to:current upper float value - 156,150.71
+        Then emits 'sliderMoved'.
+        """
+        step = 156150.71
+        new_high = self.floatHigh() - step
+        self.setFloatHigh(new_high)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+    def default(self):
+        """
+        When called, resets the slider’s values to the full range:
+        Then emits 'sliderMoved'.
+        """
+        self.setFloatLow(self._float_min)
+        self.setFloatHigh(self._float_max)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+
     # -----------------------------------------------------------------------
     # Internal scaling helpers
     # -----------------------------------------------------------------------
@@ -316,8 +346,6 @@ class RangeSlider(QtWidgets.QSlider):
                                              slider_max - slider_min,
                                              opt.upsideDown)
 
-
-    
 ##############################
 # Test
 ##############################

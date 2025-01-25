@@ -92,8 +92,11 @@ class MainWidget(QWidget):
         #Listens for new output file selected.Updates config.ini
         self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
 
-        # Connects sliders to update handler with debouncing
+        # Connects sliders to update handler, with debouncing
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+        
+        # Connects freq slider to handle_frequencies method
+        self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
         
         # Connects model manual with handler (for now)
         self.model_manual.model_manual_updated.connect(self.widget_graphs.update_manual_plot)
@@ -141,7 +144,9 @@ class MainWidget(QWidget):
         freq_slider_layout.setSpacing(5)  # Adjust spacing if needed for better visual appeal
     
         middle_layout = QHBoxLayout()
-        middle_layout.addLayout(freq_slider_layout)  # Add the frequency slider layout
+        middle_layout.addLayout(freq_slider_layout)
+        middle_layout.setAlignment(freq_slider_layout, Qt.AlignLeft)
+        middle_layout.setSpacing(0)  # remove spacing
         middle_layout.addWidget(self.widget_graphs)
         middle_layout.setContentsMargins(0, 0, 0, 0)  # Ensure no additional left margin
     
@@ -161,7 +166,6 @@ class MainWidget(QWidget):
         main_layout.setContentsMargins(5, 5, 5, 5)  # Overall margins for the main layout
     
         self.setLayout(main_layout)
-
 
     def _create_file_options_widget(self) -> QWidget:
         """
@@ -205,9 +209,15 @@ class MainWidget(QWidget):
         
         shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
         shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
+        
+        shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
+        shortcut_f8.activated.connect(self.freq_slider.default)
 
-        #page down should reduce high frequencies
-        #page up should reduce low frequencies
+        shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
+        shortcut_page_down.activated.connect(self.freq_slider.downMax)
+    
+        shortcut_page_up = QShortcut(QKeySequence(Qt.Key_PageUp), self)
+        shortcut_page_up.activated.connect(self.freq_slider.upMin)
 
     # -----------------------------------------------------------------------
     #  Private Connections Methods. Listeners and Handlers
@@ -253,7 +263,11 @@ class MainWidget(QWidget):
         
         self.widget_at_bottom._update_text(v_second)
         
-        
+    def _handle_frequency_update(self, bottom, top):
+        #cuando la frecuencia se modifique, necesito enviar notificacion a ManualModel, para que a partir de ahi solo utilice las frecuencias dadas
+        #necesito enviar una senial a los graficos apra que pongan la mascara de frecuencia
+        print(bottom, top)
+
 
 
     def _print_model_parameters(self):
