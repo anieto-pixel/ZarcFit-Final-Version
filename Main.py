@@ -189,10 +189,10 @@ class MainWidget(QWidget):
         Initializes keyboard shortcuts.
         """
         shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
-        shortcut_f1.activated.connect(lambda: self.model_manual.fit_model(self.v_sliders))
+        shortcut_f1.activated.connect(lambda: self.model_manual.fit_model_cole(self.v_sliders))
         
         shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
-        shortcut_f2.activated.connect(lambda: self.model_manual.fit_model(self.v_sliders))
+        shortcut_f2.activated.connect(lambda: self.model_manual.fit_model_bode(self.v_sliders))
 
         #f3 is supposed to reset to "all frequencies"
 
