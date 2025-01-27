@@ -109,7 +109,6 @@ class MainWidget(QWidget):
         self.widget_output_file.setup_current_file(self.config.output_file)
         #here I shall initialize the secondary variables and all that 
         
-
     # -----------------------------------------------------------------------
     #  Private UI Methods
     # -----------------------------------------------------------------------
@@ -181,7 +180,6 @@ class MainWidget(QWidget):
         container.setLayout(layout)
         return container
 
-
     # -----------------------------------------------------------------------
     #  Private Helper Methods
     # -----------------------------------------------------------------------
@@ -237,14 +235,12 @@ class MainWidget(QWidget):
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
-
     def _handle_slider_update(self, key, value):
         """
         Handles incoming slider updates by storing them and starting the debounce timer.
         """
         self.pending_updates[key] = value
         self.update_timer.start(5)  # Adjust the timeout as needed
-
 
     def _update_sliders_data(self):
         """
@@ -264,9 +260,39 @@ class MainWidget(QWidget):
         self.widget_at_bottom._update_text(v_second)
         
     def _handle_frequency_update(self, bottom, top):
-        #cuando la frecuencia se modifique, necesito enviar notificacion a ManualModel, para que a partir de ahi solo utilice las frecuencias dadas
-        #necesito enviar una senial a los graficos apra que pongan la mascara de frecuencia
-        print(bottom, top)
+#        print("#############################")
+#        print(f"top: {top} bottom: {bottom}")
+        
+        freq = self.file_data["freq"]  # Assume freq is a list of frequencies
+    
+        # Initialize index_bottom to start from the last index (highest frequency)
+        index_bottom = len(freq) - 1
+        while index_bottom > 0 and freq[index_bottom] < bottom:
+            index_bottom -= 1
+    
+        # Initialize index_top to start from the first index (lowest frequency)
+        index_top = 0
+        while index_top < len(freq) and freq[index_top] > top:
+            index_top += 1  # Increment index_top to avoid infinite loop
+   
+#        print(f"index top: {index_top} index bottom: {index_bottom}")
+#        print(f"freq top: {freq[index_top]} freq bottom: {freq[index_bottom]}")
+
+        # Ensure index_top and index_bottom are within bounds
+        index_top = min(len(freq) - 1, index_top)
+        index_bottom = max(0, index_bottom)
+    
+        
+        # Create a mask to filter the arrays
+        freq_filtered = freq[index_top:index_bottom + 1] 
+        z_real_filtered = freq[index_top:index_bottom + 1] 
+        z_imag_filtered = freq[index_top:index_bottom + 1] 
+
+        new_data = { "freq": freq_filtered,"Z_real": z_real_filtered,"Z_imag": z_imag_filtered}
+
+        self.model_manual.initialize_expdata(new_data)
+        self.widget_graphs.apply_filter_frequency_range(bottom, top)
+        
 
 
 

@@ -239,6 +239,9 @@ class WidgetGraphs(QWidget):
         """
         Filters out data outside [f_min, f_max] for all three graphs.
         """
+        
+        print(f'inside graphs{f_min, f_max}')
+        
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)

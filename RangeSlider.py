@@ -1,137 +1,128 @@
-#!/usr/bin/python3
-# -*- coding: utf-8 -*-
-
-import sys, os
+import sys
+import math
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter
 
-SCALE_FACTOR = 1e2  # scale float <-> integer. Adjust as needed.
-
+LOG_SCALE_FACTOR = 100  # how finely you want to subdivide each log10 unit
 
 class RangeSlider(QtWidgets.QSlider):
     """
-    A slider for floating-point ranges, using two handles (low & high).
-    Internally, QSlider is integer-based, so we scale floats into ints.
+    A two-handle slider for *log10* ranges.
+    QSlider is still integer-based, but now those integers represent log10(value).
     """
     sliderMoved = pyqtSignal(float, float)
 
     def __init__(self, *args):
-        super(RangeSlider, self).__init__(*args)
+        super().__init__(*args)
 
-        # If you prefer horizontal, just setOrientation(Qt.Horizontal)
         self.setOrientation(Qt.Vertical)
         self.setTickPosition(QtWidgets.QSlider.TicksBelow)
 
-        # Store these floats for reference, but QSlider min/max will be scaled ints
-        self._float_min = 3.0e-2
+        # Store float min/max in normal linear space (e.g. 2e-2, 6e6)
+        self._float_min = 2.0e-2
         self._float_max = 6.0e+6
-        self._low=self._float_min
-        self._high=self._float_max
+        
+        self._low = self._float_min 
+        self._high = self._float_max
 
-        # Set the QSlider’s integer min/max according to the scale:
+        # Also store them in log space
+        self._log_min = math.log10(self._float_min)
+        self._log_max = math.log10(self._float_max)
+
+        # We'll let the QSlider run from 0 ... (log_max - log_min)*LOG_SCALE_FACTOR
         self.setFloatRange(self._float_min, self._float_max)
 
-        # Internal integer “positions” of the two handles (low, high)
-        self._low = self.minimum()   # start at the integer min
-        self._high = self.maximum()  # start at the integer max
+        # Start both handles at extremes
+        self._low = self.minimum()
+        self._high = self.maximum()
 
         self.pressed_control = QtWidgets.QStyle.SC_None
         self.hover_control = QtWidgets.QStyle.SC_None
         self.click_offset = 0
-        self.active_slider = 0
+        self.active_slider = -1
 
         self.setMinimumWidth(100)
-        self.number_of_ticks = 20  # number of labeled ticks
+        self.number_of_ticks = 20
 
     # -----------------------------------------------------------------------
-    # Public API for floats
+    # Public API for floats in log scale
     # -----------------------------------------------------------------------
     def setFloatRange(self, fmin, fmax):
-        """Set the slider’s floating min and max, then scale to QSlider int range."""
+        """Define the float range, internally mapped to log10 space for the slider."""
         self._float_min = fmin
         self._float_max = fmax
-        int_min = self._floatToInt(fmin)
-        int_max = self._floatToInt(fmax)
+        self._log_min = math.log10(fmin)
+        self._log_max = math.log10(fmax)
+
+        # QSlider integer range: 0 ... (log_max - log_min)*LOG_SCALE_FACTOR
+        int_min = 0
+        int_max = int(round((self._log_max - self._log_min) * LOG_SCALE_FACTOR))
+
         self.setMinimum(int_min)
         self.setMaximum(int_max)
-        # Fix the current handles if needed:
+
+        # Clamp existing handles
         if self._low < int_min:
             self._low = int_min
         if self._high > int_max:
             self._high = int_max
-        self.update()
 
-    def floatMin(self):
-        """Return the float minimum (for reference only)."""
-        return self._float_min
-
-    def floatMax(self):
-        """Return the float maximum (for reference only)."""
-        return self._float_max
-
-    def setFloatLow(self, val):
-        """Set the lower handle to a float position."""
-        self._low = self._clampInt(self._floatToInt(val))
         self.update()
 
     def floatLow(self):
-        """Get the lower handle’s value in float."""
-        return self._intToFloat(self._low)
+        """Return lower handle as a float (inverse of log scale)."""
+        return 10 ** (self._log_min + (self._low / LOG_SCALE_FACTOR))
 
-    def setFloatHigh(self, val):
-        """Set the upper handle to a float position."""
-        self._high = self._clampInt(self._floatToInt(val))
+    def setFloatLow(self, val):
+        """Move lower handle to 'val' in linear space (convert to log)."""
+        logv = math.log10(val)
+        slider_pos = int(round((logv - self._log_min) * LOG_SCALE_FACTOR))
+        self._low = self._clampInt(slider_pos)
         self.update()
 
     def floatHigh(self):
-        """Get the upper handle’s value in float."""
-        return self._intToFloat(self._high)
+        """Return upper handle as a float."""
+        return 10 ** (self._log_min + (self._high / LOG_SCALE_FACTOR))
 
-    def upMin(self):
-        """
-        When called, sets the position of the lower handle to:current lower float value + 156,150.71
-        Then emits 'sliderMoved'.
-        """
-        step = 156150.71
-        new_low = self.floatLow() + step
-        self.setFloatLow(new_low)
-        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
-
-    def downMax(self):
-        """
-        When called, sets the position of the upper handle to:current upper float value - 156,150.71
-        Then emits 'sliderMoved'.
-        """
-        step = 156150.71
-        new_high = self.floatHigh() - step
-        self.setFloatHigh(new_high)
-        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
-
-    def default(self):
-        """
-        When called, resets the slider’s values to the full range:
-        Then emits 'sliderMoved'.
-        """
-        self.setFloatLow(self._float_min)
-        self.setFloatHigh(self._float_max)
-        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
-
-
-    # -----------------------------------------------------------------------
-    # Internal scaling helpers
-    # -----------------------------------------------------------------------
-    def _floatToInt(self, val):
-        return int(round(val * SCALE_FACTOR))
-
-    def _intToFloat(self, ival):
-        return ival / SCALE_FACTOR
+    def setFloatHigh(self, val):
+        """Move upper handle to 'val' in linear space."""
+        logv = math.log10(val)
+        slider_pos = int(round((logv - self._log_min) * LOG_SCALE_FACTOR))
+        self._high = self._clampInt(slider_pos)
+        self.update()
 
     def _clampInt(self, ival):
         return max(self.minimum(), min(self.maximum(), ival))
 
     # -----------------------------------------------------------------------
-    # Overridden painting to show scientific-notation labels
+    # Example: Methods for keyboard shortcuts (same idea as before)
+    # -----------------------------------------------------------------------
+    def upMin(self):
+        """Example: shift lower handle upward by a certain factor in linear space."""
+        factor = 10**0.2  # ~1.584893
+        new_low = self.floatLow()*factor
+        if new_low > self.floatHigh():
+            new_low = self.floatHigh()
+        self.setFloatLow(new_low)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+    def downMax(self):
+        """Example: shift upper handle downward by a certain factor in linear space."""
+        factor = 10**0.2  # ~1.584893
+        new_high = self.floatHigh()/factor
+        if new_high < self.floatLow():
+            new_high = self.floatLow()
+        self.setFloatHigh(new_high)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+    def default(self):
+        """Reset slider to the full float range."""
+        self.setFloatLow(self._float_min)
+        self.setFloatHigh(self._float_max)
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
+
+    # -----------------------------------------------------------------------
+    # Painting: we want ticks spaced in exponent (log) scale
     # -----------------------------------------------------------------------
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
@@ -144,18 +135,16 @@ class RangeSlider(QtWidgets.QSlider):
         opt.sliderPosition = 0
         opt.subControls = QtWidgets.QStyle.SC_SliderGroove
         style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
+        groove_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
+                                           QtWidgets.QStyle.SC_SliderGroove, self)
 
-        groove_rect = style.subControlRect(
-            QtWidgets.QStyle.CC_Slider, opt, QtWidgets.QStyle.SC_SliderGroove, self
-        )
-
-        # 2) Draw the ticks/labels
+        # 2) Draw the ticks/labels in log steps
         self._draw_ticks_and_labels(painter, groove_rect, style, opt)
 
         # 3) Draw the highlighted span
         self._draw_span(painter, style, groove_rect, opt)
 
-        # 4) Draw the two handles
+        # 4) Draw handles
         self._draw_handles(painter, style, opt)
 
     def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
@@ -171,24 +160,33 @@ class RangeSlider(QtWidgets.QSlider):
             available = slider_max - slider_min
             text_offset = groove_rect.bottom() + 15
             tick_offset = groove_rect.bottom() + 2
-        else:  # Vertical
+        else:
             slider_min = groove_rect.y() + head_thickness
             slider_max = groove_rect.bottom() - head_thickness
             available = slider_max - slider_min
             text_offset = groove_rect.right() - 20
             tick_offset = groove_rect.right() - 35
 
-        step = (self.maximum() - self.minimum()) / (self.number_of_ticks - 1)
+        # We'll space ticks in exponent. E.g. from log10(fmin) to log10(fmax).
+        # We want self.number_of_ticks values between _log_min and _log_max.
+        log_range = self._log_max - self._log_min
+        step = log_range / (self.number_of_ticks - 1)
 
         for i in range(self.number_of_ticks):
-            int_value = self.minimum() + int(round(i * step))
-            float_value = self._intToFloat(int_value)
+            # exponent from log_min up to log_max
+            exponent = self._log_min + i * step
+            float_value = 10 ** exponent
+
+            # Convert exponent to the slider's integer scale
+            slider_val = int(round((exponent - self._log_min) * LOG_SCALE_FACTOR))
+
+            # Map that slider_val to a pixel position
             pixel_offset = style.sliderPositionFromValue(
-                self.minimum(), self.maximum(), int_value, available, opt.upsideDown
+                self.minimum(), self.maximum(), slider_val, available, opt.upsideDown
             )
 
-            # Print in scientific notation with 2 decimals, e.g. 3.00E-02 or 6.00E+06
-            label = "{:.2E}".format(float_value)
+            # Format the label in scientific notation
+            label = f"{float_value:.2E}"
 
             if opt.orientation == Qt.Horizontal:
                 x = slider_min + pixel_offset
@@ -249,7 +247,7 @@ class RangeSlider(QtWidgets.QSlider):
             style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
 
     # -----------------------------------------------------------------------
-    # Mouse events
+    # Mouse event handling remains the same as your original
     # -----------------------------------------------------------------------
     def mousePressEvent(self, event):
         event.accept()
@@ -263,9 +261,7 @@ class RangeSlider(QtWidgets.QSlider):
 
             for i, value in enumerate([self._low, self._high]):
                 opt.sliderPosition = value
-                hit = style.hitTestComplexControl(
-                    style.CC_Slider, opt, event.pos(), self
-                )
+                hit = style.hitTestComplexControl(style.CC_Slider, opt, event.pos(), self)
                 if hit == style.SC_SliderHandle:
                     self.active_slider = i
                     self.pressed_control = hit
@@ -289,6 +285,8 @@ class RangeSlider(QtWidgets.QSlider):
 
         event.accept()
         new_pos = self.__pixelPosToRangeValue(self.__pick(event.pos()))
+
+        # Decide which handle is being moved
         if self.active_slider < 0:
             # dragged outside the handles: move both together
             offset = new_pos - self.click_offset
@@ -316,9 +314,8 @@ class RangeSlider(QtWidgets.QSlider):
         self.click_offset = new_pos
         self.update()
 
-        # Emit float positions to listeners
-        self.sliderMoved.emit(self._intToFloat(self._low),
-                              self._intToFloat(self._high))
+        # Emit float positions in normal (non-log) space
+        self.sliderMoved.emit(self.floatLow(), self.floatHigh())
 
     def __pick(self, pt):
         return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
@@ -346,34 +343,15 @@ class RangeSlider(QtWidgets.QSlider):
                                              slider_max - slider_min,
                                              opt.upsideDown)
 
-##############################
-# Test
-##############################
-
-def echo(low_value, high_value):
-    print(low_value, high_value)
-
-def test(argv):
-
-    app = QtWidgets.QApplication(sys.argv)
-
-    slider = RangeSlider()
-    slider.setMinimumHeight(300)
-
-    # Example: set the float range to [0.03, 6e6]
-    slider.setFloatRange(3.0e-2, 6.0e6)
-
-    # Set where you want the two thumbs to start in float
-    slider.setFloatLow(0.5)
-    slider.setFloatHigh(1.0e5)
-
-    # Connect the custom signal (which now sends floats)
-    slider.sliderMoved.connect(echo)
-
-    slider.show()
-    slider.raise_()
-    sys.exit(app.exec_())
-
-
+# Minimal demo
 if __name__ == "__main__":
-    test(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
+    win = QtWidgets.QMainWindow()
+
+    # Create our RangeSlider
+    slider = RangeSlider()
+    slider.sliderMoved.connect(lambda low, high: print(f"Low={low:.3g}, High={high:.3g}"))
+
+    win.setCentralWidget(slider)
+    win.show()
+    sys.exit(app.exec_())
