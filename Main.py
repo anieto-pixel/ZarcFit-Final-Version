@@ -209,7 +209,7 @@ class MainWidget(QWidget):
         shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
         
         shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
-        shortcut_f8.activated.connect(self.freq_slider.default)
+        shortcut_f8.activated.connect(self._handle_set_default)
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.freq_slider.downMax)
@@ -260,8 +260,6 @@ class MainWidget(QWidget):
         self.widget_at_bottom._update_text(v_second)
         
     def _handle_frequency_update(self, bottom, top):
-#        print("#############################")
-#        print(f"top: {top} bottom: {bottom}")
         
         freq = self.file_data["freq"]  # Assume freq is a list of frequencies
     
@@ -274,15 +272,11 @@ class MainWidget(QWidget):
         index_top = 0
         while index_top < len(freq) and freq[index_top] > top:
             index_top += 1  # Increment index_top to avoid infinite loop
-   
-#        print(f"index top: {index_top} index bottom: {index_bottom}")
-#        print(f"freq top: {freq[index_top]} freq bottom: {freq[index_bottom]}")
 
         # Ensure index_top and index_bottom are within bounds
         index_top = min(len(freq) - 1, index_top)
         index_bottom = max(0, index_bottom)
     
-        
         # Create a mask to filter the arrays
         freq_filtered = freq[index_top:index_bottom + 1] 
         z_real_filtered = freq[index_top:index_bottom + 1] 
@@ -293,6 +287,18 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(new_data)
         self.widget_graphs.apply_filter_frequency_range(bottom, top)
         
+    def _handle_set_default(self):
+        
+        self.freq_slider.default()
+        self.widget_graphs.update_graphs(
+            self.file_data['freq'], 
+            self.file_data['Z_real'], 
+            self.file_data['Z_imag']
+            )
+        self.model_manual.initialize_expdata(self.file_data)
+        
+        self._update_sliders_data()
+
 
 
 

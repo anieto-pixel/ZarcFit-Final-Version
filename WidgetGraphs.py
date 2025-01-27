@@ -388,6 +388,7 @@ if __name__ == "__main__":
 
     # Button to filter data to [10, 100] range
     btn_filter_10_100 = QPushButton("Filter 10..100 Hz")
+    
     def filter_10_100():
         graph_widget.apply_filter_frequency_range(10, 100)
     btn_filter_10_100.clicked.connect(filter_10_100)
@@ -395,6 +396,7 @@ if __name__ == "__main__":
 
     # Button to show full freq range again
     btn_show_all = QPushButton("Show All Freq")
+    
     def show_all():
         # We simply reset the original data to undo any prior filtering
         graph_widget.update_graphs(base_freq, base_real, base_imag)
