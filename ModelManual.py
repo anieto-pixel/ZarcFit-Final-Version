@@ -54,7 +54,7 @@ class ModelManual(QObject):
         """
         return dict(self._v_second)
 
-    def fit_model(self, v_initial_guess):
+    def fit_model_cole(self, v_initial_guess):
         # 1) Choose a fixed ordering for the parameters.
         param_names = v_initial_guess.keys()
         # 2) Convert the dict to a NumPy array using the above order.
@@ -64,7 +64,7 @@ class ModelManual(QObject):
         def cost_wrapper(x_array):
             # Reassemble the array into a dictionary
             v_dict = {k: x_array[i] for i, k in enumerate(param_names)}
-            return self._cost_function(v_dict)
+            return self._cost_function_cole(v_dict)
     
         # 4) Call scipy.optimize.minimize on the wrapper.
         result = opt.minimize(
@@ -86,9 +86,37 @@ class ModelManual(QObject):
 
         return best_fit_dict
 
-    ##MM CURRENTLY FIT_MODLE DOES FIT_MODEL_COLE, i NEED TO FIGURE UT THE BEST
-    ##WAY TO CREATE AFIT MODLE BODE AS WELL, AND SEE IF i SHOULD MAKE TWO METHODS
-    ##OR ONE
+    def fit_model_bode(self, v_initial_guess):
+        # 1) Choose a fixed ordering for the parameters.
+        param_names = v_initial_guess.keys()
+        # 2) Convert the dict to a NumPy array using the above order.
+        x0 = np.array([v_initial_guess[k] for k in param_names], dtype=float)
+        
+            # 3) Define a small wrapper that turns x back into a dict, then calls _cost_function.
+        def cost_wrapper(x_array):
+            # Reassemble the array into a dictionary
+            v_dict = {k: x_array[i] for i, k in enumerate(param_names)}
+            return self._cost_function_bode(v_dict)
+    
+        # 4) Call scipy.optimize.minimize on the wrapper.
+        result = opt.minimize(
+            cost_wrapper,
+            x0=x0,
+            method='Nelder-Mead',
+#            options={'maxiter': 3000, 'xatol': 1e-8, 'fatol': 1e-8}
+        )
+    
+        if not result.success:
+            print("Optimization failed:", result.message)
+            raise RuntimeError("Optimization did not converge.")
+    
+        # 5) Reconstruct a dict for the best-fit parameters:
+        best_fit_array = result.x
+        best_fit_dict = {k: best_fit_array[i] for i, k in enumerate(param_names)}
+
+        self.run_model_manual(best_fit_dict)
+
+        return best_fit_dict
 
     # ----------------------------------------------------
     # Private Helpers
@@ -197,7 +225,7 @@ class ModelManual(QObject):
         
         return np.array(zr_list), np.array(zi_list)
         
-    def _cost_function(self, v):
+    def _cost_function_cole(self, v):
         """
         EIS cost function with separate comparisons for real and imaginary parts.
         """
@@ -213,6 +241,27 @@ class ModelManual(QObject):
         diff_imag = (z_imag - exp_imag) ** 2
 
         return np.sum(diff_real + diff_imag)
+    
+    def _cost_function_bode(self, v):
+        """
+        EIS cost function with separate comparisons for real and imaginary parts.
+        """
+        # Model predictions
+        z_real, z_imag = self._run_model(v)
+        z_absolute = np.sqrt(z_real**2 + z_imag**2)
+        z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
+
+        # Experimental data
+        exp_real = self._experiment_data["Z_real"]
+        exp_imag = self._experiment_data["Z_imag"]
+        exp_absolute = np.sqrt(exp_real**2 + exp_imag**2)
+        exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
+
+        # Separate differences (EIS standard approach)
+        diff_absolute = (exp_absolute - z_absolute) ** 2
+        diff_phase_deg = (exp_phase_deg - z_phase_deg) ** 2
+
+        return np.sum(diff_absolute + diff_phase_deg)
     
     # ----------------------------------------------------
     # Circuit Methods
@@ -275,7 +324,7 @@ def test_model_manual():
     }
 
     # Perform the fit
-    best_fit = model.fit_model(v_init)
+    best_fit = model.fit_model_cole(v_init)
     print("Best-fit parameters:")
     for k, val in best_fit.items():
         print(f"  {k}: {val}")
