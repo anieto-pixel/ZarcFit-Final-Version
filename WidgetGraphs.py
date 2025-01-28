@@ -227,6 +227,50 @@ class ColeColeGraph(ParentGraph):
         Typical Nyquist representation: X = Re(Z), Y = -Im(Z).
         """
         return Z_real, -Z_imag
+    
+class TimeGraph(ParentGraph):
+    def __init__(self):
+        super().__init__()
+        
+        self.setTitle("Time Domain Graph")
+        self.setLabel('bottom', "Time [s]")
+        self.setLabel('left', "Amplitude")
+    
+    def _prepare_xy(self, freq, Z_real, Z_imag):
+        """
+        Going from freq-domain data (Z_real + j*Z_imag)
+        to a time-domain signal by inverse FFT.
+    
+        1) We assume freq is uniformly spaced: df = freq[i+1] - freq[i].
+        2) We define sampling frequency Fs = df * N, where N = len(freq).
+        3) Then the time array is t = [0, 1/Fs, 2/Fs, ..., (N-1)/Fs].
+        4) We do z_time = ifft(Z(f)), and plot the real part as the time signal.
+        """
+        n = len(freq)
+        if n < 2:
+            return np.array([0]), np.array([0])
+        
+        # 1) Compute spacing, assume it's uniform
+        df = freq[1] - freq[0]
+        
+        # 2) Sampling freq = df*N
+        Fs = df * n
+        
+        # 3) Create a time array
+        t = np.arange(n) / Fs
+        
+        # 4) Form the complex array in frequency domain
+        Z_complex = Z_real + 1j * Z_imag
+    
+        # Warning: This example does not handle negative frequencies or zero-padding,
+        #          which are typically required for a "proper" IFFT of real-world signals.
+        #          It's just a demonstration of going from freq -> time via IFFT.
+        z_time = np.fft.ifft(Z_complex)
+        
+        # We'll plot only the real part.
+        z_time_real = np.real(z_time)
+    
+        return t, z_time_real
 
 
 class WidgetGraphs(QWidget):
@@ -243,6 +287,12 @@ class WidgetGraphs(QWidget):
         self._big_graph = ColeColeGraph()
         self._small_graph_1 = BodeGraph()
         self._small_graph_2 = PhaseGraph()
+        self._tab_graph = TimeGraph()
+        
+        # Create a tab widget to hold the main Cole graph and the fourth graph
+        self._tab_widget = QTabWidget()
+        self._tab_widget.addTab(self._big_graph, "Cole Graph")
+        self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
 
         # Layout for the smaller graphs on the right
         right_layout = QVBoxLayout()
@@ -251,8 +301,8 @@ class WidgetGraphs(QWidget):
 
         # Layout for the big graph on the left
         left_layout = QVBoxLayout()
-        left_layout.addWidget(self._big_graph)
-
+        left_layout.addWidget(self._tab_widget)
+        
         # Combine into a main horizontal layout
         main_layout = QHBoxLayout()
         main_layout.addLayout(left_layout)
@@ -266,6 +316,7 @@ class WidgetGraphs(QWidget):
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
+        self._tab_graph.filter_frequency_range(f_min, f_max)
 
     def update_graphs(self, freq, Z_real, Z_imag):
         """
@@ -274,6 +325,7 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
         self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
         self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
+        self._tab_graph.update_parameters_base(freq, Z_real, Z_imag)
 
     def update_manual_plot(self, calc_result: CalculationResult):
         """
@@ -288,6 +340,7 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._tab_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
     
         # Unpack the 3 special points
         freq_sp   = calc_result.special_freq
@@ -298,6 +351,7 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._tab_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
     
     
     
