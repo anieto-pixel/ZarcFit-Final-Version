@@ -220,7 +220,6 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         Set the slider to a float, using the scale factor internally.
         """
-        print(value)
         
         scaled_val = int(value * self._scale_factor)
         self._slider.setValue(scaled_val)

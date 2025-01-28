@@ -88,7 +88,7 @@ class ParentGraph(pg.PlotWidget):
             pen='b',             # blue line connecting points
             symbol='o',          # circle marker
             symbolSize=7,        # smaller points
-            symbolBrush='b'      # blue fill
+            symbolBrush=None     # blue fill
         )
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
