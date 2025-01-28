@@ -81,28 +81,11 @@ class MainWidget(QWidget):
         self.pending_updates = {}
         self.value_labels = {}
 
-        # Layout the UI
+        """Layout UI"""
         self._initialize_ui()
 
-        """Connect signals """
-        """may become its own method later on, but not now"""
-
-        # Listens for new input file selected. Updates dictionaries, graphs and config.ini
-        self.widget_input_file.file_data_updated.connect(self._update_file_data)
-
-        #Listens for new output file selected.Updates config.ini
-        self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
-
-        # Connects sliders to update handler, with debouncing
-        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
-        
-        # Connects freq slider to handle_frequencies method
-        self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
-        
-        # Connects model manual with handler (for now)
-        self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
-
-        # Connecting hotkeys
+        """Connect signals to handlers"""
+        self._connect_listeners()
         self._initialize_hotkeys()
 
         "initialization 2.0 I guess? No fucking idea of how to roganize this part"
@@ -184,6 +167,25 @@ class MainWidget(QWidget):
     # -----------------------------------------------------------------------
     #  Private Helper Methods
     # -----------------------------------------------------------------------
+    def _connect_listeners(self):
+        
+        """Connect signals """
+        
+        # Listens for new input file selected. Updates dictionaries, graphs and config.ini
+        self.widget_input_file.file_data_updated.connect(self._update_file_data)
+
+        #Listens for new output file selected.Updates config.ini
+        self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
+
+        # Connects sliders to update handler, with debouncing
+        self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+        
+        # Connects freq slider to handle_frequencies method
+        self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
+        
+        # Connects model manual with handler (for now)
+        self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
+        
 
     def _initialize_hotkeys(self):
         """
