@@ -56,8 +56,7 @@ class FileWriter:
 
         except Exception as e:
             ErrorWindow.show_error_message(f"Could not write to file: {e}")
-            
-            
+                       
 class FileSelector:
     """
     Handles file creation, selection, and validation.
@@ -253,6 +252,29 @@ class WidgetOutputFile(QWidget):
             header=None  # ignoring header now
         )
 
+
+    def find_row_in_file(self, head):
+        
+        try:
+            with open(self._output_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            for line in reversed(lines):
+                # Strip and split to handle trailing newlines
+                columns = line.strip().split(",")
+                # Check the first column against 'head'
+                if columns and columns[0] == head:
+                    
+                    return dict(zip(self.variables_to_print, columns))
+
+            # If we get here, 'head' wasn't found in the first column
+            return None
+
+        except Exception as e:
+            ErrorWindow.show_error_message(f"Error reading file: {e}")
+            return None
+        
+        
 
 # -----------------------------------------------------------------------
 #  TEST (Manually adapted)

@@ -137,6 +137,8 @@ class WidgetSliders(QWidget):
         Receives a dict of { variable_key: value }, checks that it matches
         this widget's slider keys, then updates each slider.
         """
+        print("update all variables")
+        
         # 1) Ensure keys match
         if set(dictionary.keys()) != set(self.sliders.keys()):
             raise ValueError(
@@ -145,8 +147,9 @@ class WidgetSliders(QWidget):
 
         # 2) Update each slider
         for key, val in dictionary.items():
+            
             slider = self.sliders[key]
-            slider.set_value(val)
+            slider.set_value_exact(val)
             
 
 # -----------------------------------------------------------------------

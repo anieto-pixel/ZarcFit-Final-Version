@@ -207,8 +207,8 @@ class MainWidget(QWidget):
         shortcut_f6 = QShortcut(QKeySequence(Qt.Key_F6), self)
         shortcut_f6.activated.connect(self.widget_input_file._show_next_file)
         
-#        shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
-#        shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
+        shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
+        shortcut_f7.activated.connect(self._handle_recover_file_values)
         
         shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
         shortcut_f8.activated.connect(self._handle_set_default)
@@ -234,6 +234,7 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
+        self.widget_sliders.set_default_values()
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
@@ -299,6 +300,23 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
+
+    def _handle_recover_file_values(self):
+        
+        head=self.widget_input_file.get_current_file_name()
+        dictionary = self.widget_output_file.find_row_in_file(head)
+        
+        if dictionary is None:
+            print (f"Output file has no row with head: {head}")
+            return
+        
+        for key in set(self.config.slider_configurations.keys()).intersection(dictionary.keys()):
+            # Assign the value from the dictionary to the respective slider
+            
+            self.v_sliders[key] = float(dictionary[key])
+            
+            
+        self.widget_sliders.update_all_variables(self.v_sliders)
           
     def _handle_set_default(self):
         
@@ -311,13 +329,10 @@ class MainWidget(QWidget):
     def _print_model_parameters(self):
         """
         Called when Print is requested 
-        
         (will have to figure out how to get all the dictionaries called, etc)
         """
         date ={'date/time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         file={'file': self.widget_input_file.get_current_file_name()}
-
-        print(date['date/time'])
 
         main_dictionary=self.v_sliders|date|file
         model_dictionary = self.model_manual.get_model_parameters()

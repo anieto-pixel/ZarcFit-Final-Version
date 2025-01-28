@@ -1,4 +1,5 @@
 import sys
+import math
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QSlider, QLabel
 )
@@ -132,7 +133,6 @@ class CustomSliders(QWidget):
         """
         Programmatically sets the slider to a given integer value.
         """
-        
         self._slider.setValue(int(value))
 
     def value_changed(self):
@@ -220,8 +220,16 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         Set the slider to a float, using the scale factor internally.
         """
+        print(value)
+        
         scaled_val = int(value * self._scale_factor)
         self._slider.setValue(scaled_val)
+        
+    def set_value_exact(self, value):
+        """
+        Set the slider to a float, using the scale factor internally.
+        """
+        self.set_value(value)
 
     def value_changed(self):
         """
@@ -261,6 +269,10 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         n = self._slider.value() / self._scale_factor
         return self._base_power ** n
+    
+    def set_value_exact(self, value):
+        self.set_value(math.log10(value))
+
 
 #######################################################################
 # -----------------------------------------------------------------------
