@@ -10,6 +10,7 @@ Graphs for impedance data visualization:
 """
 
 import sys
+import copy
 import numpy as np
 import pyqtgraph as pg
 
@@ -25,6 +26,7 @@ class ParentGraph(pg.PlotWidget):
       - Plotting or filtering frequency ranges
       - Overridden methods to transform freq, Z_real, Z_imag into X, Y
     """
+    
 
     def __init__(self):
         super().__init__()
@@ -40,6 +42,10 @@ class ParentGraph(pg.PlotWidget):
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
         }
+        
+        # Keep a copy of the original data so we can re-expand
+        self._original_base_data = copy.deepcopy(self._base_data)
+        self._original_manual_data = copy.deepcopy(self._manual_data)
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
@@ -96,49 +102,53 @@ class ParentGraph(pg.PlotWidget):
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points within [f_min, f_max].
+        Always filter from the original datasets so we can re-expand later.
         """
-        # Filter base data
+        # Filter from the original base data
         base_mask = (
-            (self._base_data['freq'] >= f_min) &
-            (self._base_data['freq'] <= f_max)
+            (self._original_base_data['freq'] >= f_min) &
+            (self._original_base_data['freq'] <= f_max)
         )
-        filtered_base = {
-            'freq': self._base_data['freq'][base_mask],
-            'Z_real': self._base_data['Z_real'][base_mask],
-            'Z_imag': self._base_data['Z_imag'][base_mask],
+        self._base_data = {
+            'freq'  : self._original_base_data['freq'][base_mask],
+            'Z_real': self._original_base_data['Z_real'][base_mask],
+            'Z_imag': self._original_base_data['Z_imag'][base_mask],
         }
 
-        # Filter manual data
+        # Filter from the original manual data
         manual_mask = (
-            (self._manual_data['freq'] >= f_min) &
-            (self._manual_data['freq'] <= f_max)
+            (self._original_manual_data['freq'] >= f_min) &
+            (self._original_manual_data['freq'] <= f_max)
         )
-        filtered_manual = {
-            'freq': self._manual_data['freq'][manual_mask],
-            'Z_real': self._manual_data['Z_real'][manual_mask],
-            'Z_imag': self._manual_data['Z_imag'][manual_mask],
+        self._manual_data = {
+            'freq'  : self._original_manual_data['freq'][manual_mask],
+            'Z_real': self._original_manual_data['Z_real'][manual_mask],
+            'Z_imag': self._original_manual_data['Z_imag'][manual_mask],
         }
 
-        self._base_data = filtered_base
-        self._manual_data = filtered_manual
         self._refresh_graph()
 
     def update_parameters_base(self, freq, Z_real, Z_imag):
         """
         Sets new 'base' data and re-displays both plots.
+        Also update the originals so filtering includes the new full dataset.
         """
         self._base_data = {
             'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag
         }
+        self._original_base_data = copy.deepcopy(self._base_data)
         self._refresh_graph()
+        
 
     def update_parameters_manual(self, freq, Z_real, Z_imag):
         """
         Sets new 'manual' (dynamic) data and refreshes only the dynamic plot.
+        Also update the originals so filtering includes the new full dataset.
         """
         self._manual_data = {
             'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag
         }
+        self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
         
         
