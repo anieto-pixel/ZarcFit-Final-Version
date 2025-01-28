@@ -8,6 +8,7 @@ import sys
 import logging
 import inspect
 import numpy as np
+from datetime import datetime
 from sympy import pi
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
@@ -201,13 +202,13 @@ class MainWidget(QWidget):
         shortcut_f4.activated.connect(self._print_model_parameters)
 
         shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
-        shortcut_f5.activated.connect(self._print_model_parameters)
+        shortcut_f5.activated.connect(self.widget_input_file._show_previous_file)
         
         shortcut_f6 = QShortcut(QKeySequence(Qt.Key_F6), self)
-        shortcut_f6.activated.connect(self.widget_input_file._show_previous_file)
+        shortcut_f6.activated.connect(self.widget_input_file._show_next_file)
         
-        shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
-        shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
+#        shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
+#        shortcut_f7.activated.connect(self.widget_input_file._show_next_file)
         
         shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
         shortcut_f8.activated.connect(self._handle_set_default)
@@ -298,8 +299,7 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
-        
-        
+          
     def _handle_set_default(self):
         
         self.v_sliders = dict(zip(self.config.slider_configurations.keys(),
@@ -314,8 +314,16 @@ class MainWidget(QWidget):
         
         (will have to figure out how to get all the dictionaries called, etc)
         """
-        content, header = self.model_manual.print_model_parameters()
-        self.widget_output_file.write_to_file(content, header)
+        date ={'date/time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+        file={'file': self.widget_input_file.get_current_file_name()}
+
+        print(date['date/time'])
+
+        main_dictionary=self.v_sliders|date|file
+        model_dictionary = self.model_manual.get_model_parameters()
+        graph_dictionary= self.widget_graphs.get_special_points()
+
+        self.widget_output_file.write_to_file(main_dictionary | model_dictionary| graph_dictionary)
 
         
 

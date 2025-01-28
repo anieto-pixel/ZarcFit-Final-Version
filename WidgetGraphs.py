@@ -239,9 +239,6 @@ class WidgetGraphs(QWidget):
         """
         Filters out data outside [f_min, f_max] for all three graphs.
         """
-        
-        print(f'inside graphs{f_min, f_max}')
-        
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
@@ -262,6 +259,8 @@ class WidgetGraphs(QWidget):
         self._small_graph_1.update_parameters_manual(freq, Z_real, Z_imag)
         self._small_graph_2.update_parameters_manual(freq, Z_real, Z_imag)
 
+    def get_special_points(self):
+        return {}
 
 # -----------------------------------------------------------------------
 #  Quick test

@@ -66,6 +66,10 @@ class ModelManual(QObject):
         """
         return self._fit_model(self._cost_function_bode, v_initial_guess)
 
+    def get_model_parameters(self):
+        return self._q | self._v_second  
+        
+
     # ----------------------------------------------------
     # Private Helpers
     # ----------------------------------------------------

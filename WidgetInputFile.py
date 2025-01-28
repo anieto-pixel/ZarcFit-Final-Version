@@ -87,8 +87,6 @@ class WidgetInputFile(QWidget):
             raise ValueError(f"Configuration must include parameters: {missing}")
         else:
             self.config_p=self._cast_config_parameters(self.config_p)
-            
-            
 
     def setup_current_file(self, current_file):
         """
