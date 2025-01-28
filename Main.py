@@ -64,7 +64,6 @@ class MainWidget(QWidget):
         self.widget_buttons = WidgetButtonsRow()
         
         self.widget_at_bottom = WidgetTextBar(
-            #self.config.series_secondary_variables.keys(), 
             self.config.parallel_model_secondary_variables.keys()
         )
 
@@ -91,7 +90,9 @@ class MainWidget(QWidget):
         "initialization 2.0 I guess? No fucking idea of how to roganize this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
         self.widget_output_file.setup_current_file(self.config.output_file)
-        #here I shall initialize the secondary variables and all that 
+        #here I shall initialize the secondary variables and all that
+        
+        self._update_sliders_data()
         
     # -----------------------------------------------------------------------
     #  Private UI Methods
@@ -235,8 +236,9 @@ class MainWidget(QWidget):
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
         self.model_manual.initialize_expdata(self.file_data)
         
+        self._handle_set_default
         self._update_sliders_data()
-        self.widget_sliders.set_default_values()
+
         
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
@@ -261,7 +263,6 @@ class MainWidget(QWidget):
 
         # Grab the newly calculated secondaries to display in bottom text
         v_second = self.model_manual.get_latest_secondaries()
-        
         self.widget_at_bottom._update_text(v_second)
         
     def _handle_frequency_update(self, bottom, top):
@@ -293,6 +294,7 @@ class MainWidget(QWidget):
         self.widget_graphs.apply_filter_frequency_range(bottom, top)
         
     def _handle_set_allfreqs(self):
+        
         self.freq_slider.default()
         self.widget_graphs.update_graphs(
             self.file_data['freq'], 
@@ -322,9 +324,9 @@ class MainWidget(QWidget):
           
     def _handle_set_default(self):
         
+        self.widget_sliders.set_default_values()
         self.v_sliders = dict(zip(self.config.slider_configurations.keys(),
                                   self.config.slider_default_values))
-        self.widget_sliders.set_default_values()
         self._handle_set_allfreqs()
 
 

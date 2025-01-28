@@ -79,7 +79,7 @@ class ParentGraph(pg.PlotWidget):
         self._static_plot = self.plot(
             pen='g',             # green line connecting points
             symbol='o',          # circle marker
-            symbolSize=7,        # smaller points
+            symbolSize=5,        # smaller points
             symbolBrush='g'      # green fill for markers
         )
         self._refresh_plot(self._base_data, self._static_plot)
@@ -174,18 +174,21 @@ class PhaseGraph(ParentGraph):
     def __init__(self):
         super().__init__()
         self.setTitle("Phase (Log Scale of Degrees)")
-        self.setLabel('bottom', "Frequency [Hz]")
+        self.setLabel('bottom', "Frequency [Hz]")#log
         self.setLabel('left', "log10(|Phase|)")
+        #fix y
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
         Convert to phase in degrees, then take log10(|phase|).
         """
+        freq_log=np.log10(freq)
+        
         phase_deg = np.degrees(np.arctan2(Z_imag, Z_real))
         # log10 of the absolute value, with a small offset to avoid log(0)
         phase_log = np.log10(np.abs(phase_deg) + 1e-10)
         
-        return freq, phase_log
+        return freq_log, phase_log
 
 
 class BodeGraph(ParentGraph):
@@ -203,9 +206,11 @@ class BodeGraph(ParentGraph):
         """
         Convert impedance to magnitude (dB) = 20 * log10(|Z|).
         """
+        freq_log=np.log10(freq)
+        
         mag = np.sqrt(Z_real**2 + Z_imag**2)
-        mag_db = 20 * np.log10(mag)
-        return freq, mag_db
+        mag_db = np.log10(mag)
+        return freq_log, mag_db
 
 
 class ColeColeGraph(ParentGraph):
