@@ -15,6 +15,7 @@ import pyqtgraph as pg
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import Qt
+from ModelManual import CalculationResult
 
 
 class ParentGraph(pg.PlotWidget):
@@ -139,7 +140,30 @@ class ParentGraph(pg.PlotWidget):
             'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag
         }
         self._refresh_plot(self._manual_data, self._dynamic_plot)
-
+        
+        
+    def update_special_points(self, freq_array, z_real_array, z_imag_array):
+        # Clear old special items if needed
+        for item in getattr(self, '_special_items', []):
+            self.removeItem(item)
+        self._special_items = []
+    
+        for i, color in enumerate(['r', 'g', 'b']):  # or pick whatever colors
+            f = freq_array[i]
+            zr = z_real_array[i]
+            zi = z_imag_array[i]
+            x, y = self._prepare_xy(np.array([f]), np.array([zr]), np.array([zi]))
+    
+            plot_item = self.plot(
+                x, y,
+                pen=None,
+                symbol='o',
+                symbolSize=8,
+                symbolBrush=color,
+                symbolPen=color
+            )
+            self._special_items.append(plot_item)
+            
 
 class PhaseGraph(ParentGraph):
     """
@@ -251,13 +275,32 @@ class WidgetGraphs(QWidget):
         self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
         self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
 
-    def update_manual_plot(self, freq, Z_real, Z_imag):
+    def update_manual_plot(self, calc_result: CalculationResult):
         """
         Updates the 'manual' (dynamic) data for all three graphs.
         """
-        self._big_graph.update_parameters_manual(freq, Z_real, Z_imag)
-        self._small_graph_1.update_parameters_manual(freq, Z_real, Z_imag)
-        self._small_graph_2.update_parameters_manual(freq, Z_real, Z_imag)
+        # Unpack main arrays
+        freq_main   = calc_result.main_freq
+        z_real_main = calc_result.main_z_real
+        z_imag_main = calc_result.main_z_imag
+    
+        # Pass them as 'manual/dynamic' data to each graph
+        self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+    
+        # Unpack the 3 special points
+        freq_sp   = calc_result.special_freq
+        z_real_sp = calc_result.special_z_real
+        z_imag_sp = calc_result.special_z_imag
+    
+        # Plot those 3 points in each graph. We'll create a new function to handle that:
+        self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+    
+    
+    
 
     def get_special_points(self):
         return {}
@@ -265,54 +308,82 @@ class WidgetGraphs(QWidget):
 # -----------------------------------------------------------------------
 #  Quick test
 # -----------------------------------------------------------------------
+import sys
+import numpy as np
+import pyqtgraph as pg
 
-if __name__ == "__main__":
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QLabel, QSlider, QPushButton
+)
+from PyQt5.QtCore import Qt
+
+# Import your adapted graph widget and CalculationResult
+# from your_file import WidgetGraphs, CalculationResult
+
+def test_widget_graphs():
     app = QApplication(sys.argv)
 
-    # Create a main widget to hold the graphs + sliders + test buttons
+    # 1) Create a main widget to hold the graphs + sliders + test buttons
     main_widget = QWidget()
     main_layout = QVBoxLayout(main_widget)
 
-    # 1) The composite widget with ColeCole, Bode, Phase
+    # 2) The composite widget with ColeCole, Bode, Phase
     graph_widget = WidgetGraphs()
     main_layout.addWidget(graph_widget)
 
     # ---------------------------------------------------------------------
-    # Create our original data for the "base" (green) line:
+    # Base (green) data: "static" reference
     # ---------------------------------------------------------------------
     base_freq = np.array([1, 10, 100, 1000, 10000])
     base_real = np.array([100, 80, 60, 40, 20])
     base_imag = np.array([-50, -40, -30, -20, -10])
 
-    # Create data for the "manual" (blue) line:
+    # Initialize the 'base' lines with green
+    graph_widget.update_graphs(base_freq, base_real, base_imag)
+
+    # ---------------------------------------------------------------------
+    # Manual (blue) data + 3 special points
+    # ---------------------------------------------------------------------
     manual_freq = np.array([1, 10, 100, 1000, 10000])
     manual_real = np.array([90, 70, 50, 30, 10])
     manual_imag = np.array([-45, -35, -25, -15, -5])
 
-    # Initialize the graphs with these as the base + manual data
-    graph_widget.update_graphs(base_freq, base_real, base_imag)     # green line
-    graph_widget.update_manual_plot(manual_freq, manual_real, manual_imag)  # blue line
+    # Three special frequency points
+    sp_freq = np.array([5, 50, 500]) 
+    sp_real = np.array([88, 48, 12]) 
+    sp_imag = np.array([-44, -28, -10])
+
+    # Build a CalculationResult for the "manual" portion
+    # (Note: For the 3 special points, we only have 3 data, 
+    #  so they’ll be shown as separate colored markers.)
+    initial_calc_result = CalculationResult(
+        main_freq = manual_freq,
+        main_z_real = manual_real,
+        main_z_imag = manual_imag,
+        special_freq = sp_freq,
+        special_z_real = sp_real,
+        special_z_imag = sp_imag
+    )
+
+    # Pass it to the graph widget’s update_manual_plot (blue + special points)
+    graph_widget.update_manual_plot(initial_calc_result)
 
     # ---------------------------------------------------------------------
-    # 2) Create five sliders:
-    #    1) Frequency scale (black)
-    #    2) Green Real scale
-    #    3) Green Imag scale
-    #    4) Blue Real scale
-    #    5) Blue Imag scale
+    # Create sliders to scale the base & manual data in real-time
     # ---------------------------------------------------------------------
     sliders_layout = QGridLayout()
     main_layout.addLayout(sliders_layout)
 
-    # -- (1) Frequency scale (black) --
-    freq_label = QLabel("Freq Scale (black):")
+    # 5 sliders: freq scale (for *both* base & manual), 
+    #            green real, green imag, blue real, blue imag
+    freq_slider_label = QLabel("Freq Scale (black):")
     freq_slider = QSlider(Qt.Horizontal)
-    freq_slider.setRange(1, 300)   # maps to 0.01..3.00
-    freq_slider.setValue(100)      # 1.0 scale initially
-    sliders_layout.addWidget(freq_label, 0, 0)
+    freq_slider.setRange(1, 300)
+    freq_slider.setValue(100)
+    sliders_layout.addWidget(freq_slider_label, 0, 0)
     sliders_layout.addWidget(freq_slider, 0, 1)
 
-    # -- (2) Green Real scale --
     green_real_label = QLabel("Green Z_real:")
     green_real_slider = QSlider(Qt.Horizontal)
     green_real_slider.setRange(1, 300)
@@ -320,7 +391,6 @@ if __name__ == "__main__":
     sliders_layout.addWidget(green_real_label, 1, 0)
     sliders_layout.addWidget(green_real_slider, 1, 1)
 
-    # -- (3) Green Imag scale --
     green_imag_label = QLabel("Green Z_imag:")
     green_imag_slider = QSlider(Qt.Horizontal)
     green_imag_slider.setRange(1, 300)
@@ -328,7 +398,6 @@ if __name__ == "__main__":
     sliders_layout.addWidget(green_imag_label, 2, 0)
     sliders_layout.addWidget(green_imag_slider, 2, 1)
 
-    # -- (4) Blue Real scale --
     blue_real_label = QLabel("Blue Z_real:")
     blue_real_slider = QSlider(Qt.Horizontal)
     blue_real_slider.setRange(1, 300)
@@ -336,7 +405,6 @@ if __name__ == "__main__":
     sliders_layout.addWidget(blue_real_label, 3, 0)
     sliders_layout.addWidget(blue_real_slider, 3, 1)
 
-    # -- (5) Blue Imag scale --
     blue_imag_label = QLabel("Blue Z_imag:")
     blue_imag_slider = QSlider(Qt.Horizontal)
     blue_imag_slider.setRange(1, 300)
@@ -346,9 +414,9 @@ if __name__ == "__main__":
 
     def on_any_slider_changed():
         """
-        Callback when any of the 5 sliders moves:
-          - Recompute scaled freq, real, imag for both green (base) and blue (manual),
-          - Then update the graphs in real time.
+        When any slider moves, rescale base & manual data
+        and re-plot them. Then build a new CalculationResult
+        for the manual portion (including the special points).
         """
         freq_scale = freq_slider.value() / 100.0
 
@@ -368,11 +436,31 @@ if __name__ == "__main__":
         manual_real_scaled = manual_real * blue_r_scale
         manual_imag_scaled = manual_imag * blue_i_scale
 
-        # Update both lines across ColeCole, Bode, and Phase
-        graph_widget.update_graphs(base_freq_scaled, base_real_scaled, base_imag_scaled)
-        graph_widget.update_manual_plot(manual_freq_scaled, manual_real_scaled, manual_imag_scaled)
+        # Scale special points
+        sp_freq_scaled = sp_freq * freq_scale
+        sp_real_scaled = sp_real * blue_r_scale
+        sp_imag_scaled = sp_imag * blue_i_scale
 
-    # Connect all sliders to the same handler
+        # Update the 'base' line in green
+        graph_widget.update_graphs(
+            base_freq_scaled,
+            base_real_scaled,
+            base_imag_scaled
+        )
+
+        # Construct a new CalculationResult for the manual portion
+        calc_res = CalculationResult(
+            main_freq     = manual_freq_scaled,
+            main_z_real   = manual_real_scaled,
+            main_z_imag   = manual_imag_scaled,
+            special_freq  = sp_freq_scaled,
+            special_z_real= sp_real_scaled,
+            special_z_imag= sp_imag_scaled
+        )
+        # Pass it to update_manual_plot
+        graph_widget.update_manual_plot(calc_res)
+
+    # Connect all sliders
     freq_slider.valueChanged.connect(on_any_slider_changed)
     green_real_slider.valueChanged.connect(on_any_slider_changed)
     green_imag_slider.valueChanged.connect(on_any_slider_changed)
@@ -385,30 +473,45 @@ if __name__ == "__main__":
     button_layout = QHBoxLayout()
     main_layout.addLayout(button_layout)
 
-    # Button to filter data to [10, 100] range
     btn_filter_10_100 = QPushButton("Filter 10..100 Hz")
-    
+    button_layout.addWidget(btn_filter_10_100)
+
     def filter_10_100():
         graph_widget.apply_filter_frequency_range(10, 100)
     btn_filter_10_100.clicked.connect(filter_10_100)
-    button_layout.addWidget(btn_filter_10_100)
 
-    # Button to show full freq range again
     btn_show_all = QPushButton("Show All Freq")
-    
-    def show_all():
-        # We simply reset the original data to undo any prior filtering
-        graph_widget.update_graphs(base_freq, base_real, base_imag)
-        graph_widget.update_manual_plot(manual_freq, manual_real, manual_imag)
-    btn_show_all.clicked.connect(show_all)
     button_layout.addWidget(btn_show_all)
+
+    def show_all():
+        """
+        Reset the original data to undo prior filtering and re-plot.
+        """
+        graph_widget.update_graphs(base_freq, base_real, base_imag)
+
+        # Also reset manual part
+        calc_res = CalculationResult(
+            main_freq     = manual_freq,
+            main_z_real   = manual_real,
+            main_z_imag   = manual_imag,
+            special_freq  = sp_freq,
+            special_z_real= sp_real,
+            special_z_imag= sp_imag
+        )
+        graph_widget.update_manual_plot(calc_res)
+
+    btn_show_all.clicked.connect(show_all)
 
     # ---------------------------------------------------------------------
     # Final Setup
     # ---------------------------------------------------------------------
     main_widget.setLayout(main_layout)
     main_widget.resize(900, 700)
-    main_widget.setWindowTitle("Test - Full Coverage of Public Methods")
+    main_widget.setWindowTitle("WidgetGraphs - Test of CalculationResult + Special Points")
     main_widget.show()
 
     sys.exit(app.exec_())
+
+
+if __name__ == "__main__":
+    test_widget_graphs()

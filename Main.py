@@ -23,7 +23,7 @@ from PyQt5.QtGui import QFontMetrics, QFont
 from ConfigImporter import ConfigImporter
 from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
 from RangeSlider import RangeSlider
-from ModelManual import ModelManual
+from ModelManual import ModelManual, CalculationResult
 from WidgetOutputFile import WidgetOutputFile
 from WidgetInputFile import WidgetInputFile
 from WidgetSliders import WidgetSliders
@@ -100,7 +100,7 @@ class MainWidget(QWidget):
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
         
         # Connects model manual with handler (for now)
-        self.model_manual.model_manual_updated.connect(self.widget_graphs.update_manual_plot)
+        self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
 
         # Connecting hotkeys
         self._initialize_hotkeys()

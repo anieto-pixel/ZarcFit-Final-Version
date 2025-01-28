@@ -3,9 +3,26 @@
 
 import numpy as np
 import scipy.optimize as opt
+from scipy.optimize import Bounds
 import logging
 import inspect
-from PyQt5.QtCore import QObject, pyqtSignal
+from dataclasses import dataclass
+from PyQt5.QtCore import QObject, pyqtSignal, QCoreApplication
+
+#
+@dataclass
+class CalculationResult:
+    """
+    Container for main and special impedance data.
+    """
+    main_freq:      np.ndarray   # The frequency array used for the main curve
+    main_z_real:    np.ndarray
+    main_z_imag:    np.ndarray
+    special_freq:   np.ndarray   # The 3 special frequencies
+    special_z_real: np.ndarray
+    special_z_imag: np.ndarray
+    
+
 
 class ModelManual(QObject):
     """
@@ -14,8 +31,12 @@ class ModelManual(QObject):
     Now it also calculates 'secondary variables' that used to be in Main.
     It is hardcoded because my boss made me do it :) .
     """
+    #model manual upadted is legacy for now
+#    model_manual_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
-    model_manual_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
+    # Option B: Or add a new “all-in-one” signal that emits a CalculationResult:
+    model_manual_result = pyqtSignal(CalculationResult)
+
 
     def __init__(self):
         """
@@ -26,8 +47,8 @@ class ModelManual(QObject):
         # We'll store frequencies and results in these arrays
         self._experiment_data = {
             "freq": np.array([1, 10, 100, 1000, 10000]),
-#            "Z_real": np.zeros(5),
-#            "Z_imag": np.zeros(5),
+            "Z_real": np.zeros(5),
+            "Z_imag": np.zeros(5),
         }
 
         # We'll keep a copy of the secondary variables from the last run
@@ -38,14 +59,37 @@ class ModelManual(QObject):
         self._experiment_data= file_data
 
     def run_model_manual(self,v):
-        z_real, z_imag = self._run_model(v)
+        """
+        Main entry point to run the model with the given slider/fit parameters `v`.
+        1) Computes main impedance arrays over self._experiment_data['freq'].
+        2) Computes special frequencies + their impedance.
+        3) Packs all into a CalculationResult.
+        4) Emits signals, stores _modeled_data for cost-function usage.
+        5) Returns the CalculationResult for direct inspection.
+        """
         
-        # Emit the new impedance data    
-        self.model_manual_updated.emit(
-            self._experiment_data["freq"],
-            z_real, 
-            z_imag
+        freq_array = self._experiment_data["freq"] 
+        z_real, z_imag = self._run_model(v, freq_array)
+        
+        # 2) Compute the special frequencies based on the slider dict
+        special_freq = self._get_special_freqs(v) 
+        spec_zr, spec_zi = self._run_model(v, special_freq)
+
+        # 3) Create a new CalculationResult
+        result = CalculationResult(
+            main_freq = freq_array,
+            main_z_real   = z_real,
+            main_z_imag   = z_imag,
+            special_freq  = special_freq,
+            special_z_real = spec_zr,
+            special_z_imag = spec_zi
         )
+        
+        # Legacy emit the new impedance data    
+        # self.model_manual_updated.emit(self._experiment_data["freq"], z_real, z_imag)
+        
+        self.model_manual_result.emit(result)
+        return result
 
     def get_latest_secondaries(self):
         """
@@ -69,7 +113,6 @@ class ModelManual(QObject):
     def get_model_parameters(self):
         return self._q | self._v_second  
         
-
     # ----------------------------------------------------
     # Private Helpers
     # ----------------------------------------------------
@@ -79,11 +122,36 @@ class ModelManual(QObject):
         Single private helper that removes code duplication.  
         It calls the provided cost_func, e.g. _cost_function_cole or _cost_function_bode.
         """
-        # 1) Choose a fixed ordering for the parameters.
+        # 1) Choose a fixed ordering for the parameters. Convert the dict to a NumPy.
         param_names = list(v_initial_guess.keys())
+        x0 = np.array([v_initial_guess[k] for k in param_names], dtype=float)      
     
-        # 2) Convert the dict to a NumPy array using that order.
-        x0 = np.array([v_initial_guess[k] for k in param_names], dtype=float)
+        # 2) Decide on lower/upper bounds. For instance:
+        #    - Frequencies above 1e-9, impedances above 1e-6, etc.
+        lower_bounds = []
+        upper_bounds = []
+        for name in param_names:
+            if name.startswith("F"): 
+                lower_bounds.append(1e-2)   # freq > 0
+                upper_bounds.append(1e8)    # arbitrary large
+            elif name.startswith("P"): 
+                lower_bounds.append(0.0)    # phase exponent? 
+                upper_bounds.append(1.0)    # or maybe 1.0 if you know domain
+            elif name.startswith("R"): 
+                lower_bounds.append(1e-2)   # resistances can’t be zero
+                upper_bounds.append(1e8)    
+            elif name.startswith("L"):
+                lower_bounds.append(1e-12)  
+                upper_bounds.append(1e-3)   # or something appropriate
+            elif name.startswith("Q"):
+                lower_bounds.append(1e-8)  
+                upper_bounds.append(1e2)   # pick domain
+            else:
+                # fallback
+                lower_bounds.append(-1e9)
+                upper_bounds.append(1e9)
+    
+        bounds = Bounds(lower_bounds, upper_bounds)        
     
         # 3) Define a small wrapper for SciPy that reconstructs the dict, then calls cost_func.
         def cost_wrapper(x_array):
@@ -95,6 +163,8 @@ class ModelManual(QObject):
             cost_wrapper,
             x0=x0,
             method='Nelder-Mead',
+            bounds=bounds,         # If using a method that supports bounds
+            options={'maxfev': 2000}  # allow more function evaluation
         )
     
         if not result.success:
@@ -105,10 +175,7 @@ class ModelManual(QObject):
         best_fit_array = result.x
         best_fit_dict = {k: best_fit_array[i] for i, k in enumerate(param_names)}
     
-        # Finally, run the model with these best-fit params 
-        # so that _modeled_data is updated and signals are emitted.
         self.run_model_manual(best_fit_dict)
-    
         return best_fit_dict
         
     def _calculate_secondary_variables(self, v):
@@ -134,6 +201,17 @@ class ModelManual(QObject):
         self._v_second["pQm"] = Qm*(v["Rm"]/(v["Rinf"] + v["Rh"] + v["Rm"]))**2
         self._v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"])*(v["Rinf"] + v["Rh"] + v["Rm"] +v["Rl"])/v["Rl"]
         self._v_second["pQl"] = Ql*(v["Rl"]/(v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
+
+    def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
+        """
+        Pseudocode that yields 3 freq points based on your domain logic.
+        E.g. perhaps you pick them from slider ranges or some formula.
+        """
+        f1 = slider_values["Fh"] 
+        f2 = slider_values["Fm"] 
+        f3 = slider_values["Fl"]
+        
+        return np.array([f1, f2, f3], dtype=float)
     
     # Mostly for testing purposes
     def _run_model_series(self, v):
@@ -171,7 +249,7 @@ class ModelManual(QObject):
         # Update the arrays
         return np.array(zr_list), np.array(zi_list)
 
-    def _run_model(self, v):
+    def _run_model(self, v: dict, freq_array: np.ndarray):
         """
         The main model used in cost functions.
         """
@@ -181,20 +259,20 @@ class ModelManual(QObject):
         zr_list = []
         zi_list = []
 
-        for freq in self._experiment_data["freq"]:
+        for f in freq_array:
             # Inductor
-            zinf = self._inductor(freq, v["Linf"])
+            zinf = self._inductor(f, v["Linf"])
 
             # Parallel system
-            z_line_h = v2["pRh"] + self._cpe(freq, v2["pQh"], v["Ph"], v["Ph"])
-            z_line_m = v2["pRm"] + self._cpe(freq, v2["pQm"], v["Pm"], v["Pm"])
-            z_line_l = v2["pRl"] + self._cpe(freq, v2["pQl"], v["Pl"], v["Pl"])
+            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v["Ph"], v["Ph"])
+            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v["Pm"], v["Pm"])
+            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v["Pl"], v["Pl"])
 
             z_lines = self._parallel(z_line_m, z_line_l)
             z_rock = self._parallel(z_lines, v2["R0"])
             zparallel = self._parallel(z_line_h, z_rock)
 
-            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
+            z_cpee = self._cpe(f, v["Qe"], v["Pef"], v["Pei"])
             zarce = self._parallel(z_cpee, v["Re"])
 
             z_total = zinf + zparallel + zarce
@@ -203,11 +281,14 @@ class ModelManual(QObject):
 
         return np.array(zr_list), np.array(zi_list)
         
-    def _cost_function_cole(self, v):
+    def _cost_function_cole(self, v: dict) -> float:
         """
         EIS cost function with separate comparisons for real and imaginary parts.
         """
-        z_real, z_imag = self._run_model(v)
+        
+        freq_array = self._experiment_data["freq"]
+        
+        z_real, z_imag = self._run_model(v, freq_array)
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
 
@@ -216,11 +297,13 @@ class ModelManual(QObject):
 
         return np.sum(diff_real + diff_imag)
     
-    def _cost_function_bode(self, v):
+    def _cost_function_bode(self, v: dict) -> float:
         """
         Bode cost function that compares magnitude and phase.
         """
-        z_real, z_imag = self._run_model(v)
+        freq_array = self._experiment_data["freq"]
+        
+        z_real, z_imag = self._run_model(v, freq_array)
         z_absolute = np.sqrt(z_real**2 + z_imag**2)
         z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
 
@@ -233,41 +316,153 @@ class ModelManual(QObject):
         diff_phase_deg = (exp_phase_deg - z_phase_deg) ** 2
 
         return np.sum(diff_absolute + diff_phase_deg)
-
     
     # ----------------------------------------------------
     # Circuit Methods
     # ----------------------------------------------------
 
     def _inductor(self, freq, linf):
-        return (2 * np.pi * freq) * linf *1j
+        result = (2 * np.pi * freq) * linf *1j
+        return result
         
     def _q_from_f0(self, r , f0, p):
-        return 1.0 / (r * (2.0 * np.pi * f0)**p)
-        
+        result= 1.0 / (r * (2.0 * np.pi * f0)**p)
+        return result
+    
     def _cpe(self, freq , q, pf, pi):
         phase_factor = (1j)**pi
         omega_exp = (2.0 * np.pi * freq)**pf
-        return 1.0 / (q * phase_factor * omega_exp)
+        result= 1.0 / (q * phase_factor * omega_exp)
+        return result
         
     def _parallel(self,z_1, z_2):
         denominator= (1/z_1) + (1/z_2)
-        return 1/denominator
-
+        result= 1/denominator
+        return result
+    
+####################################################################
 # -----------------------------------------------------------------------
 #  TEST FOR UPDATED ModelManual
 # -----------------------------------------------------------------------
-def test_model_manual():
+########################################################################
+
+
+
+
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
+    QSlider, QLabel, QHBoxLayout, QGridLayout
+)
+from PyQt5.QtCore import Qt
+import numpy as np
+from dataclasses import asdict
+
+class ResultsWidget(QWidget):
     """
-    Manual test function to verify the ModelManual class works.
-    Run this in a standalone Python session or integrate into your test suite.
+    A simple widget to display the results in a grid format and add sliders for parameter control.
     """
+    def __init__(self, model, v_init, results_callback):
+        super().__init__()
+        self.setWindowTitle("Interactive Model Viewer")
+
+        # Store model and callback
+        self.model = model
+        self.results_callback = results_callback
+
+        # Main layout
+        self.layout = QVBoxLayout(self)
+
+        # Grid for sliders
+        self.slider_grid = QGridLayout()
+        self.layout.addLayout(self.slider_grid)
+
+        # Table to display results
+        self.table = QTableWidget(self)
+        self.layout.addWidget(self.table)
+
+        # Store slider references
+        self.sliders = {}
+        self.v_init = v_init
+
+        # Add sliders for each parameter
+        row = 0
+        for param, value in v_init.items():
+            self.add_slider(param, value, row)
+            row += 1
+
+        # Initialize results table
+        self.update_results(self.run_model())
+
+    def add_slider(self, param, initial_value, row):
+        """
+        Add a slider to the grid for controlling a parameter.
+        """
+        label = QLabel(f"{param}: {initial_value:.3e}", self)
+        slider = QSlider(Qt.Horizontal, self)
+        slider.setMinimum(1)
+        slider.setMaximum(1000)
+        slider.setValue(int(initial_value * 10 if initial_value > 0 else 1))
+        slider.valueChanged.connect(lambda value, p=param, lbl=label: self.update_parameter(p, value, lbl))
+
+        self.slider_grid.addWidget(label, row, 0)
+        self.slider_grid.addWidget(slider, row, 1)
+        self.sliders[param] = slider
+
+    def update_parameter(self, param, value, label):
+        """
+        Update the parameter value and rerun the model.
+        """
+        # Scale value back to the original range
+        scaled_value = value / 10 if "F" in param or "L" in param else value
+        self.v_init[param] = scaled_value
+        label.setText(f"{param}: {scaled_value:.3e}")
+
+        # Rerun the model with updated parameters
+        self.update_results(self.run_model())
+
+    def run_model(self):
+        """
+        Run the model with the current parameter values.
+        """
+        return self.model.run_model_manual(self.v_init)
+
+    def update_results(self, calculation_result):
+        """
+        Update the grid display with new results and invoke the callback.
+        """
+        # Convert the CalculationResult to a dictionary for easier iteration
+        result_dict = asdict(calculation_result)
+
+        # Prepare the table dimensions
+        self.table.setRowCount(len(result_dict))
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(["Parameter", "Value"])
+
+        # Populate the table
+        for row, (key, value) in enumerate(result_dict.items()):
+            self.table.setItem(row, 0, QTableWidgetItem(key))
+            # Format the array values as strings
+            value_str = str(value) if not isinstance(value, np.ndarray) else np.array2string(value, precision=4)
+            self.table.setItem(row, 1, QTableWidgetItem(value_str))
+
+        # Invoke the callback (e.g., for printing to terminal)
+        self.results_callback(calculation_result)
+
+
+def test_model_manual_with_sliders():
+    """
+    Interactive test with sliders, displaying the evolution of results in a grid and printing them to the terminal.
+    """
+    # Initialize Qt application
+    app = QApplication([])
+
+    # Create the model
     model = ModelManual()
 
-    # Example experimental data (synthetic)
-    test_freq = np.array([1, 10, 100, 1000, 10000], dtype=float)
-    test_Zr = np.array([50, 40, 30, 20, 10], dtype=float)
-    test_Zi = np.array([0, -10, -20, -30, -40], dtype=float)
+    # Example experimental data
+    test_freq = np.array([1, 10, 100, 1000, 10000, 100000], dtype=float)
+    test_Zr = np.array([1.9, 1.24, 1.23, 1.21, 1.14, 8.03], dtype=float)
+    test_Zi = np.array([-1.09, -1.12, -1.46, -3.31, -1.06, -3.85], dtype=float)
     file_data = {
         "freq": test_freq,
         "Z_real": test_Zr,
@@ -275,51 +470,45 @@ def test_model_manual():
     }
     model.initialize_expdata(file_data)
 
-    # Example initial guess
+    # Example slider/initial guess
     v_init = {
-        "Rinf": 10.0,
+        "Rinf": 671,
         "Linf": 1e-6,
-        "Rh": 100.0,
-        "Fh": 1000.0,
-        "Ph": 0.8,
-        "Rm": 100.0,
-        "Fm": 1000.0,
-        "Pm": 0.8,
-        "Rl": 100.0,
-        "Fl": 1000.0,
-        "Pl": 0.8,
-        "Re": 50.0,
-        "Qe": 1e-5,
-        "Pef": 0.8,
-        "Pei": 0.8,
+        "Rh":   120000,
+        "Fh":   178000,
+        "Ph":   0.7,
+        "Rm":   1.0,
+        "Fm":   0.1,
+        "Pm":   0.5,
+        "Rl":   100.0,
+        "Fl":   1000.0,
+        "Pl":   0.8,
+        "Re":   50.0,
+        "Qe":   1e-5,
+        "Pef":  0.8,
+        "Pei":  0.8,
     }
 
-    # Fit using the Cole cost function
-    best_fit_cole = model.fit_model_cole(v_init)
-    print("Best-fit parameters (Cole):")
-    for k, val in best_fit_cole.items():
-        print(f"  {k}: {val}")
+    # Function to print results in the terminal
+    def print_results_to_terminal(calc_result):
+        print("\nFull Calculation Result:")
+        for key, value in asdict(calc_result).items():
+            if isinstance(value, np.ndarray):
+                print(f"{key}: {np.array2string(value, precision=4)}")
+            else:
+                print(f"{key}: {value}")
 
-    z_real_fit_cole = model._modeled_data["Z_real"]
-    z_imag_fit_cole = model._modeled_data["Z_imag"]
-    print("Final model fit (Z_real) [Cole]:", z_real_fit_cole)
-    print("Final model fit (Z_imag) [Cole]:", z_imag_fit_cole)
+    # Create the GUI for displaying results and interacting with sliders
+    results_widget = ResultsWidget(model, v_init, results_callback=print_results_to_terminal)
+    results_widget.resize(800, 600)
+    results_widget.show()
 
-    # Fit using the Bode cost function
-    best_fit_bode = model.fit_model_bode(v_init)
-    print("\nBest-fit parameters (Bode):")
-    for k, val in best_fit_bode.items():
-        print(f"  {k}: {val}")
+    # Run the application loop
+    app.exec_()
 
-    z_real_fit_bode = model._modeled_data["Z_real"]
-    z_imag_fit_bode = model._modeled_data["Z_imag"]
-    print("Final model fit (Z_real) [Bode]:", z_real_fit_bode)
-    print("Final model fit (Z_imag) [Bode]:", z_imag_fit_bode)
 
-    print("\nDone with manual test.")
-
-# -----------------------------------------------------------------------
-#  If you want to run this test immediately when script is invoked:
-# -----------------------------------------------------------------------
 if __name__ == "__main__":
-    test_model_manual()
+    test_model_manual_with_sliders()
+
+
+
