@@ -25,13 +25,13 @@ class CustomSliders(QWidget):
         self.disabled_colour = "gray"
         self.number_of_tick_intervals = number_of_tick_intervals
 
-        # Main slider and label
+        # Main slider
         self._slider = QSlider(Qt.Vertical, self)
-        self._value_label = QLabel(str(self._slider.value()), self)
-
-        # Disable button
-        self._disable_button = QPushButton("Disable", self)
-
+        
+        # Disable button with label overlay
+        self._disable_button = QPushButton(str(self._slider.value()), self)
+        self._disable_button.setStyleSheet("font-size: 12px;")
+        
         # Overall widget layout
         self._layout = QVBoxLayout()
         self._slider.valueChanged.connect(self._update_label)
@@ -50,7 +50,6 @@ class CustomSliders(QWidget):
         Create and assign a layout containing the slider and the value label.
         """
         self._layout.addWidget(self._slider)
-        self._layout.addWidget(self._value_label)
         self._layout.addWidget(self._disable_button)
         self.setLayout(self._layout)
         
@@ -84,21 +83,20 @@ class CustomSliders(QWidget):
         """)
         
     def _toggle_slider(self):
-        
         if self._slider.isEnabled():
             self._slider.setEnabled(False)
             self._update_slider_style(self.disabled_colour)
-            self._disable_button.setText("Enable")
         else:
             self._slider.setEnabled(True)
             self._update_slider_style(self.colour)
-            self._disable_button.setText("Disable")
+        
+        self._update_label()
 
     def _update_label(self):
         """
         Update the on-screen label whenever the slider value changes.
         """
-        self._value_label.setText(f"Slider: {self.get_value()}")
+        self._disable_button.setText(str(self.get_value()))
 
     def _string_by_tick(self, i):
         """
@@ -199,7 +197,8 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         Show the floating-point value with three decimal places.
         """
-        self._value_label.setText(f"{self.get_value():.3f}")
+        self._disable_button.setText(f"{self.get_value():.3f}")
+        
 
     def _emit_corrected_value(self, _):
         """
@@ -254,7 +253,7 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         Display the computed exponent value in scientific notation.
         """
-        self._value_label.setText(f"{self.get_value():.1e}")
+        self._disable_button.setText(f"{self.get_value():.1e}")
 
     def _string_by_tick(self, i):
         """
