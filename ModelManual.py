@@ -31,10 +31,6 @@ class ModelManual(QObject):
     Now it also calculates 'secondary variables' that used to be in Main.
     It is hardcoded because my boss made me do it :) .
     """
-    #model manual upadted is legacy for now
-#    model_manual_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
-
-    # Option B: Or add a new “all-in-one” signal that emits a CalculationResult:
     model_manual_result = pyqtSignal(CalculationResult)
 
 
@@ -50,6 +46,7 @@ class ModelManual(QObject):
             "Z_real": np.zeros(5),
             "Z_imag": np.zeros(5),
         }
+        self.disabled_variables = set()
 
         # We'll keep a copy of the secondary variables from the last run
         self._q = {}
@@ -113,6 +110,14 @@ class ModelManual(QObject):
     def get_model_parameters(self):
         return self._q | self._v_second  
         
+    def set_disabled_variables(self, key, disabled):
+        if disabled:
+            self.disabled_variables.add(key)  
+        else:
+            self.disabled_variables.discard(key)
+    
+    
+
     # ----------------------------------------------------
     # Private Helpers
     # ----------------------------------------------------

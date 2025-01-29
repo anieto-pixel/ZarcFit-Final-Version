@@ -16,7 +16,7 @@ class CustomSliders(QWidget):
       - A label showing the current slider value.
     """
     
-    was_toggled = pyqtSignal(int)
+    was_disabled = pyqtSignal(int)
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         super().__init__()
@@ -101,14 +101,14 @@ class CustomSliders(QWidget):
             self._update_slider_style(self.disabled_colour)
             self._disable_button.setStyleSheet("background-color: gray;  border: none;")
             
-            self.was_toggled.emit(False)
+            self.was_disabled.emit(True)
             
         else:
             self._slider.setEnabled(True)
             self._update_slider_style(self.colour)
             self._disable_button.setStyleSheet("background-color: none;")
             
-            self.was_toggled.emit(True)
+            self.was_disabled.emit(False)
         
         self._update_label()
 
@@ -420,7 +420,7 @@ class TestSliders(QWidget):
         slider.value_changed().connect(
             lambda val, label=label_text: print(f"{label} Changed: {val}")
         )
-        slider.was_toggled.connect(
+        slider.was_disabled.connect(
             lambda val, label=label_text: print(f"{label} Was toggled: {val}")
         )
 
