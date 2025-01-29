@@ -339,6 +339,53 @@ class WidgetGraphs(QWidget):
         main_layout.addWidget(right_frame)
         self.setLayout(main_layout)
 
+
+
+
+    def apply_filter_frequency_range(self, f_min, f_max):
+        """
+        Filters out data outside [f_min, f_max] for all three graphs.
+        """
+        self._big_graph.filter_frequency_range(f_min, f_max)
+        self._small_graph_1.filter_frequency_range(f_min, f_max)
+        self._small_graph_2.filter_frequency_range(f_min, f_max)
+        self._tab_graph.filter_frequency_range(f_min, f_max)
+
+    def update_graphs(self, freq, Z_real, Z_imag):
+        """
+        Updates the 'base' (static) data for all three graphs simultaneously.
+        """
+        self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
+        self._tab_graph.update_parameters_base(freq, Z_real, Z_imag)
+
+    def update_manual_plot(self, calc_result: CalculationResult):
+        """
+        Updates the 'manual' (dynamic) data for all three graphs.
+        """
+        # Unpack main arrays
+        freq_main   = calc_result.main_freq
+        z_real_main = calc_result.main_z_real
+        z_imag_main = calc_result.main_z_imag
+    
+        # Pass them as 'manual/dynamic' data to each graph
+        self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._tab_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+    
+        # Unpack the 3 special points
+        freq_sp   = calc_result.special_freq
+        z_real_sp = calc_result.special_z_real
+        z_imag_sp = calc_result.special_z_imag
+    
+        # Plot those 3 points in each graph. We'll create a new function to handle that:
+        self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._tab_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+
     def apply_filter_frequency_range(self, f_min, f_max):
         """
         Filters out data outside [f_min, f_max] for all three graphs.

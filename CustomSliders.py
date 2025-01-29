@@ -1,7 +1,7 @@
 import sys
 import math
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QSlider, QLabel
+    QApplication, QWidget, QVBoxLayout, QSlider, QLabel, QPushButton
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QRect, QSize
 from PyQt5.QtGui import QPainter, QFont, QColor, QFontMetrics
@@ -18,24 +18,27 @@ class CustomSliders(QWidget):
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         super().__init__()
+        # Setup slider parameters
         self._min_value = min_value
         self._max_value = max_value
+        self.colour = colour
+        self.disabled_colour = "gray"
         self.number_of_tick_intervals = number_of_tick_intervals
 
         # Main slider and label
         self._slider = QSlider(Qt.Vertical, self)
         self._value_label = QLabel(str(self._slider.value()), self)
 
+        # Disable button
+        self._disable_button = QPushButton("Disable", self)
+
         # Overall widget layout
         self._layout = QVBoxLayout()
-
-        # Connect slider value changes to an internal update
         self._slider.valueChanged.connect(self._update_label)
+        self._disable_button.clicked.connect(self._toggle_slider)
 
         # Configure slider appearance and functionality
-        self._setup_slider(colour)
-
-        # Assemble the layout
+        self._setup_slider()
         self._setup_layout()
         
     # -----------------------------------------------------------------------
@@ -48,9 +51,10 @@ class CustomSliders(QWidget):
         """
         self._layout.addWidget(self._slider)
         self._layout.addWidget(self._value_label)
+        self._layout.addWidget(self._disable_button)
         self.setLayout(self._layout)
         
-    def _setup_slider(self, colour):
+    def _setup_slider(self):
         """
         Configure the slider's properties (range, ticks, color).
         """
@@ -61,22 +65,34 @@ class CustomSliders(QWidget):
         interval = max(1, (self._max_value - self._min_value) // self.number_of_tick_intervals)
         self._slider.setTickInterval(interval)
 
-        # Style the slider handle and track
-        self._slider.setStyleSheet(f"""
+        self._update_slider_style(self.colour)
+        self.setMinimumWidth(75)
+        
+    def _update_slider_style(self, colour):
+        self._slider.setStyleSheet(f"""                      
+                 
             QSlider::handle:vertical {{
                 background: {colour};
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
+                width: 10px;
+                height: 10px;
+                border-radius: 20px;
             }}
             QSlider::add-page:vertical {{
                 background: #d3d3d3;
-                border-radius: 5px;
+                border-radius: 2px;
             }}
         """)
-
-        # Provide enough width so ticks and label don't overlap
-        self.setMinimumWidth(75)
+        
+    def _toggle_slider(self):
+        
+        if self._slider.isEnabled():
+            self._slider.setEnabled(False)
+            self._update_slider_style(self.disabled_colour)
+            self._disable_button.setText("Enable")
+        else:
+            self._slider.setEnabled(True)
+            self._update_slider_style(self.colour)
+            self._disable_button.setText("Disable")
 
     def _update_label(self):
         """
@@ -140,6 +156,8 @@ class CustomSliders(QWidget):
         Exposes the slider's valueChanged signal for external listeners.
         """
         return self._slider.valueChanged
+    
+        pass
 
 #############################################################################
 
@@ -162,7 +180,7 @@ class DoubleSliderWithTicks(CustomSliders):
     #  Private Methods
     # -----------------------------------------------------------------------
 
-    def _setup_slider(self, colour):
+    def _setup_slider(self):
         """
         Overridden to set slider's range as scaled integers. Ticks also scaled.
         """
@@ -174,18 +192,7 @@ class DoubleSliderWithTicks(CustomSliders):
         interval = max(1, (int_max - int_min) // self.number_of_tick_intervals)
         self._slider.setTickInterval(interval)
 
-        self._slider.setStyleSheet(f"""
-            QSlider::handle:vertical {{
-                background: {colour};
-                width: 20px;
-                height: 20px;
-                border-radius: 10px;
-            }}
-            QSlider::add-page:vertical {{
-                background: #d3d3d3;
-                border-radius: 5px;
-            }}
-        """)
+        self._update_slider_style(self.colour)
         self.setMinimumWidth(75)
         
     def _update_label(self):
