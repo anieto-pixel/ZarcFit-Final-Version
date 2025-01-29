@@ -322,20 +322,42 @@ class ModelManual(QObject):
     # ----------------------------------------------------
 
     def _inductor(self, freq, linf):
+        if linf == 0:
+            raise ValueError("Inductance (linf) cannot be zero.")
+        if freq < 0:
+            raise ValueError("Frequency cannot be negative.")
+        
         result = (2 * np.pi * freq) * linf *1j
         return result
         
     def _q_from_f0(self, r , f0, p):
+        if r == 0:
+            raise ValueError("Resistance r cannot be zero.")
+        if f0 <= 0:
+            raise ValueError("Resonant frequency f0 must be positive.")
+    
         result= 1.0 / (r * (2.0 * np.pi * f0)**p)
         return result
     
     def _cpe(self, freq , q, pf, pi):
+        if q == 0:
+            raise ValueError("Parameter q cannot be zero.")
+        if freq < 0:
+            raise ValueError("Frequency must be non-negative for CPE model.")
+        if freq == 0 and pf > 0:
+            raise ValueError("freq=0 and pf>0 results in division by zero in CPE.")
+        if freq == 0 and pf < 0:
+            raise ValueError("freq=0 and pf<0 is undefined (0 to a negative power).")
+        
         phase_factor = (1j)**pi
         omega_exp = (2.0 * np.pi * freq)**pf
         result= 1.0 / (q * phase_factor * omega_exp)
         return result
         
     def _parallel(self,z_1, z_2):
+        if z_1 == 0 or z_2 == 0:
+            raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
+
         denominator= (1/z_1) + (1/z_2)
         result= 1/denominator
         return result

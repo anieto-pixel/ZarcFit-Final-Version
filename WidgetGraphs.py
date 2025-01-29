@@ -158,7 +158,7 @@ class ParentGraph(pg.PlotWidget):
             self.removeItem(item)
         self._special_items = []
     
-        for i, color in enumerate(['r', 'g', 'b']):  # or pick whatever colors
+        for i, color in enumerate(['r', 'g', 'c']):  # or pick whatever colors
             f = freq_array[i]
             zr = z_real_array[i]
             zi = z_imag_array[i]
@@ -167,8 +167,8 @@ class ParentGraph(pg.PlotWidget):
             plot_item = self.plot(
                 x, y,
                 pen=None,
-                symbol='o',
-                symbolSize=8,
+                symbol='x',
+                symbolSize=12,
                 symbolBrush=color,
                 symbolPen=color
             )
@@ -184,7 +184,7 @@ class PhaseGraph(ParentGraph):
     def __init__(self):
         super().__init__()
         self.setTitle("Phase (Log Scale of Degrees)")
-        self.setLabel('bottom', "Frequency [Hz]")#log
+        self.setLabel('bottom', "log10(Freq[Hz])")#log
         self.setLabel('left', "log10(|Phase|)")
         #fix y
 
@@ -200,7 +200,6 @@ class PhaseGraph(ParentGraph):
         
         return freq_log, phase_log
 
-
 class BodeGraph(ParentGraph):
     """
     Plots the magnitude of impedance (in dB) vs. frequency (Bode plot).
@@ -209,8 +208,8 @@ class BodeGraph(ParentGraph):
     def __init__(self):
         super().__init__()
         self.setTitle("Bode Graph")
-        self.setLabel('bottom', "Frequency [Hz]")
-        self.setLabel('left', "Log Magnitude [dB]")
+        self.setLabel('bottom', "log10(Freq[Hz])")
+        self.setLabel('left', "Log10 Magnitude [dB]")
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
@@ -222,12 +221,10 @@ class BodeGraph(ParentGraph):
         mag_db = np.log10(mag)
         return freq_log, mag_db
 
-
 class ColeColeGraph(ParentGraph):
     """
     Plots Cole-Cole (Nyquist) diagram: real(Z) vs. -imag(Z).
     """
-
     def __init__(self):
         super().__init__()
         
@@ -294,34 +291,52 @@ class WidgetGraphs(QWidget):
       - A large Cole-Cole graph
       - Two smaller graphs (Bode and Phase) stacked vertically
     """
-
     def __init__(self):
         super().__init__()
 
-        # Instantiate the 3 graphs
         self._big_graph = ColeColeGraph()
         self._small_graph_1 = BodeGraph()
         self._small_graph_2 = PhaseGraph()
         self._tab_graph = TimeGraph()
-        
-        # Create a tab widget to hold the main Cole graph and the fourth graph
+
+        # Create the tab widget
         self._tab_widget = QTabWidget()
         self._tab_widget.addTab(self._big_graph, "Cole Graph")
         self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
+        self._tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        # Layout for the smaller graphs on the right
-        right_layout = QVBoxLayout()
+        # Remove QTabWidget's own frame so we can control the framing exactly
+        self._tab_widget.setStyleSheet("QTabWidget::pane { border: none; }")
+
+        # The height of the tab bar
+        tab_bar_height = self._tab_widget.tabBar().sizeHint().height()
+
+        # LEFT SIDE: QTabWidget inside a QFrame
+        left_frame = QFrame()
+        left_frame.setFrameShape(QFrame.StyledPanel)
+        left_frame.setFrameShadow(QFrame.Raised)
+        left_layout = QVBoxLayout(left_frame)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
+        left_layout.addWidget(self._tab_widget)
+
+        # RIGHT SIDE: two smaller graphs, also in a QFrame
+        right_frame = QFrame()
+        right_frame.setFrameShape(QFrame.StyledPanel)
+        right_frame.setFrameShadow(QFrame.Raised)
+        right_layout = QVBoxLayout(right_frame)
+        # Push down by the tab bar height to align the top edges of the "graph area"
+        right_layout.setContentsMargins(0, tab_bar_height, 0, 0)
+        right_layout.setSpacing(0)
         right_layout.addWidget(self._small_graph_1)
         right_layout.addWidget(self._small_graph_2)
 
-        # Layout for the big graph on the left
-        left_layout = QVBoxLayout()
-        left_layout.addWidget(self._tab_widget)
-        
-        # Combine into a main horizontal layout
+        # MAIN LAYOUT
         main_layout = QHBoxLayout()
-        main_layout.addLayout(left_layout)
-        main_layout.addLayout(right_layout)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        main_layout.addWidget(left_frame)
+        main_layout.addWidget(right_frame)
         self.setLayout(main_layout)
 
     def apply_filter_frequency_range(self, f_min, f_max):

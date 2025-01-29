@@ -238,7 +238,6 @@ class DoubleSliderWithTicks(CustomSliders):
 
 ##############################################################################
 
-
 class EPowerSliderWithTicks(DoubleSliderWithTicks):
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         self._base_power = 10
@@ -254,8 +253,8 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         Show each tick label as "1E<exponent>" based on the scaled integer.
         """
-        #exponent = int(i / self._scale_factor)
-        exponent = i / self._scale_factor
+        exponent = int(i / self._scale_factor)
+        #exponent = i / self._scale_factor
         return f"1E{exponent}"
     
     # -----------------------------------------------------------------------
@@ -271,7 +270,6 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
     
     def set_value_exact(self, value):
         self.set_value(math.log10(value))
-
 
 #######################################################################
 # -----------------------------------------------------------------------
