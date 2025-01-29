@@ -54,30 +54,15 @@ class WidgetSliders(QWidget):
     # -----------------------------------------------------------------------
     def _create_sliders(self, slider_configurations):
         """
-        Creates each slider widget. Also calculates a minimum width sufficient
-        to display a "1E-999999" label (6-digit) plus extra space for tick marks.
+        Creates each slider widget and ensures the button fits completely.
         """
         sliders = {}
 
-        # 1) Decide on the largest label text you'd need for six digits:
-        test_label_text = "-999999999"
-        test_label = QLabel(test_label_text)
-        font_metrics = QFontMetrics(test_label.font())
-
-        # 2) Measure how wide that text is in pixels
-        text_width = font_metrics.horizontalAdvance(test_label_text)
-
-        # 3) Add some margin for painting tick labels at x=30 in CustomSliders
-        #    and so the text won't get cut off if we go slightly bigger
-        needed_width = text_width
-
         for key, (slider_type, min_value, max_value, color, number_of_tick_intervals) in slider_configurations.items():
             slider_widget = slider_type(min_value, max_value, color, number_of_tick_intervals)
-
-            # 4) Force the slider's minimum width so labels/ticks won't be truncated
-            slider_widget.setMinimumWidth(needed_width)
-
+            slider_widget.setMinimumWidth(slider_widget._calculate_button_width())  # Ensure button fits fully
             sliders[key] = slider_widget
+        
         return sliders
 
     def _setup_layout(self, slider_configurations):

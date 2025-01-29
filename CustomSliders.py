@@ -31,7 +31,9 @@ class CustomSliders(QWidget):
         # Disable button with label overlay
         self._disable_button = QPushButton(str(self._slider.value()), self)
         self._disable_button.setStyleSheet("font-size: 12px;")
-        
+                
+        self._disable_button.setFixedSize(self._calculate_button_width(),20)  # Fixed height 30
+
         # Overall widget layout
         self._layout = QVBoxLayout()
         self._slider.valueChanged.connect(self._update_label)
@@ -67,6 +69,15 @@ class CustomSliders(QWidget):
         self._update_slider_style(self.colour)
         self.setMinimumWidth(75)
         
+    def _calculate_button_width(self):
+        """
+        Calculate the width required to display 8 characters.
+        """
+        font = QFont()
+        font.setPointSize(12)  # Match the label size
+        metrics = self.fontMetrics()
+        return metrics.horizontalAdvance("-0099e+00") + 10  # Add padding
+        
     def _update_slider_style(self, colour):
         self._slider.setStyleSheet(f"""                      
                  
@@ -86,9 +97,11 @@ class CustomSliders(QWidget):
         if self._slider.isEnabled():
             self._slider.setEnabled(False)
             self._update_slider_style(self.disabled_colour)
+            self._disable_button.setStyleSheet("background-color: gray;  border: none;")
         else:
             self._slider.setEnabled(True)
             self._update_slider_style(self.colour)
+            self._disable_button.setStyleSheet("background-color: none;")
         
         self._update_label()
 
