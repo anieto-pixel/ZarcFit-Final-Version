@@ -15,6 +15,8 @@ class CustomSliders(QWidget):
       - Tick markings displayed on the widget's paint event.
       - A label showing the current slider value.
     """
+    
+    was_toggled = pyqtSignal(int)
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         super().__init__()
@@ -98,10 +100,15 @@ class CustomSliders(QWidget):
             self._slider.setEnabled(False)
             self._update_slider_style(self.disabled_colour)
             self._disable_button.setStyleSheet("background-color: gray;  border: none;")
+            
+            self.was_toggled.emit(False)
+            
         else:
             self._slider.setEnabled(True)
             self._update_slider_style(self.colour)
             self._disable_button.setStyleSheet("background-color: none;")
+            
+            self.was_toggled.emit(True)
         
         self._update_label()
 
@@ -412,6 +419,9 @@ class TestSliders(QWidget):
         # Connect to print changes
         slider.value_changed().connect(
             lambda val, label=label_text: print(f"{label} Changed: {val}")
+        )
+        slider.was_toggled.connect(
+            lambda val, label=label_text: print(f"{label} Was toggled: {val}")
         )
 
         # Horizontal layout: slider on the left, input fields on the right

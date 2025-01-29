@@ -30,6 +30,7 @@ class WidgetSliders(QWidget):
     """
 
     slider_value_updated = pyqtSignal(str, float)
+    slider_was_toggled = pyqtSignal(str, int)
 
     def __init__(self, slider_configurations: dict, slider_default_values: list):
         super().__init__()
@@ -99,6 +100,11 @@ class WidgetSliders(QWidget):
         """
         for key, slider in self.sliders.items():
             slider.value_changed().connect(partial(self.slider_value_updated.emit, key))
+            
+        for key, slider in self.sliders.items():
+            # The slider has a signal called iWasToggled (bool) perhaps
+            slider.was_toggled.connect(partial(self.slider_was_toggled.emit, key))
+ 
 
     # -----------------------------------------------------------------------
     #  Public Methods
