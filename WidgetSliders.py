@@ -181,6 +181,7 @@ if __name__ == "__main__":
     
     # Connect the signal to a simple print function
     sliders_widget.slider_value_updated.connect(print)
+    sliders_widget.slider_was_toggled.connect(print)
     btn_set_0.clicked.connect(lambda: set_all_to_0(sliders_widget))
 
     test_window.show()
