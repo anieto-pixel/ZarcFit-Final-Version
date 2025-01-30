@@ -16,7 +16,7 @@ class CustomSliders(QWidget):
       - A label showing the current slider value.
     """
     
-    was_disabled = pyqtSignal(int)
+    was_disabled = pyqtSignal(bool)
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         super().__init__()
@@ -174,8 +174,6 @@ class CustomSliders(QWidget):
         Exposes the slider's valueChanged signal for external listeners.
         """
         return self._slider.valueChanged
-    
-        pass
 
 #############################################################################
 
@@ -219,7 +217,6 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         self._disable_button.setText(f"{self.get_value():.3f}")
         
-
     def _emit_corrected_value(self, _):
         """
         Emit the float value via self.valueChanged to external listeners.
@@ -246,13 +243,13 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         Set the slider to a float, using the scale factor internally.
         """
-        
         scaled_val = int(value * self._scale_factor)
         self._slider.setValue(scaled_val)
         
     def set_value_exact(self, value):
         """
-        Set the slider to a float, using the scale factor internally.
+        Set the slider to the value given. 
+        Expects the desired value as an unescaled float
         """
         self.set_value(value)
 
@@ -295,6 +292,10 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         return self._base_power ** n
     
     def set_value_exact(self, value):
+        """
+        When the actual desired value is given, finds the log10 and passes
+        that value to set value for the slider
+        """
         self.set_value(math.log10(value))
 
 #######################################################################

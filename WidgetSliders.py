@@ -30,7 +30,8 @@ class WidgetSliders(QWidget):
     """
 
     slider_value_updated = pyqtSignal(str, float)
-    slider_was_toggled = pyqtSignal(str, int)
+    slider_was_disabled = pyqtSignal(str, bool)
+    all_sliders_reseted = pyqtSignal(dict)
 
     def __init__(self, slider_configurations: dict, slider_default_values: list):
         super().__init__()
@@ -53,6 +54,10 @@ class WidgetSliders(QWidget):
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
+
+    def _signal_all_sliders_reseted(self):
+        pass
+
     def _create_sliders(self, slider_configurations):
         """
         Creates each slider widget and ensures the button fits completely.
@@ -60,6 +65,7 @@ class WidgetSliders(QWidget):
         sliders = {}
 
         for key, (slider_type, min_value, max_value, color, number_of_tick_intervals) in slider_configurations.items():
+            
             slider_widget = slider_type(min_value, max_value, color, number_of_tick_intervals)
             slider_widget.setMinimumWidth(slider_widget._calculate_button_width())  # Ensure button fits fully
             sliders[key] = slider_widget
@@ -103,7 +109,7 @@ class WidgetSliders(QWidget):
             
         for key, slider in self.sliders.items():
             # The slider has a signal called iWasToggled (bool) perhaps
-            slider.was_toggled.connect(partial(self.slider_was_toggled.emit, key))
+            slider.was_disabled.connect(partial(self.slider_was_disabled.emit, key))
  
 
     # -----------------------------------------------------------------------
@@ -117,13 +123,31 @@ class WidgetSliders(QWidget):
         """Retrieves a slider by its key."""
         return self.sliders.keys()
 
+    def get_all_values(self):
+        dict_to_emit={} 
+        
+        for key, default_value in self.slider_default_values.items():
+            slider = self.sliders[key] 
+            dict_to_emit[key]=slider.get_value()
+
+        return dict_to_emit
+
     def set_default_values(self):
         """Resets all sliders to their default positions."""
+        
+        dict_to_emit={}
+        
         for key, default_value in self.slider_default_values.items():
+        
             slider = self.sliders[key]
             slider.set_value(default_value)
             
-    def update_all_variables(self, dictionary):
+            dict_to_emit[key]=slider.get_value()
+
+            
+        self.all_sliders_reseted.emit(dict_to_emit)
+            
+    def set_all_variables(self, dictionary):
         """
         Receives a dict of { variable_key: value }, checks that it matches
         this widget's slider keys, then updates each slider.
@@ -136,11 +160,15 @@ class WidgetSliders(QWidget):
                 "Incoming dictionary keys do not match the slider keys in WidgetSliders."
             )
 
-        # 2) Update each slider
+        # 2) Update each slider and emit
+        dict_to_emit={}
         for key, val in dictionary.items():
             
             slider = self.sliders[key]
             slider.set_value_exact(val)
+            dict_to_emit[key]=slider.get_value()
+            
+        self.all_sliders_reseted.emit(dict_to_emit)
             
 
 # -----------------------------------------------------------------------
@@ -155,7 +183,7 @@ if __name__ == "__main__":
         old_dict= sliders_widget.sliders
         
         new_dict = {k: 0.0 for k in old_dict.keys()}
-        sliders_widget.update_all_variables(new_dict)
+        sliders_widget.set_all_variables(new_dict)
 
     app = QApplication(sys.argv)
 
@@ -181,7 +209,7 @@ if __name__ == "__main__":
     
     # Connect the signal to a simple print function
     sliders_widget.slider_value_updated.connect(print)
-    sliders_widget.slider_was_toggled.connect(print)
+    sliders_widget.slider_was_disabled.connect(print)
     btn_set_0.clicked.connect(lambda: set_all_to_0(sliders_widget))
 
     test_window.show()

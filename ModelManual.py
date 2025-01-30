@@ -23,7 +23,6 @@ class CalculationResult:
     special_z_imag: np.ndarray
     
 
-
 class ModelManual(QObject):
     """
     This class replicates the circuit calculation by evaluating
@@ -33,14 +32,10 @@ class ModelManual(QObject):
     """
     model_manual_result = pyqtSignal(CalculationResult)
 
-
     def __init__(self):
-        """
-        :param config_importer: an instance of ConfigImporter
-        """
+
         super().__init__()
 
-        # We'll store frequencies and results in these arrays
         self._experiment_data = {
             "freq": np.array([1, 10, 100, 1000, 10000]),
             "Z_real": np.zeros(5),
@@ -99,6 +94,7 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Cole' cost function.
         """
+        print("hey, we are here")
         return self._fit_model(self._cost_function_cole, v_initial_guess)
 
     def fit_model_bode(self, v_initial_guess):
@@ -116,72 +112,100 @@ class ModelManual(QObject):
         else:
             self.disabled_variables.discard(key)
     
-    
-
     # ----------------------------------------------------
     # Private Helpers
     # ----------------------------------------------------
-    
+        
     def _fit_model(self, cost_func, v_initial_guess):
         """
         Single private helper that removes code duplication.  
-        It calls the provided cost_func, e.g. _cost_function_cole or _cost_function_bode.
+        It calls the provided cost_func, e.g. _cost_function_cole or _cost_function_bode,
+        omitting any variables in self.disabled_variables from the optimizer.
         """
-        # 1) Choose a fixed ordering for the parameters. Convert the dict to a NumPy.
-        param_names = list(v_initial_guess.keys())
-        x0 = np.array([v_initial_guess[k] for k in param_names], dtype=float)      
+        
+        print("****************************")
+        print(v_initial_guess)
+        print("****************************")
     
-        # 2) Decide on lower/upper bounds. For instance:
-        #    - Frequencies above 1e-9, impedances above 1e-6, etc.
+        # 1) Build a list of "free" keys that are not disabled
+        all_keys = list(v_initial_guess.keys())
+        free_keys = [k for k in all_keys if k not in self.disabled_variables]
+    
+        # 2) Build an initial guess array (x0) only for free parameters
+        x0 = [v_initial_guess[k] for k in free_keys]
+    
+        # 3) Build bounds only for the free parameters
         lower_bounds = []
         upper_bounds = []
-        for name in param_names:
-            if name.startswith("F"): 
-                lower_bounds.append(1e-2)   # freq > 0
-                upper_bounds.append(1e8)    # arbitrary large
-            elif name.startswith("P"): 
-                lower_bounds.append(0.0)    # phase exponent? 
-                upper_bounds.append(1.0)    # or maybe 1.0 if you know domain
-            elif name.startswith("R"): 
-                lower_bounds.append(1e-2)   # resistances can’t be zero
-                upper_bounds.append(1e8)    
+        for name in free_keys:
+            if name.startswith("F"):
+                lower_bounds.append(1e-2)    # Frequency > 0
+                upper_bounds.append(1e8)     # Arbitrary large
+            elif name.startswith("P"):
+                lower_bounds.append(0.0)     # Phase exponent?
+                upper_bounds.append(1.0)     # Possibly 1.0
+            elif name.startswith("R"):
+                lower_bounds.append(1e-2)    # Resistances can't be zero
+                upper_bounds.append(1e8)
             elif name.startswith("L"):
-                lower_bounds.append(1e-12)  
-                upper_bounds.append(1e-3)   # or something appropriate
+                lower_bounds.append(1e-12)   
+                upper_bounds.append(1e-3)    # Example domain
             elif name.startswith("Q"):
-                lower_bounds.append(1e-8)  
-                upper_bounds.append(1e2)   # pick domain
+                lower_bounds.append(1e-8)    
+                upper_bounds.append(1e2)     
             else:
-                # fallback
+                # Fallback
                 lower_bounds.append(-1e9)
                 upper_bounds.append(1e9)
     
-        bounds = Bounds(lower_bounds, upper_bounds)        
+        bounds = Bounds(lower_bounds, upper_bounds)
     
-        # 3) Define a small wrapper for SciPy that reconstructs the dict, then calls cost_func.
+        # 4) Define a cost_wrapper that merges free parameters (from x_array)
+        #    with locked/disabled ones (from v_initial_guess).
         def cost_wrapper(x_array):
-            v_dict = {k: x_array[i] for i, k in enumerate(param_names)}
-            return cost_func(v_dict)
+            # Reconstruct dict for free params from x_array
+            free_v_dict = {k: x_array[i] for i, k in enumerate(free_keys)}
+            # Locked params remain at their original values:
+            locked_v_dict = {
+                k: v_initial_guess[k] 
+                for k in self.disabled_variables if k in all_keys
+            }
+            # Merge both into one dict
+            full_v_dict = {**free_v_dict, **locked_v_dict}
     
-        # 4) Call scipy.optimize.minimize on the wrapper.
+            return cost_func(full_v_dict)
+    
+        # 5) Call scipy.optimize.minimize using only free parameters
         result = opt.minimize(
             cost_wrapper,
             x0=x0,
             method='Nelder-Mead',
-            bounds=bounds,         # If using a method that supports bounds
-            options={'maxfev': 2000}  # allow more function evaluation
+            bounds=bounds,          # Only meaningful if your chosen method respects bounds
+            options={'maxfev': 2000}
         )
     
+        # 6) Check optimization success
         if not result.success:
             print("Optimization failed:", result.message)
             raise RuntimeError("Optimization did not converge.")
     
-        # 5) Reconstruct a dict for the best-fit parameters:
-        best_fit_array = result.x
-        best_fit_dict = {k: best_fit_array[i] for i, k in enumerate(param_names)}
+        # 7) Reconstruct best-fit params for the free variables
+        best_fit_free = {k: result.x[i] for i, k in enumerate(free_keys)}
+        # For locked variables, keep them at their initial guess
+        best_fit_locked = {
+            k: v_initial_guess[k] 
+            for k in self.disabled_variables if k in all_keys
+        }
     
+        # 8) Combine free + locked into a final result dict
+        best_fit_dict = {**best_fit_free, **best_fit_locked}
+    
+        # 9) Use the final result in run_model_manual and return
         self.run_model_manual(best_fit_dict)
+        
+        print(f"convergence {best_fit_dict}")
         return best_fit_dict
+
         
     def _calculate_secondary_variables(self, v):
         """

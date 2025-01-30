@@ -39,14 +39,6 @@ class MainWidget(QWidget):
         """ini file related"""
         # Initialize ConfigImporter
         self.config = ConfigImporter(config_file)
-
-        """Data atributes"""
-        # Data placeholders for file & model outputs
-        self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
-
-        # Dictionary of variables
-        self.v_sliders = dict(zip(self.config.slider_configurations.keys(),
-                                  self.config.slider_default_values))  # variables of the sliders
         
         """Initialize core widgets"""
         #print(self.config.input_file)
@@ -70,7 +62,13 @@ class MainWidget(QWidget):
         """Initialize Models"""
         # Model for manual and automatic computations
         self.model_manual = ModelManual()
+        
+        """Initialize Data atributes"""
+        # Data placeholders for file & model outputs
+        self.file_data = {"freq": None, "Z_real": None, "Z_imag": None}
 
+        # Dictionary of variables
+        self.v_sliders = self.widget_sliders.get_all_values()
 
         """Optimize Sliders Signaling"""
         # Initialize a timer for debouncing slider updates
@@ -87,16 +85,31 @@ class MainWidget(QWidget):
         self._connect_listeners()
         self._initialize_hotkeys()
 
-        "initialization 2.0 I guess? No fucking idea of how to roganize this part"
+        "initialization 2.0 I guess? No flying idea of how to call or organice this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
         self.widget_output_file.setup_current_file(self.config.output_file)
         #here I shall initialize the secondary variables and all that
         
+        "initialize models and graphs with current parameters"
         self._update_sliders_data()
         
     # -----------------------------------------------------------------------
     #  Private UI Methods
     # -----------------------------------------------------------------------
+    def _create_file_options_widget(self) -> QWidget:
+        """
+        Builds the top bar containing the file input and file output widgets.
+        """
+        layout = QHBoxLayout()
+        layout.addWidget(self.widget_input_file)
+        layout.addStretch()
+        layout.addWidget(self.widget_output_file)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        container = QWidget()
+        container.setLayout(layout)
+        return container
+    
     def _initialize_ui(self):
         """
         Assembles the main layout, placing the top bar and bottom splitter.
@@ -151,20 +164,6 @@ class MainWidget(QWidget):
     
         self.setLayout(main_layout)
 
-    def _create_file_options_widget(self) -> QWidget:
-        """
-        Builds the top bar containing the file input and file output widgets.
-        """
-        layout = QHBoxLayout()
-        layout.addWidget(self.widget_input_file)
-        layout.addStretch()
-        layout.addWidget(self.widget_output_file)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        container = QWidget()
-        container.setLayout(layout)
-        return container
-
     # -----------------------------------------------------------------------
     #  Private Helper Methods
     # -----------------------------------------------------------------------
@@ -180,6 +179,10 @@ class MainWidget(QWidget):
 
         # Connects sliders to update handler, with debouncing
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
+        # Connects all sliders changed with initialization of v_sliders
+        self.widget_sliders.all_sliders_reseted.connect(self._initialize_v_sliders)
+        # Connects sliders disable signal to model
+        self.widget_sliders.slider_was_disabled.connect(self.model_manual.set_disabled_variables)
         
         # Connects freq slider to handle_frequencies method
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
@@ -187,7 +190,6 @@ class MainWidget(QWidget):
         # Connects model manual with handler (for now)
         self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
         
-
     def _initialize_hotkeys(self):
         """
         Initializes keyboard shortcuts.
@@ -230,7 +232,6 @@ class MainWidget(QWidget):
         """
         Called when WidgetInputFile emits new file data.
         """
-        #print("signal was received")
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
@@ -239,8 +240,17 @@ class MainWidget(QWidget):
         self._handle_set_default
         self._update_sliders_data()
 
-        
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
+
+    def _initialize_v_sliders(self, dictionary):
+        
+        if set(dictionary.keys()) != set(self.sliders.keys()):
+            raise ValueError(
+                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
+            )
+        else:
+            self.v_sliders=dictionary
+        
 
     def _handle_slider_update(self, key, value):
         """
@@ -304,7 +314,7 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
-
+###NEED A FIX
     def _handle_recover_file_values(self):
         
         head=self.widget_input_file.get_current_file_name()
@@ -320,8 +330,8 @@ class MainWidget(QWidget):
             self.v_sliders[key] = float(dictionary[key])
             
             
-        self.widget_sliders.update_all_variables(self.v_sliders)
-          
+        self.widget_sliders.set_all_variables(self.v_sliders)
+#NEED A FIX       
     def _handle_set_default(self):
         
         self.widget_sliders.set_default_values()
