@@ -152,7 +152,6 @@ class WidgetSliders(QWidget):
         Receives a dict of { variable_key: value }, checks that it matches
         this widget's slider keys, then updates each slider.
         """
-        print("update all variables")
         
         # 1) Ensure keys match
         if set(dictionary.keys()) != set(self.sliders.keys()):

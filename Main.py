@@ -201,7 +201,7 @@ class MainWidget(QWidget):
         shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
         shortcut_f2.activated.connect(lambda: self.model_manual.fit_model_bode(self.v_sliders))
 
-        shortcut_f3 = QShortcut(QKeySequence(Qt.Key_F2), self)
+        shortcut_f3 = QShortcut(QKeySequence(Qt.Key_F3), self)
         shortcut_f3.activated.connect(self._handle_set_allfreqs)
 
         shortcut_f4 = QShortcut(QKeySequence(Qt.Key_F4), self)
