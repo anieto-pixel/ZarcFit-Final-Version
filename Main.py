@@ -180,7 +180,7 @@ class MainWidget(QWidget):
         # Connects sliders to update handler, with debouncing
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
         # Connects all sliders changed with initialization of v_sliders
-        self.widget_sliders.all_sliders_reseted.connect(self._initialize_v_sliders)
+        self.widget_sliders.all_sliders_reseted.connect(self._reset_v_sliders)
         # Connects sliders disable signal to model
         self.widget_sliders.slider_was_disabled.connect(self.model_manual.set_disabled_variables)
         
@@ -242,7 +242,7 @@ class MainWidget(QWidget):
 
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
-    def _initialize_v_sliders(self, dictionary):
+    def _reset_v_sliders(self, dictionary):
         
         if set(dictionary.keys()) != set(self.sliders.keys()):
             raise ValueError(
@@ -314,7 +314,7 @@ class MainWidget(QWidget):
         self.model_manual.initialize_expdata(self.file_data)
         
         self._update_sliders_data()
-###NEED A FIX
+
     def _handle_recover_file_values(self):
         
         head=self.widget_input_file.get_current_file_name()
@@ -326,17 +326,13 @@ class MainWidget(QWidget):
         
         for key in set(self.config.slider_configurations.keys()).intersection(dictionary.keys()):
             # Assign the value from the dictionary to the respective slider
-            
             self.v_sliders[key] = float(dictionary[key])
             
-            
         self.widget_sliders.set_all_variables(self.v_sliders)
-#NEED A FIX       
+    
     def _handle_set_default(self):
         
         self.widget_sliders.set_default_values()
-        self.v_sliders = dict(zip(self.config.slider_configurations.keys(),
-                                  self.config.slider_default_values))
         self._handle_set_allfreqs()
 
 
