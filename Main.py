@@ -165,7 +165,7 @@ class MainWidget(QWidget):
         self.setLayout(main_layout)
 
     # -----------------------------------------------------------------------
-    #  Private Helper Methods
+    #  Private Connections. Listeners and Hotkeys
     # -----------------------------------------------------------------------
     def _connect_listeners(self):
         
@@ -187,8 +187,9 @@ class MainWidget(QWidget):
         # Connects freq slider to handle_frequencies method
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
         
-        # Connects model manual with handler (for now)
+        # Connects model manual with handler 
         self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
+        self.model_manual.model_manual_values.connect(self.widget_sliders.set_all_variables)
         
     def _initialize_hotkeys(self):
         """
@@ -225,7 +226,7 @@ class MainWidget(QWidget):
         shortcut_page_up.activated.connect(self.freq_slider.upMin)
 
     # -----------------------------------------------------------------------
-    #  Private Connections Methods. Listeners and Handlers
+    #  Private Connections Methods. Handlers
     # -----------------------------------------------------------------------
 
     def _update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
@@ -244,14 +245,14 @@ class MainWidget(QWidget):
 
     def _reset_v_sliders(self, dictionary):
         
-        if set(dictionary.keys()) != set(self.sliders.keys()):
+        if set(dictionary.keys()) != set(self.v_sliders.keys()):
             raise ValueError(
                 "Incoming dictionary keys do not match the slider keys in WidgetSliders."
             )
         else:
             self.v_sliders=dictionary
+            self._update_sliders_data()
         
-
     def _handle_slider_update(self, key, value):
         """
         Handles incoming slider updates by storing them and starting the debounce timer.
@@ -334,7 +335,6 @@ class MainWidget(QWidget):
         
         self.widget_sliders.set_default_values()
         self._handle_set_allfreqs()
-
 
     def _print_model_parameters(self):
         """

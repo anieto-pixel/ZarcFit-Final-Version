@@ -31,6 +31,7 @@ class ModelManual(QObject):
     It is hardcoded because my boss made me do it :) .
     """
     model_manual_result = pyqtSignal(CalculationResult)
+    model_manual_values = pyqtSignal(dict)
 
     def __init__(self):
 
@@ -77,9 +78,6 @@ class ModelManual(QObject):
             special_z_imag = spec_zi
         )
         
-        # Legacy emit the new impedance data    
-        # self.model_manual_updated.emit(self._experiment_data["freq"], z_real, z_imag)
-        
         self.model_manual_result.emit(result)
         return result
 
@@ -94,8 +92,9 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Cole' cost function.
         """
-        print("hey, we are here")
+        
         return self._fit_model(self._cost_function_cole, v_initial_guess)
+    
 
     def fit_model_bode(self, v_initial_guess):
         """
@@ -122,10 +121,6 @@ class ModelManual(QObject):
         It calls the provided cost_func, e.g. _cost_function_cole or _cost_function_bode,
         omitting any variables in self.disabled_variables from the optimizer.
         """
-        
-        print("****************************")
-        print(v_initial_guess)
-        print("****************************")
     
         # 1) Build a list of "free" keys that are not disabled
         all_keys = list(v_initial_guess.keys())
@@ -142,8 +137,8 @@ class ModelManual(QObject):
                 lower_bounds.append(1e-2)    # Frequency > 0
                 upper_bounds.append(1e8)     # Arbitrary large
             elif name.startswith("P"):
-                lower_bounds.append(0.0)     # Phase exponent?
-                upper_bounds.append(1.0)     # Possibly 1.0
+                lower_bounds.append(0.0)     # Phase exponent
+                upper_bounds.append(1.0)     # Add different clause for pei
             elif name.startswith("R"):
                 lower_bounds.append(1e-2)    # Resistances can't be zero
                 upper_bounds.append(1e8)
@@ -199,11 +194,10 @@ class ModelManual(QObject):
     
         # 8) Combine free + locked into a final result dict
         best_fit_dict = {**best_fit_free, **best_fit_locked}
-    
-        # 9) Use the final result in run_model_manual and return
-        self.run_model_manual(best_fit_dict)
         
-        print(f"convergence {best_fit_dict}")
+        # 9) Use the final result in run_model_manual and return
+        self.model_manual_values.emit(best_fit_dict)
+        
         return best_fit_dict
 
         
