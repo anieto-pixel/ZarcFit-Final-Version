@@ -229,8 +229,8 @@ class MainWidget(QWidget):
         self.widget_buttons.f8_button.clicked.connect(self._handle_set_default)
         
         shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
-        shortcut_f9.activated.connect(self.widget_buttons.f9_button.click)
-#        self.widget_buttons.f9_button.clicked.connect(lambda: self.model_manual.fit_model_cole(self.v_sliders))
+        shortcut_f9.activated.connect(self.widget_buttons.f9_button.f9_toggled)
+        self.widget_buttons.f9_button.toggled.connect(self.model_manual.set_rinf_negative)
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.widget_buttons.fdown_button.click)  # Should map to down
@@ -239,7 +239,8 @@ class MainWidget(QWidget):
         shortcut_page_up = QShortcut(QKeySequence(Qt.Key_PageUp), self)
         shortcut_page_up.activated.connect(self.widget_buttons.fup_button.click)  # Should map to up
         self.widget_buttons.fup_button.clicked.connect(self.freq_slider.upMin)  # Should increase freq
-
+ 
+    
     # -----------------------------------------------------------------------
     #  Private Connections Methods. Handlers
     # -----------------------------------------------------------------------

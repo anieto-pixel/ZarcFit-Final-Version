@@ -61,6 +61,11 @@ class ModelManual(QObject):
         else:
             self.disabled_variables.discard(key)
         
+        
+    #MM FILL THIS IN AT SOME POINT
+    def set_rinf_negative(self):
+        pass
+        
     def fit_model_cole(self, v_initial_guess):
         """
         Fit the model using the 'Cole' cost function.
