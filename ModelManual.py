@@ -59,9 +59,6 @@ class ModelManual(QObject):
             self.disabled_variables.add(key)  
         else:
             self.disabled_variables.discard(key)
-            
-    def set_bounds(self, bounds : dict):
-        pass
         
     def fit_model_cole(self, v_initial_guess):
         """
@@ -177,30 +174,26 @@ class ModelManual(QObject):
         lower_bounds = []
         upper_bounds = []
         
+        dictionary_lower = {
+            'Linf':1e-12,'Rinf': 1e-2, 
+            'Rh': 1e-2,'Fh': 1e-2,'Ph': 0.0, 
+            'Rm': 1e-2,'Fm': 1e-2, 'Pm': 0.0,
+            'Rl': 1e-2,'Fl': 1e-2,'Pl': 0.0,
+            'Re': 1e-2,'Qe': 1e-8,'Pef': 0.0, 'Pei': -3.2,
+        }
         
-        for name in free_keys:
-            if name.startswith("F"):
-                lower_bounds.append(1e-2)    # Frequency > 0
-                upper_bounds.append(1e8)     # Arbitrary large
-            elif name == "Pei":  # ****** SPECIAL CASE FOR PEI ******
-                lower_bounds.append(-3.2)
-                upper_bounds.append(0.8)
-            elif name.startswith("P"):
-                lower_bounds.append(0.0)     # Phase exponent
-                upper_bounds.append(1.0)     # Add different clause for pei
-            elif name.startswith("R"):
-                lower_bounds.append(1e-2)    # Resistances can't be zero
-                upper_bounds.append(1e8)
-            elif name.startswith("L"):
-                lower_bounds.append(1e-12)   
-                upper_bounds.append(1e-3)    # Example domain
-            elif name.startswith("Q"):
-                lower_bounds.append(1e-8)    
-                upper_bounds.append(1e2)     
-            else:
-                # Fallback
-                lower_bounds.append(-1e9)
-                upper_bounds.append(1e9)
+        dictionary_upper= {
+            'Linf':1e-3,'Rinf':1e8,
+            'Rh': 1e8,'Fh': 1e8,'Ph': 1.0,
+            'Rm': 1e8,'Fm': 1e8,'Pm': 1.0,
+            'Rl': 1e8,'Fl': 1e8,'Pl': 1.0,
+            'Re': 1e8,'Qe': 1e2,'Pef': 1.0,'Pei': 0.8,
+        }
+        
+        
+        lower_bounds = self._scale_v_to_x(free_keys, dictionary_lower)
+        upper_bounds = self._scale_v_to_x(free_keys, dictionary_upper)
+
                 
         return lower_bounds, upper_bounds
    
@@ -427,101 +420,131 @@ from dataclasses import asdict
 
 class ResultsWidget(QWidget):
     """
-    A simple widget to display the results in a grid format and add sliders for parameter control.
+    A simple widget to display the results in a grid format
+    and add sliders for parameter control within known bounds.
     """
     def __init__(self, model, v_init, results_callback):
         super().__init__()
         self.setWindowTitle("Interactive Model Viewer")
 
-        # Store model and callback
         self.model = model
         self.results_callback = results_callback
 
-        # Main layout
         self.layout = QVBoxLayout(self)
-
-        # Grid for sliders
         self.slider_grid = QGridLayout()
         self.layout.addLayout(self.slider_grid)
 
-        # Table to display results
         self.table = QTableWidget(self)
         self.layout.addWidget(self.table)
 
-        # Store slider references
         self.sliders = {}
-        self.v_init = v_init
+        self.v_init = dict(v_init)  # copy so we can mutate
 
-        # Add sliders for each parameter
+        # Hardcoded dictionary of physical bounds so we can clamp slider range
+        self.physical_bounds = {
+            "Rinf": (1e-2, 1e8),
+            "Linf": (1e-12, 1e-3),
+            "Rh":   (1e-2, 1e8),
+            "Fh":   (1e-2, 1e8),
+            "Ph":   (1e-9, 1.0),
+            "Rm":   (1e-2, 1e8),
+            "Fm":   (1e-2, 1e8),
+            "Pm":   (1e-9, 1.0),
+            "Rl":   (1e-2, 1e8),
+            "Fl":   (1e-2, 1e8),
+            "Pl":   (1e-9, 1.0),
+            "Re":   (1e-2, 1e8),
+            "Qe":   (1e-8, 1e2),
+            "Pef":  (1e-9, 1.0),
+            "Pei":  (-3.2, 0.8),  # linear
+        }
+
+        # Add sliders for each parameter in v_init
         row = 0
-        for param, value in v_init.items():
+        for param, value in self.v_init.items():
             self.add_slider(param, value, row)
             row += 1
 
-        # Initialize results table
+        # Initial run
         self.update_results(self.run_model())
 
     def add_slider(self, param, initial_value, row):
         """
-        Add a slider to the grid for controlling a parameter.
+        Add a slider that maps a 1..1000 integer range onto
+        the [lower, upper] bounds in physical space.
         """
-        label = QLabel(f"{param}: {initial_value:.3e}", self)
+        lower, upper = self.physical_bounds.get(param, (1e-3, 1e3))
+
+        # We'll store them so we can do the linear mapping
+        # param_value = lower + (slider_value/1000)*(upper - lower)
+        self.sliders[param] = {}
+
+        label = QLabel(f"{param}: {initial_value:.3g}", self)
         slider = QSlider(Qt.Horizontal, self)
         slider.setMinimum(1)
         slider.setMaximum(1000)
-        slider.setValue(int(initial_value * 10 if initial_value > 0 else 1))
-        slider.valueChanged.connect(lambda value, p=param, lbl=label: self.update_parameter(p, value, lbl))
+
+        # Find an integer that corresponds to initial_value
+        # param_value -> slider_value = (param - lower)/(upper - lower)*1000
+        s_val = int( (initial_value - lower)/(upper - lower)*1000 ) 
+        s_val = max(min(s_val, 1000), 1)  # clamp to 1..1000
+
+        slider.setValue(s_val)
+
+        # store references
+        self.sliders[param]["slider"] = slider
+        self.sliders[param]["label"]  = label
+        self.sliders[param]["lower"]  = lower
+        self.sliders[param]["upper"]  = upper
+
+        slider.valueChanged.connect(lambda val, p=param: self.update_parameter(p, val))
 
         self.slider_grid.addWidget(label, row, 0)
         self.slider_grid.addWidget(slider, row, 1)
-        self.sliders[param] = slider
 
-    def update_parameter(self, param, value, label):
+    def update_parameter(self, param, slider_value):
         """
-        Update the parameter value and rerun the model.
+        Convert slider_value (1..1000) back to physical param in [lower, upper].
+        Re-run the model, update table, etc.
         """
-        # Scale value back to the original range
-        scaled_value = value / 10 if "F" in param or "L" in param else value
-        self.v_init[param] = scaled_value
-        label.setText(f"{param}: {scaled_value:.3e}")
+        bounds = self.sliders[param]
+        lower  = bounds["lower"]
+        upper  = bounds["upper"]
 
-        # Rerun the model with updated parameters
+        # Map the slider to param_value
+        param_value = lower + (slider_value/1000.0)*(upper - lower)
+        self.v_init[param] = param_value
+
+        # Update label
+        label = bounds["label"]
+        label.setText(f"{param}: {param_value:.3g}")
+
+        # Re-run model
         self.update_results(self.run_model())
 
     def run_model(self):
-        """
-        Run the model with the current parameter values.
-        """
         return self.model.run_model_manual(self.v_init)
 
     def update_results(self, calculation_result):
-        """
-        Update the grid display with new results and invoke the callback.
-        """
-        # Convert the CalculationResult to a dictionary for easier iteration
         result_dict = asdict(calculation_result)
-
-        # Prepare the table dimensions
         self.table.setRowCount(len(result_dict))
         self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Parameter", "Value"])
 
-        # Populate the table
         for row, (key, value) in enumerate(result_dict.items()):
             self.table.setItem(row, 0, QTableWidgetItem(key))
-            # Format the array values as strings
-            value_str = str(value) if not isinstance(value, np.ndarray) else np.array2string(value, precision=4)
+            # Convert arrays to a short string
+            if isinstance(value, np.ndarray):
+                value_str = np.array2string(value, precision=4)
+            else:
+                value_str = str(value)
             self.table.setItem(row, 1, QTableWidgetItem(value_str))
 
-        # Invoke the callback (e.g., for printing to terminal)
+        # Fire callback
         self.results_callback(calculation_result)
 
 
 def test_model_manual_with_sliders():
-    """
-    Interactive test with sliders, displaying the evolution of results in a grid and printing them to the terminal.
-    """
-    # Initialize Qt application
     app = QApplication([])
 
     # Create the model
@@ -529,24 +552,25 @@ def test_model_manual_with_sliders():
 
     # Example experimental data
     test_freq = np.array([1, 10, 100, 1000, 10000, 100000], dtype=float)
-    test_Zr = np.array([1.9, 1.24, 1.23, 1.21, 1.14, 8.03], dtype=float)
-    test_Zi = np.array([-1.09, -1.12, -1.46, -3.31, -1.06, -3.85], dtype=float)
+    test_Zr   = np.array([1.9, 1.24, 1.23, 1.21, 1.14, 8.03], dtype=float)
+    test_Zi   = np.array([-1.09, -1.12, -1.46, -3.31, -1.06, -3.85], dtype=float)
+
     file_data = {
-        "freq": test_freq,
+        "freq":   test_freq,
         "Z_real": test_Zr,
         "Z_imag": test_Zi,
     }
     model.initialize_expdata(file_data)
 
-    # Example slider/initial guess
+    # Example initial guesses (in physical space, within the declared bounds)
     v_init = {
-        "Rinf": 671,
-        "Linf": 1e-6,
-        "Rh":   120000,
-        "Fh":   178000,
+        "Rinf": 1.0e3,
+        "Linf": 1.0e-6,
+        "Rh":   1.0e5,
+        "Fh":   5.0e3,
         "Ph":   0.7,
-        "Rm":   1.0,
-        "Fm":   0.1,
+        "Rm":   10.0,
+        "Fm":   100.0,
         "Pm":   0.5,
         "Rl":   100.0,
         "Fl":   1000.0,
@@ -554,24 +578,20 @@ def test_model_manual_with_sliders():
         "Re":   50.0,
         "Qe":   1e-5,
         "Pef":  0.8,
-        "Pei":  0.8,
+        "Pei":  0.1,   # can be negative or positive
     }
 
-    # Function to print results in the terminal
     def print_results_to_terminal(calc_result):
-        print("\nFull Calculation Result:")
-        for key, value in asdict(calc_result).items():
-            if isinstance(value, np.ndarray):
-                print(f"{key}: {np.array2string(value, precision=4)}")
+        print("\nUpdated Calculation Result:")
+        for k, val in asdict(calc_result).items():
+            if isinstance(val, np.ndarray):
+                print(f"{k}: {np.array2string(val, precision=4)}")
             else:
-                print(f"{key}: {value}")
+                print(f"{k}: {val}")
 
-    # Create the GUI for displaying results and interacting with sliders
-    results_widget = ResultsWidget(model, v_init, results_callback=print_results_to_terminal)
-    results_widget.resize(800, 600)
-    results_widget.show()
-
-    # Run the application loop
+    w = ResultsWidget(model, v_init, results_callback=print_results_to_terminal)
+    w.resize(800, 600)
+    w.show()
     app.exec_()
 
 
