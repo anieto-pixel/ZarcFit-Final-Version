@@ -218,6 +218,9 @@ class MainWidget(QWidget):
         
         shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
         shortcut_f8.activated.connect(self._handle_set_default)
+        
+        shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
+        shortcut_f9.activated.connect(self.widget_sliders.get_slider("Rinf").change_sign)
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.freq_slider.downMax)
@@ -268,6 +271,8 @@ class MainWidget(QWidget):
         for key, value in self.pending_updates.items():
             self.v_sliders[key] = value
         self.pending_updates.clear()
+        
+        print('in update slider data')
 
         # Run the model, which also calculates secondaries
         self.model_manual.run_model_manual(self.v_sliders)
@@ -362,7 +367,8 @@ if __name__ == "__main__":
     window.setCentralWidget(main_widget)
     window.setWindowTitle("Slider with Ticks and Labels (Optimized)")
     
-#    window.setGeometry(0, 0, 1000, 900)  # Set the initial size and position (x=0, y=0, width=800, height=600)
+    window.setGeometry(0, 0, 1500, 900)  # Set the initial size and position (x=0, y=0, width=800, height=600)
+
     window.show()
 
     sys.exit(app.exec_())

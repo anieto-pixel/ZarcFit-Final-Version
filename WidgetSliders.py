@@ -78,9 +78,7 @@ class WidgetSliders(QWidget):
         in a vertical sub-layout.
         """
         main_layout = QHBoxLayout()
-        main_layout.setSpacing(10)
-        # Set horizontal margins only (left=10, top=0, right=10, bottom=0)
-        main_layout.setContentsMargins(1000, 0, 1000, 0)
+
 
         for key, slider in self.sliders.items():
             # Sub-layout for each labeled slider

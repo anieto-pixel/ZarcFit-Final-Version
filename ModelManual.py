@@ -92,7 +92,6 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Cole' cost function.
         """
-        print("cole")
         
         return self._fit_model(self._cost_function_cole, v_initial_guess)
     
@@ -101,10 +100,6 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Bode' cost function.
         """
-        
-        
-        print("inside bode graph")
-        
         
         return self._fit_model(self._cost_function_bode, v_initial_guess)
 
