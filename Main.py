@@ -83,7 +83,7 @@ class MainWidget(QWidget):
 
         """Connect signals to handlers"""
         self._connect_listeners()
-        self._initialize_hotkeys()
+        self._initialize_hotkeys_and_buttons()
 
         "initialization 2.0 I guess? No flying idea of how to call or organice this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
@@ -191,42 +191,54 @@ class MainWidget(QWidget):
         self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
         self.model_manual.model_manual_values.connect(self.widget_sliders.set_all_variables)
         
-    def _initialize_hotkeys(self):
+    def _initialize_hotkeys_and_buttons(self):
         """
         Initializes keyboard shortcuts.
         """
+
         shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
-        shortcut_f1.activated.connect(lambda: self.model_manual.fit_model_cole(self.v_sliders))
+        shortcut_f1.activated.connect(self.widget_buttons.f1_button.click)
+        self.widget_buttons.f1_button.clicked.connect(lambda: self.model_manual.fit_model_cole(self.v_sliders))
         
         shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
-        shortcut_f2.activated.connect(lambda: self.model_manual.fit_model_bode(self.v_sliders))
+        shortcut_f2.activated.connect(self.widget_buttons.f2_button.click)
+        self.widget_buttons.f2_button.clicked.connect(lambda: self.model_manual.fit_model_bode(self.v_sliders))
 
         shortcut_f3 = QShortcut(QKeySequence(Qt.Key_F3), self)
-        shortcut_f3.activated.connect(self._handle_set_allfreqs)
+        shortcut_f3.activated.connect(self.widget_buttons.f3_button.click)
+        self.widget_buttons.f3_button.clicked.connect(self._handle_set_allfreqs)
 
         shortcut_f4 = QShortcut(QKeySequence(Qt.Key_F4), self)
-        shortcut_f4.activated.connect(self._print_model_parameters)
+        shortcut_f4.activated.connect(self.widget_buttons.f4_button.click)
+        self.widget_buttons.f4_button.clicked.connect(self._print_model_parameters)
 
         shortcut_f5 = QShortcut(QKeySequence(Qt.Key_F5), self)
-        shortcut_f5.activated.connect(self.widget_input_file._show_previous_file)
+        shortcut_f5.activated.connect(self.widget_buttons.f5_button.click)
+        self.widget_buttons.f5_button.clicked.connect(self.widget_input_file._show_previous_file)
         
         shortcut_f6 = QShortcut(QKeySequence(Qt.Key_F6), self)
-        shortcut_f6.activated.connect(self.widget_input_file._show_next_file)
+        shortcut_f6.activated.connect(self.widget_buttons.f6_button.click)
+        self.widget_buttons.f6_button.clicked.connect(self.widget_input_file._show_next_file)
         
         shortcut_f7 = QShortcut(QKeySequence(Qt.Key_F7), self)
-        shortcut_f7.activated.connect(self._handle_recover_file_values)
+        shortcut_f7.activated.connect(self.widget_buttons.f7_button.click)
+        self.widget_buttons.f7_button.clicked.connect(self._handle_recover_file_values)
         
         shortcut_f8 = QShortcut(QKeySequence(Qt.Key_F8), self)
-        shortcut_f8.activated.connect(self._handle_set_default)
+        shortcut_f8.activated.connect(self.widget_buttons.f8_button.click)
+        self.widget_buttons.f8_button.clicked.connect(self._handle_set_default)
         
-#        shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
-#        shortcut_f9.activated.connect(self.widget_sliders.get_slider("Rinf").change_sign)
+        shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
+        shortcut_f9.activated.connect(self.widget_buttons.f9_button.click)
+#        self.widget_buttons.f9_button.clicked.connect(lambda: self.model_manual.fit_model_cole(self.v_sliders))
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
-        shortcut_page_down.activated.connect(self.freq_slider.downMax)
-    
+        shortcut_page_down.activated.connect(self.widget_buttons.fdown_button.click)  # Should map to down
+        self.widget_buttons.fdown_button.clicked.connect(self.freq_slider.downMax)  # Should decrease freq
+        
         shortcut_page_up = QShortcut(QKeySequence(Qt.Key_PageUp), self)
-        shortcut_page_up.activated.connect(self.freq_slider.upMin)
+        shortcut_page_up.activated.connect(self.widget_buttons.fup_button.click)  # Should map to up
+        self.widget_buttons.fup_button.clicked.connect(self.freq_slider.upMin)  # Should increase freq
 
     # -----------------------------------------------------------------------
     #  Private Connections Methods. Handlers
@@ -353,7 +365,10 @@ class MainWidget(QWidget):
 
         self.widget_output_file.write_to_file(main_dictionary | model_dictionary| graph_dictionary)
 
-        
+
+    ####################################################
+    # Test
+    ###################################################    
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

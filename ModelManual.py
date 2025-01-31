@@ -9,7 +9,8 @@ import inspect
 from dataclasses import dataclass
 from PyQt5.QtCore import QObject, pyqtSignal, QCoreApplication
 
-#
+# "Bounds are sacled. Need to add padding for 0 values, handle Qei, and implement a way of making Rinf negative"
+
 @dataclass
 class CalculationResult:
     """
