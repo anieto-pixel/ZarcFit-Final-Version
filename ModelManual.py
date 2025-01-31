@@ -22,7 +22,6 @@ class CalculationResult:
     special_z_real: np.ndarray
     special_z_imag: np.ndarray
     
-
 class ModelManual(QObject):
     """
     This class replicates the circuit calculation by evaluating
@@ -60,6 +59,9 @@ class ModelManual(QObject):
             self.disabled_variables.add(key)  
         else:
             self.disabled_variables.discard(key)
+            
+    def set_bounds(self, bounds : dict):
+        pass
         
     def fit_model_cole(self, v_initial_guess):
         """
@@ -118,26 +120,44 @@ class ModelManual(QObject):
     # Fit Methods
     # ----------------------------------------------------
     # Private Methods
-    def _fit_model(self, cost_func, v_initial_guess):
+    def _fit_model(self, cost_func, v_given):
         
-        all_keys = list(v_initial_guess.keys())
+        #Select th keys of variables to be optimized (those not locked)
+        all_keys = list(v_given.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
-        x0 = [v_initial_guess[k] for k in free_keys]
+        
+        # for readability v will be actual values and x will be logs
+        # x represents the free v that minimize will "guess"
+        # x0 represents the initial guesses for the free.
+        # This line prepares them as the log of the free keys
+        x0 =self._scale_v_to_x(free_keys, v_given)
 
+#remember to set the limmits as logs as well, I think?
+        #This line sets the bounds. Note, Nelder-Mead ignores bounds. Boudns work for "SLSQP", "trust-constr", or "TNC"
         lower_bounds, upper_bounds = self._build_bounds(free_keys)
         bounds = Bounds(lower_bounds, upper_bounds)
         
-        def _cost_wrapper(x_array):
-            free_v_dict = {k: x_array[i] for i, k in enumerate(free_keys)}
-            locked_v_dict = {k: v_initial_guess[k] for k in self.disabled_variables if k in all_keys}
-            full_v_dict = {**free_v_dict, **locked_v_dict}
-            return cost_func(full_v_dict)
+        #wraps cost function for use. Defined nested for a more complete view of fit_model's functioning
+        #minimize "sends" different values for x_guessing.
+        #cost wrapper wraps them into dictionary form, which is what the _run_model
+        #and cost functions need to run, runs the cost function, and returns it's result.
+        def _cost_wrapper(x_guessing):
+            
+            free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
+            
+            #free_v_dict = {k: x_guessing[i] for i, k in enumerate(free_keys)}
+            locked_v_dict = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
+            full_v_dict = free_v_dict | locked_v_dict
+            
+            cost = cost_func(full_v_dict)
+            
+            return cost
 
         result = opt.minimize(
-            _cost_wrapper,
-            x0=x0,
+            _cost_wrapper,  #Objective function:_cost_wrapper (returns a single scalar)
+            x0=x0,          #x0 (starting values for FREE parameters).
             method='Nelder-Mead',
-            bounds=bounds,
+#            bounds=bounds,
             options={'maxfev': 2000}
         )
 
@@ -145,9 +165,9 @@ class ModelManual(QObject):
             print("Optimization failed:", result.message)
             raise RuntimeError("Optimization did not converge.")
 
-        best_fit_free = {k: result.x[i] for i, k in enumerate(free_keys)}
-        best_fit_locked = {k: v_initial_guess[k] for k in self.disabled_variables if k in all_keys}
-        best_fit_dict = {**best_fit_free, **best_fit_locked}
+        best_fit_free = self._descale_x_to_v(free_keys , result.x)
+        best_fit_locked = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
+        best_fit_dict = best_fit_free | best_fit_locked
         
         self.model_manual_values.emit(best_fit_dict)
         return best_fit_dict
@@ -156,6 +176,8 @@ class ModelManual(QObject):
     def _build_bounds(self, free_keys):
         lower_bounds = []
         upper_bounds = []
+        
+        
         for name in free_keys:
             if name.startswith("F"):
                 lower_bounds.append(1e-2)    # Frequency > 0
@@ -181,8 +203,8 @@ class ModelManual(QObject):
                 upper_bounds.append(1e9)
                 
         return lower_bounds, upper_bounds
-    
-        
+   
+     
     def _cost_function_cole(self, v: dict) -> float:
         """
         EIS cost function with separate comparisons for real and imaginary parts.
@@ -374,25 +396,26 @@ class ModelManual(QObject):
         
         return np.array([f1, f2, f3], dtype=float)
 
-    
-
-    def _v_to_log10(self,v):
+    #MM
+    #Two small methods. meant for readability of some future student. 
+    #Question if I want to keep or if I want to add as lines of code in corresponding methods
+    def _scale_v_to_x(self,keys, v):
+        "Receives a list of keys and a dictionary. Returns a scaled list"
         
-        #for key in v.keys()
-        pass
+        x = [np.log10(v[k]) for k in keys]
+        return x
     
-    def _log10_to_v(self,v):
-        pass
-
-    
+    def _descale_x_to_v(self, keys, x):
+        "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
+ 
+        v = {keys[i]: 10 ** x[i] for i in range(len(keys))}
+        return v
+   
 ####################################################################
 # -----------------------------------------------------------------------
 #  TEST FOR UPDATED ModelManual
 # -----------------------------------------------------------------------
 ########################################################################
-
-
-
 
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
