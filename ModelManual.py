@@ -47,10 +47,32 @@ class ModelManual(QObject):
         # We'll keep a copy of the secondary variables from the last run
         self._q = {}
         self._v_second = {}
+        
+    # ----------------------------------------------------
+    # Public Method
+    # ----------------------------------------------------    
 
     def initialize_expdata(self, file_data: dict):
         self._experiment_data= file_data
-
+        
+    def set_disabled_variables(self, key, disabled):
+        if disabled:
+            self.disabled_variables.add(key)  
+        else:
+            self.disabled_variables.discard(key)
+        
+    def fit_model_cole(self, v_initial_guess):
+        """
+        Fit the model using the 'Cole' cost function.
+        """
+        return self._fit_model(self._cost_function_cole, v_initial_guess)
+    
+    def fit_model_bode(self, v_initial_guess):
+        """
+        Fit the model using the 'Bode' cost function.
+        """
+        return self._fit_model(self._cost_function_bode, v_initial_guess)      
+        
     def run_model_manual(self,v):
         """
         Main entry point to run the model with the given slider/fit parameters `v`.
@@ -64,10 +86,10 @@ class ModelManual(QObject):
         freq_array = self._experiment_data["freq"] 
         z_real, z_imag = self._run_model(v, freq_array)
         
-        # 2) Compute the special frequencies based on the slider dict
-        special_freq = self._get_special_freqs(v) 
+        # 2) Compute the special frequencies based on the slider dict 
+        special_freq = self._get_special_freqs(v)
         spec_zr, spec_zi = self._run_model(v, special_freq)
-
+        
         # 3) Create a new CalculationResult
         result = CalculationResult(
             main_freq = freq_array,
@@ -88,49 +110,50 @@ class ModelManual(QObject):
         """
         return dict(self._v_second)
 
-    def fit_model_cole(self, v_initial_guess):
-        """
-        Fit the model using the 'Cole' cost function.
-        """
-        
-        return self._fit_model(self._cost_function_cole, v_initial_guess)
-    
-
-    def fit_model_bode(self, v_initial_guess):
-        """
-        Fit the model using the 'Bode' cost function.
-        """
-        
-        return self._fit_model(self._cost_function_bode, v_initial_guess)
-
     def get_model_parameters(self):
         return self._q | self._v_second  
-        
-    def set_disabled_variables(self, key, disabled):
-        if disabled:
-            self.disabled_variables.add(key)  
-        else:
-            self.disabled_variables.discard(key)
+    
     
     # ----------------------------------------------------
-    # Private Helpers
+    # Fit Methods
     # ----------------------------------------------------
-        
+    # Private Methods
     def _fit_model(self, cost_func, v_initial_guess):
-        """
-        Single private helper that removes code duplication.  
-        It calls the provided cost_func, e.g. _cost_function_cole or _cost_function_bode,
-        omitting any variables in self.disabled_variables from the optimizer.
-        """
-    
-        # 1) Build a list of "free" keys that are not disabled
+        
         all_keys = list(v_initial_guess.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
-    
-        # 2) Build an initial guess array (x0) only for free parameters
         x0 = [v_initial_guess[k] for k in free_keys]
+
+        lower_bounds, upper_bounds = self._build_bounds(free_keys)
+        bounds = Bounds(lower_bounds, upper_bounds)
+        
+        def _cost_wrapper(x_array):
+            free_v_dict = {k: x_array[i] for i, k in enumerate(free_keys)}
+            locked_v_dict = {k: v_initial_guess[k] for k in self.disabled_variables if k in all_keys}
+            full_v_dict = {**free_v_dict, **locked_v_dict}
+            return cost_func(full_v_dict)
+
+        result = opt.minimize(
+            _cost_wrapper,
+            x0=x0,
+            method='Nelder-Mead',
+            bounds=bounds,
+            options={'maxfev': 2000}
+        )
+
+        if not result.success:
+            print("Optimization failed:", result.message)
+            raise RuntimeError("Optimization did not converge.")
+
+        best_fit_free = {k: result.x[i] for i, k in enumerate(free_keys)}
+        best_fit_locked = {k: v_initial_guess[k] for k in self.disabled_variables if k in all_keys}
+        best_fit_dict = {**best_fit_free, **best_fit_locked}
+        
+        self.model_manual_values.emit(best_fit_dict)
+        return best_fit_dict
+
     
-        # 3) Build bounds only for the free parameters (will become its own method)
+    def _build_bounds(self, free_keys):
         lower_bounds = []
         upper_bounds = []
         for name in free_keys:
@@ -156,90 +179,49 @@ class ModelManual(QObject):
                 # Fallback
                 lower_bounds.append(-1e9)
                 upper_bounds.append(1e9)
+                
+        return lower_bounds, upper_bounds
     
-        bounds = Bounds(lower_bounds, upper_bounds)
-    
-        # 4) Define a cost_wrapper that merges free parameters (from x_array)
-        #    with locked/disabled ones (from v_initial_guess).
-        def cost_wrapper(x_array):
-            # Reconstruct dict for free params from x_array
-            free_v_dict = {k: x_array[i] for i, k in enumerate(free_keys)}
-            # Locked params remain at their original values:
-            locked_v_dict = {
-                k: v_initial_guess[k] 
-                for k in self.disabled_variables if k in all_keys
-            }
-            # Merge both into one dict
-            full_v_dict = {**free_v_dict, **locked_v_dict}
-    
-            return cost_func(full_v_dict)
-    
-        # 5) Call scipy.optimize.minimize using only free parameters
-        result = opt.minimize(
-            cost_wrapper,
-            x0=x0,
-            method='Nelder-Mead',
-            bounds=bounds,          # Only meaningful if your chosen method respects bounds
-            options={'maxfev': 2000}
-        )
-    
-        # 6) Check optimization success
-        if not result.success:
-            print("Optimization failed:", result.message)
-            raise RuntimeError("Optimization did not converge.")
-    
-        # 7) Reconstruct best-fit params for the free variables
-        best_fit_free = {k: result.x[i] for i, k in enumerate(free_keys)}
-        # For locked variables, keep them at their initial guess
-        best_fit_locked = {
-            k: v_initial_guess[k] 
-            for k in self.disabled_variables if k in all_keys
-        }
-    
-        # 8) Combine free + locked into a final result dict
-        best_fit_dict = {**best_fit_free, **best_fit_locked}
         
-        # 9) Use the final result in run_model_manual and return
-        self.model_manual_values.emit(best_fit_dict)
+    def _cost_function_cole(self, v: dict) -> float:
+        """
+        EIS cost function with separate comparisons for real and imaginary parts.
+        """
         
-        return best_fit_dict
+        freq_array = self._experiment_data["freq"]
+        
+        z_real, z_imag = self._run_model(v, freq_array)
+        exp_real = self._experiment_data["Z_real"]
+        exp_imag = self._experiment_data["Z_imag"]
 
-        
-    def _calculate_secondary_variables(self, v):
-        """
-        Computes 'series' and 'parallel' secondary variables
-        Returns a dict of newly calculated secondary variables.
-        """
-        
-        #print(v)
-        Qh = self._q_from_f0( v["Rh"], v["Fh"], v["Ph"])
-        Qm = self._q_from_f0( v["Rm"], v["Fm"], v["Pm"])
-        Ql = self._q_from_f0( v["Rl"], v["Fl"], v["Pl"])
-        
-        self._q["Qh"]=Qh
-        self._q["Qm"]=Qm
-        self._q["Ql"]=Ql
-        #print(self._q)
-        
-        self._v_second["R0"] = v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]
-        self._v_second["pRh"] = v["Rinf"]*(v["Rinf"] + v["Rh"])/v["Rh"]
-        self._v_second["pQh"] = Qh*(v["Rh"]/(v["Rinf"] + v["Rh"]))**2
-        self._v_second["pRm"] = (v["Rinf"] + v["Rh"])*(v["Rinf"] + v["Rh"] +v["Rm"])/v["Rm"]
-        self._v_second["pQm"] = Qm*(v["Rm"]/(v["Rinf"] + v["Rh"] + v["Rm"]))**2
-        self._v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"])*(v["Rinf"] + v["Rh"] + v["Rm"] +v["Rl"])/v["Rl"]
-        self._v_second["pQl"] = Ql*(v["Rl"]/(v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
+        diff_real = (z_real - exp_real) ** 2
+        diff_imag = (z_imag - exp_imag) ** 2
 
-    def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
-        """
-        Pseudocode that yields 3 freq points based on your domain logic.
-        E.g. perhaps you pick them from slider ranges or some formula.
-        """
-        f1 = slider_values["Fh"] 
-        f2 = slider_values["Fm"] 
-        f3 = slider_values["Fl"]
-        
-        return np.array([f1, f2, f3], dtype=float)
+        return np.sum(diff_real + diff_imag)
     
+    def _cost_function_bode(self, v: dict) -> float:
+        """
+        Bode cost function that compares magnitude and phase.
+        """
+        freq_array = self._experiment_data["freq"]
+        
+        z_real, z_imag = self._run_model(v, freq_array)
+        z_absolute = np.sqrt(z_real**2 + z_imag**2)
+        z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
+
+        exp_real = self._experiment_data["Z_real"]
+        exp_imag = self._experiment_data["Z_imag"]
+        exp_absolute = np.sqrt(exp_real**2 + exp_imag**2)
+        exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
+
+        diff_absolute = (exp_absolute - z_absolute) ** 2
+        diff_phase_deg = (exp_phase_deg - z_phase_deg) ** 2
+
+        return np.sum(diff_absolute + diff_phase_deg)
+
+    # ----------------------------------------------------
+    # Models
+    # ----------------------------------------------------
     # Mostly for testing purposes
     def _run_model_series(self, v):
         
@@ -307,43 +289,7 @@ class ModelManual(QObject):
             zi_list.append(z_total.imag)
 
         return np.array(zr_list), np.array(zi_list)
-        
-    def _cost_function_cole(self, v: dict) -> float:
-        """
-        EIS cost function with separate comparisons for real and imaginary parts.
-        """
-        
-        freq_array = self._experiment_data["freq"]
-        
-        z_real, z_imag = self._run_model(v, freq_array)
-        exp_real = self._experiment_data["Z_real"]
-        exp_imag = self._experiment_data["Z_imag"]
 
-        diff_real = (z_real - exp_real) ** 2
-        diff_imag = (z_imag - exp_imag) ** 2
-
-        return np.sum(diff_real + diff_imag)
-    
-    def _cost_function_bode(self, v: dict) -> float:
-        """
-        Bode cost function that compares magnitude and phase.
-        """
-        freq_array = self._experiment_data["freq"]
-        
-        z_real, z_imag = self._run_model(v, freq_array)
-        z_absolute = np.sqrt(z_real**2 + z_imag**2)
-        z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
-
-        exp_real = self._experiment_data["Z_real"]
-        exp_imag = self._experiment_data["Z_imag"]
-        exp_absolute = np.sqrt(exp_real**2 + exp_imag**2)
-        exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
-
-        diff_absolute = (exp_absolute - z_absolute) ** 2
-        diff_phase_deg = (exp_phase_deg - z_phase_deg) ** 2
-
-        return np.sum(diff_absolute + diff_phase_deg)
-    
     # ----------------------------------------------------
     # Circuit Methods
     # ----------------------------------------------------
@@ -387,7 +333,57 @@ class ModelManual(QObject):
 
         denominator= (1/z_1) + (1/z_2)
         result= 1/denominator
-        return result
+        return result    
+
+    # ----------------------------------------------------
+    # Private Helpers
+    # ----------------------------------------------------
+    
+    def _calculate_secondary_variables(self, v):
+        """
+        Computes 'series' and 'parallel' secondary variables
+        Returns a dict of newly calculated secondary variables.
+        """
+        
+        #print(v)
+        Qh = self._q_from_f0( v["Rh"], v["Fh"], v["Ph"])
+        Qm = self._q_from_f0( v["Rm"], v["Fm"], v["Pm"])
+        Ql = self._q_from_f0( v["Rl"], v["Fl"], v["Pl"])
+        
+        self._q["Qh"]=Qh
+        self._q["Qm"]=Qm
+        self._q["Ql"]=Ql
+        #print(self._q)
+        
+        self._v_second["R0"] = v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]
+        self._v_second["pRh"] = v["Rinf"]*(v["Rinf"] + v["Rh"])/v["Rh"]
+        self._v_second["pQh"] = Qh*(v["Rh"]/(v["Rinf"] + v["Rh"]))**2
+        self._v_second["pRm"] = (v["Rinf"] + v["Rh"])*(v["Rinf"] + v["Rh"] +v["Rm"])/v["Rm"]
+        self._v_second["pQm"] = Qm*(v["Rm"]/(v["Rinf"] + v["Rh"] + v["Rm"]))**2
+        self._v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"])*(v["Rinf"] + v["Rh"] + v["Rm"] +v["Rl"])/v["Rl"]
+        self._v_second["pQl"] = Ql*(v["Rl"]/(v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
+
+    def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
+        """
+        Pseudocode that yields 3 freq points based on your domain logic.
+        E.g. perhaps you pick them from slider ranges or some formula.
+        """
+        f1 = slider_values["Fh"] 
+        f2 = slider_values["Fm"] 
+        f3 = slider_values["Fl"]
+        
+        return np.array([f1, f2, f3], dtype=float)
+
+    
+
+    def _v_to_log10(self,v):
+        
+        #for key in v.keys()
+        pass
+    
+    def _log10_to_v(self,v):
+        pass
+
     
 ####################################################################
 # -----------------------------------------------------------------------

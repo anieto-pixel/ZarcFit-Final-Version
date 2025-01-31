@@ -20,8 +20,6 @@ class CustomSliders(QWidget):
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         super().__init__()
-        #boolean
-        self._in_negative_mode = False
         
         # Setup slider parameters
         self._min_value = min_value
@@ -165,10 +163,7 @@ class CustomSliders(QWidget):
         Returns the current integer value of the slider.
         """
         value = self._slider.value()
-        
-        if not self._in_negative_mode: return value
-        else: return - value
-
+        return value
 
     def set_value(self, value):
         """
@@ -182,13 +177,6 @@ class CustomSliders(QWidget):
         """
         return self._slider.valueChanged
 
-    def change_sign(self):
-        
-        print("called!")
-        self._in_negative_mode = not self._in_negative_mode
-        
-        #self._apply_styles()
-        self._update_label()
         
         
 #############################################################################
@@ -254,9 +242,7 @@ class DoubleSliderWithTicks(CustomSliders):
         Return the float value, unscaled.
         """
         value = self._slider.value() / self._scale_factor
-        
-        if not self._in_negative_mode: return value
-        else: return - value
+        return value
 
     def set_value(self, value):
         """
@@ -309,8 +295,7 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         n = self._slider.value() / self._scale_factor
         value = self._base_power ** n
-        if not self._in_negative_mode: return value
-        else: return - value
+        return value
     
     def set_value_exact(self, value):
         """
@@ -319,7 +304,7 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         """
         self.set_value(math.log10(value))
 
-#######################################################################
+############################
 # -----------------------------------------------------------------------
 #  Test
 # -----------------------------------------------------------------------
@@ -399,18 +384,33 @@ class TestSliders(QWidget):
     def add_slider_section(self, slider_type, slider_class,
                            label_text, min_val, max_val, colour,
                            number_of_tick_intervals, is_float=False):
+        """
+        Creates a slider+label+input-box section.
+        slider_type: a string identifier ('custom', 'double', etc.)
+        slider_class: the QWidget-based slider class to instantiate
+        label_text: text to display above the slider
+        min_val, max_val, colour: parameters to pass to slider_class
+        is_float: whether inputs should be float or int
+        """
+        # Outer vertical container
         container = QVBoxLayout()
-        container.setSpacing(10)
-        container.setContentsMargins(10, 10, 10, 10)
+        container.setSpacing(10)  # *** Increased Spacing ***
+        container.setContentsMargins(10, 10, 10, 10)  # *** Increased Margins ***
+        # (left, top, right, bottom)
 
+        # Label
         main_label = QLabel(label_text)
-        main_label.setAlignment(Qt.AlignCenter)
-        main_label.setStyleSheet("font-weight: bold;")
+        main_label.setAlignment(Qt.AlignCenter)  # *** Center Alignment ***
+        main_label.setStyleSheet("font-weight: bold;")  # *** Bold Font for Emphasis ***
         container.addWidget(main_label)
 
+        # Create the slider
         slider = slider_class(min_val, max_val, colour, number_of_tick_intervals)
         self.sliders[slider_type] = slider
 
+        # Store info so we can rebuild if Min or Max changes
+        # Note that "layout" is the horizontal layout that holds the slider
+        # so we can remove/insert the slider widget there.
         self.slider_info[slider_type] = {
             "slider_class": slider_class,
             "min_val": min_val,
@@ -418,11 +418,12 @@ class TestSliders(QWidget):
             "colour": colour,
             "number_of_tick_intervals": number_of_tick_intervals,
             "is_float": is_float,
-            "layout": None,
+            "layout": None,       # We'll fill this in a moment
             "slider_widget": slider,
             "label_text": label_text
         }
 
+        # Connect to print changes
         slider.value_changed().connect(
             lambda val, label=label_text: print(f"{label} Changed: {val}")
         )
@@ -430,62 +431,75 @@ class TestSliders(QWidget):
             lambda val, label=label_text: print(f"{label} Was toggled: {val}")
         )
 
+        # Horizontal layout: slider on the left, input fields on the right
         h_layout = QHBoxLayout()
-        h_layout.setSpacing(15)
-        h_layout.setContentsMargins(10, 10, 10, 10)
+        h_layout.setSpacing(15)  # *** Increased Spacing ***
+        h_layout.setContentsMargins(10, 10, 10, 10)  # *** Increased Margins ***
+        # (left, top, right, bottom)
 
+        # *** Fixed Width for Slider Area to Prevent Expansion ***
         slider_container = QVBoxLayout()
         slider_container.setContentsMargins(0, 0, 0, 0)
         slider_container.addWidget(slider)
-        slider.setMinimumWidth(100)
-        slider.setMaximumWidth(150)
+        # Optionally, set a fixed width or minimum width
+        slider.setMinimumWidth(100)  # *** Set Minimum Width ***
+        slider.setMaximumWidth(150)  # *** Set Maximum Width ***
         h_layout.addLayout(slider_container)
 
+        # Remember the layout in slider_info so we can manipulate it later
         self.slider_info[slider_type]["layout"] = h_layout
 
+        # A vertical layout for the three input boxes
         input_layout = QVBoxLayout()
-        input_layout.setSpacing(5)
-        input_layout.setContentsMargins(10, 10, 10, 10)
+        input_layout.setSpacing(5)  # *** Increased Spacing ***
+        input_layout.setContentsMargins(10, 10, 10, 10)  # *** Increased Margins ***
+        # (left, top, right, bottom)
 
-        # Existing code for "Set Value", "Min", "Max" inputs
+        # "Set Value", "Min", "Max"
         input_labels = ["Set Value", "Min", "Max"]
         for i, lbl in enumerate(input_labels):
             single_input_layout = QVBoxLayout()
-            single_input_layout.setSpacing(2)
-            single_input_layout.setContentsMargins(5, 5, 5, 5)
-            single_input_layout.setAlignment(Qt.AlignLeft)
+            single_input_layout.setSpacing(2)  # *** Increased Spacing ***
+            single_input_layout.setContentsMargins(5, 5, 5, 5)  # *** Increased Margins ***
+            single_input_layout.setAlignment(Qt.AlignLeft)  # Align left
 
             small_label = QLabel(lbl)
-            small_label.setAlignment(Qt.AlignLeft)
-            small_label.setFixedHeight(20)
+            small_label.setAlignment(Qt.AlignLeft)  # Ensure the label is aligned left
+            small_label.setFixedHeight(20)  # *** Increased Height for Better Readability ***
+            # *** Removed Font Size Adjustment ***
+            # small_label.setStyleSheet("font-size: 10px;")  # *** Removed ***
+            # (This line has been removed to restore the original font size)
 
             input_box = QLineEdit()
             input_box.setPlaceholderText(lbl)
-            input_box.setFixedWidth(80)
-            input_box.setMaximumWidth(100)
-            input_box.setMinimumWidth(60)
+            input_box.setFixedWidth(80)  # *** Increased Width ***
+            input_box.setMaximumWidth(100)  # *** Maximum Width to Prevent Expansion ***
+            input_box.setMinimumWidth(60)  # *** Minimum Width to Maintain Consistency ***
 
+            # *** Proper Variable Binding in Lambda ***
             current_slider_type = slider_type
             current_input_index = i
+
             input_box.returnPressed.connect(
-                lambda box=input_box, idx=current_input_index, st=current_slider_type: 
-                    self.save_slider_input(st, idx, box, is_float)
+                lambda box=input_box, idx=current_input_index, st=current_slider_type: self.save_slider_input(
+                    st, idx, box, is_float
+                )
             )
 
             single_input_layout.addWidget(small_label)
             single_input_layout.addWidget(input_box)
             input_layout.addLayout(single_input_layout)
 
-        # Add a button to toggle the sign of the slider
-        toggle_sign_button = QPushButton("Toggle Sign")
-        toggle_sign_button.clicked.connect(slider.change_sign)
-        input_layout.addWidget(toggle_sign_button)
-
+        # *** Spacer to Prevent Input Layout from Stretching ***
         input_layout.addStretch()
+
+        # *** Spacer to Allocate Fixed Space and Prevent Shifting ***
         h_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Fixed, QSizePolicy.Minimum))
+
         h_layout.addLayout(input_layout)
 
         container.addLayout(h_layout)
+
         return container
 
     def save_slider_input(self, slider_type, input_index, input_box, is_float):
@@ -595,7 +609,6 @@ class TestSliders(QWidget):
 
         # Insert the new slider at index 0 in the layout
         layout.insertWidget(0, new_slider)
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
