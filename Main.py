@@ -362,7 +362,7 @@ if __name__ == "__main__":
     window.setCentralWidget(main_widget)
     window.setWindowTitle("Slider with Ticks and Labels (Optimized)")
     
-    window.setGeometry(0, 0, 1000, 900)  # Set the initial size and position (x=0, y=0, width=800, height=600)
+#    window.setGeometry(0, 0, 1000, 900)  # Set the initial size and position (x=0, y=0, width=800, height=600)
     window.show()
 
     sys.exit(app.exec_())

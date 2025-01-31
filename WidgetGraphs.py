@@ -334,13 +334,10 @@ class WidgetGraphs(QWidget):
         # MAIN LAYOUT
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        main_layout.setSpacing(10)
         main_layout.addWidget(left_frame)
         main_layout.addWidget(right_frame)
         self.setLayout(main_layout)
-
-
-
 
     def apply_filter_frequency_range(self, f_min, f_max):
         """

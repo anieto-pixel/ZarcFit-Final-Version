@@ -135,13 +135,16 @@ class ModelManual(QObject):
         # 2) Build an initial guess array (x0) only for free parameters
         x0 = [v_initial_guess[k] for k in free_keys]
     
-        # 3) Build bounds only for the free parameters
+        # 3) Build bounds only for the free parameters (will become its own method)
         lower_bounds = []
         upper_bounds = []
         for name in free_keys:
             if name.startswith("F"):
                 lower_bounds.append(1e-2)    # Frequency > 0
                 upper_bounds.append(1e8)     # Arbitrary large
+            elif name == "Pei":  # ****** SPECIAL CASE FOR PEI ******
+                lower_bounds.append(-3.2)
+                upper_bounds.append(0.8)
             elif name.startswith("P"):
                 lower_bounds.append(0.0)     # Phase exponent
                 upper_bounds.append(1.0)     # Add different clause for pei
