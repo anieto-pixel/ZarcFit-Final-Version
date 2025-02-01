@@ -229,7 +229,7 @@ class MainWidget(QWidget):
         self.widget_buttons.f8_button.clicked.connect(self._handle_set_default)
         
         shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
-        shortcut_f9.activated.connect(self.widget_buttons.f9_button.f9_toggled)
+        shortcut_f9.activated.connect(self.widget_buttons.f9_button.click)
         self.widget_buttons.f9_button.toggled.connect(self.model_manual.set_rinf_negative)
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)

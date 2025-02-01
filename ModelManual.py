@@ -43,6 +43,7 @@ class ModelManual(QObject):
             "Z_imag": np.zeros(5),
         }
         self.disabled_variables = set()
+        self.negative_rinf = False
 
         # We'll keep a copy of the secondary variables from the last run
         self._q = {}
@@ -61,10 +62,10 @@ class ModelManual(QObject):
         else:
             self.disabled_variables.discard(key)
         
+    def set_rinf_negative(self, state: bool):
         
-    #MM FILL THIS IN AT SOME POINT
-    def set_rinf_negative(self):
-        pass
+        print(f" set rinf {state}")
+        self.negative_rinf= state
         
     def fit_model_cole(self, v_initial_guess):
         """
@@ -106,6 +107,7 @@ class ModelManual(QObject):
         )
         
         self.model_manual_result.emit(result)
+        print(f"outside the method, where it should not matter {v['Rinf']}")
         return result
 
     def get_latest_secondaries(self):
@@ -145,16 +147,18 @@ class ModelManual(QObject):
         #cost wrapper wraps them into dictionary form, which is what the _run_model
         #and cost functions need to run, runs the cost function, and returns it's result.
         def _cost_wrapper(x_guessing):
+            try:
+                free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
+                
+                locked_v_dict = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
+                full_v_dict = free_v_dict | locked_v_dict
+                
+                cost = cost_func(full_v_dict)
+                return cost
             
-            free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
-            
-            #free_v_dict = {k: x_guessing[i] for i, k in enumerate(free_keys)}
-            locked_v_dict = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
-            full_v_dict = free_v_dict | locked_v_dict
-            
-            cost = cost_func(full_v_dict)
-            
-            return cost
+            except ValueError:
+                # Force a huge cost whenever errors are thrown, etc.
+                return 1e20
 
         result = opt.minimize(
             _cost_wrapper,  #Objective function:_cost_wrapper (returns a single scalar)
@@ -175,7 +179,6 @@ class ModelManual(QObject):
         self.model_manual_values.emit(best_fit_dict)
         return best_fit_dict
 
-    
     def _build_bounds(self, free_keys):
         lower_bounds = []
         upper_bounds = []
@@ -203,7 +206,6 @@ class ModelManual(QObject):
                 
         return lower_bounds, upper_bounds
    
-     
     def _cost_function_cole(self, v: dict) -> float:
         """
         EIS cost function with separate comparisons for real and imaginary parts.
@@ -279,36 +281,46 @@ class ModelManual(QObject):
         # Update the arrays
         return np.array(zr_list), np.array(zi_list)
 
+    #MM CHECK THAT HIS DOE SNOT CAUSE CHAOS
     def _run_model(self, v: dict, freq_array: np.ndarray):
         """
         The main model used in cost functions.
         """
-        self._calculate_secondary_variables(v)
+        print("ENTERING RUN MODEL")
+        print(f"{v['Rinf']}, boolean{ self.negative_rinf}")
+        
+        v_l = v.copy()
+    
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+    
+        self._calculate_secondary_variables(v_l)  # ✅ Pass v_l instead of v
         v2 = self._v_second
-
+    
         zr_list = []
         zi_list = []
-
+    
         for f in freq_array:
             # Inductor
-            zinf = self._inductor(f, v["Linf"])
-
+            zinf = self._inductor(f, v_l["Linf"])
+    
             # Parallel system
-            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v["Ph"], v["Ph"])
-            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v["Pm"], v["Pm"])
-            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v["Pl"], v["Pl"])
-
+            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
+            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
+            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
+    
             z_lines = self._parallel(z_line_m, z_line_l)
             z_rock = self._parallel(z_lines, v2["R0"])
             zparallel = self._parallel(z_line_h, z_rock)
-
-            z_cpee = self._cpe(f, v["Qe"], v["Pef"], v["Pei"])
-            zarce = self._parallel(z_cpee, v["Re"])
-
+    
+            z_cpee = self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"])
+            zarce = self._parallel(z_cpee, v_l["Re"])
+    
             z_total = zinf + zparallel + zarce
             zr_list.append(z_total.real)
             zi_list.append(z_total.imag)
-
+    
+        print(f"afterwards {v_l['Rinf']}")
         return np.array(zr_list), np.array(zi_list)
 
     # ----------------------------------------------------
@@ -395,19 +407,38 @@ class ModelManual(QObject):
         
         return np.array([f1, f2, f3], dtype=float)
 
-    #MM
-    #Two small methods. meant for readability of some future student. 
-    #Question if I want to keep or if I want to add as lines of code in corresponding methods
     def _scale_v_to_x(self,keys, v):
         "Receives a list of keys and a dictionary. Returns a scaled list"
+        print(" _scale_v_to_x")
+        print(v)
+        print("**********************")
         
-        x = [np.log10(v[k]) for k in keys]
+        x = []
+        for k in keys:
+            if k.startswith('P'):
+                # Linear scaling
+                x.append(v[k] * 100.0)
+            else:
+                # Logarithmic scaling
+                x.append(np.log10(v[k]))
+        print(x)
+        print("=====================")
         return x
     
     def _descale_x_to_v(self, keys, x):
+        print("_descale_x_to_v")
+        print(x)
+        print("**********************")
+        
         "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
- 
-        v = {keys[i]: 10 ** x[i] for i in range(len(keys))}
+        v = {}
+        for i, k in enumerate(keys):
+            if k.startswith('P'):
+                v[k] = x[i] / 100.0
+            else:
+                v[k] = 10.0 ** (x[i])
+        print(v)
+        print("=====================")
         return v
    
 ####################################################################
@@ -548,7 +579,6 @@ class ResultsWidget(QWidget):
 
         # Fire callback
         self.results_callback(calculation_result)
-
 
 def test_model_manual_with_sliders():
     app = QApplication([])
