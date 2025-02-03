@@ -146,7 +146,7 @@ class ModelManual(QObject):
         #cost wrapper wraps them into dictionary form, which is what the _run_model
         #and cost functions need to run, runs the cost function, and returns it's result.
         def _cost_wrapper(x_guessing):
-            print(x_guessing)
+            #print(x_guessing)
             try:
                 free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
                 
@@ -163,8 +163,12 @@ class ModelManual(QObject):
         result = opt.minimize(
             _cost_wrapper,  #Objective function:_cost_wrapper (returns a single scalar)
             x0=x0,          #x0 (starting values for FREE parameters).
-            method='Nelder-Mead',
-#            bounds=bounds,
+#            method='Nelder-Mead',
+#            method="BFGS",
+            method='L-BFGS-B',
+#            method="TNC",
+#            method="SLSQP",
+            bounds=bounds,
             options={'maxfev': 2000}
         )
 
