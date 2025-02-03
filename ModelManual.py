@@ -64,7 +64,6 @@ class ModelManual(QObject):
         
     def set_rinf_negative(self, state: bool):
         
-        print(f" set rinf {state}")
         self.negative_rinf= state
         
     def fit_model_cole(self, v_initial_guess):
@@ -107,7 +106,7 @@ class ModelManual(QObject):
         )
         
         self.model_manual_result.emit(result)
-        print(f"outside the method, where it should not matter {v['Rinf']}")
+
         return result
 
     def get_latest_secondaries(self):
@@ -286,15 +285,13 @@ class ModelManual(QObject):
         """
         The main model used in cost functions.
         """
-        print("ENTERING RUN MODEL")
-        print(f"{v['Rinf']}, boolean{ self.negative_rinf}")
         
         v_l = v.copy()
     
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
     
-        self._calculate_secondary_variables(v_l)  # ✅ Pass v_l instead of v
+        self._calculate_secondary_variables(v_l)  
         v2 = self._v_second
     
         zr_list = []
@@ -320,7 +317,6 @@ class ModelManual(QObject):
             zr_list.append(z_total.real)
             zi_list.append(z_total.imag)
     
-        print(f"afterwards {v_l['Rinf']}")
         return np.array(zr_list), np.array(zi_list)
 
     # ----------------------------------------------------
@@ -409,9 +405,9 @@ class ModelManual(QObject):
 
     def _scale_v_to_x(self,keys, v):
         "Receives a list of keys and a dictionary. Returns a scaled list"
-        print(" _scale_v_to_x")
-        print(v)
-        print("**********************")
+#        print(" _scale_v_to_x")
+#        print(v)
+#        print("**********************")
         
         x = []
         for k in keys:
@@ -421,14 +417,14 @@ class ModelManual(QObject):
             else:
                 # Logarithmic scaling
                 x.append(np.log10(v[k]))
-        print(x)
-        print("=====================")
+#        print(x)
+#        print("=====================")
         return x
     
     def _descale_x_to_v(self, keys, x):
-        print("_descale_x_to_v")
-        print(x)
-        print("**********************")
+#        print("_descale_x_to_v")
+#        print(x)
+#        print("**********************")
         
         "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
         v = {}
@@ -437,8 +433,8 @@ class ModelManual(QObject):
                 v[k] = x[i] / 100.0
             else:
                 v[k] = 10.0 ** (x[i])
-        print(v)
-        print("=====================")
+#        print(v)
+#        print("=====================")
         return v
    
 ####################################################################

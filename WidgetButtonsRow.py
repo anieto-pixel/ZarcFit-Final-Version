@@ -89,16 +89,14 @@ class WidgetButtonsRow(QWidget):
         self.f9_button.setStyleSheet("QPushButton { background-color: red; }" if state else "QPushButton { background-color: none; }")
         
 
-    def _flash_button_green(self, button, duration=500):     
-
-        original_effect = button.graphicsEffect()
+    def _flash_button_green(self, button, duration=500):
         effect = QGraphicsColorizeEffect()
-        effect.setColor(QColor(0, 150, 0, 255))  # Custom darker green color
+        effect.setColor(QColor(0, 150, 0, 255))  # darker green
         effect.setStrength(1.0)
         button.setGraphicsEffect(effect)
         
-        # Remove the effect after 'duration' milliseconds, restoring the original effect
-        QTimer.singleShot(duration, lambda: button.setGraphicsEffect(original_effect))
+        # Remove the effect after 'duration' ms
+        QTimer.singleShot(duration, lambda: button.setGraphicsEffect(None))
 
 
     # (Optional) Public methods or signals could go here
