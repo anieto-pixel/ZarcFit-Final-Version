@@ -146,6 +146,7 @@ class ModelManual(QObject):
         #cost wrapper wraps them into dictionary form, which is what the _run_model
         #and cost functions need to run, runs the cost function, and returns it's result.
         def _cost_wrapper(x_guessing):
+            print(x_guessing)
             try:
                 free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
                 
@@ -245,7 +246,7 @@ class ModelManual(QObject):
     # Models
     # ----------------------------------------------------
     # Mostly for testing purposes
-    def _run_model_series(self, v):
+    def _run_model_series(self, v: dict, freq_array: np.ndarray):
         
         """
         Alternative model path for testing (not used in cost functions directly).
@@ -256,7 +257,7 @@ class ModelManual(QObject):
         zi_list = []
 
         # Combine the user’s slider dictionary with v_seco
-        for freq in self._experiment_data["freq"]:
+        for freq in freq_array:
             zinf = self._inductor(freq, v["Linf"]) + v["Rinf"]
             
             z_cpeh = self._cpe(freq, self._q["Qh"], v["Ph"], v["Ph"])
@@ -413,7 +414,7 @@ class ModelManual(QObject):
         for k in keys:
             if k.startswith('P'):
                 # Linear scaling
-                x.append(v[k] * 100.0)
+                x.append(v[k] * 10.0)
             else:
                 # Logarithmic scaling
                 x.append(np.log10(v[k]))
@@ -430,7 +431,7 @@ class ModelManual(QObject):
         v = {}
         for i, k in enumerate(keys):
             if k.startswith('P'):
-                v[k] = x[i] / 100.0
+                v[k] = x[i] / 10.0
             else:
                 v[k] = 10.0 ** (x[i])
 #        print(v)
