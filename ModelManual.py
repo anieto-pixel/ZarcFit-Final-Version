@@ -169,7 +169,7 @@ class ModelManual(QObject):
 #            method="TNC",
 #            method="SLSQP",
             bounds=bounds,
-            options={'maxfev': 2000}
+#            options={'maxfev': 2000}
         )
 
         if not result.success:
@@ -441,6 +441,7 @@ class ModelManual(QObject):
 #        print(v)
 #        print("=====================")
         return v
+   
    
 ####################################################################
 # -----------------------------------------------------------------------
