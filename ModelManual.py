@@ -23,6 +23,167 @@ class CalculationResult:
     special_z_real: np.ndarray
     special_z_imag: np.ndarray
     
+import numpy as np
+
+class ModelCircuit(object):
+    def __init__(self, negative_rinf=False, q=None, v_second=None):
+        super().__init__()
+        # --- FIX #1: Avoid mutable default arguments, properly assign attributes.
+        if q is None:
+            q = {}
+        if v_second is None:
+            v_second = {}
+        self.negative_rinf = negative_rinf
+        self.q = q
+        self.v_second = v_second
+
+    def run_model(self, v: dict, freq_array: np.ndarray):
+        return np.array([]), np.array([])
+
+    def init_parameters(self):
+        return self.negative_rinf, self.q, self.v_second
+
+    # ------------------------------------------
+    # Variable Calculations
+    # ------------------------------------------
+    def _calculate_secondary_variables(self, v):
+        """
+        Computes 'series' and 'parallel' secondary variables
+        Returns a dict of newly calculated secondary variables.
+        """
+        # --- FIX #2: Method name mismatch: renamed 'self.q_from_f0' calls
+        # to 'self._q_from_f0' for consistency.
+        Qh = self._q_from_f0(v["Rh"], v["Fh"], v["Ph"])
+        Qm = self._q_from_f0(v["Rm"], v["Fm"], v["Pm"])
+        Ql = self._q_from_f0(v["Rl"], v["Fl"], v["Pl"])
+
+        self.q["Qh"] = Qh
+        self.q["Qm"] = Qm
+        self.q["Ql"] = Ql
+
+        self.v_second["R0"] = v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]
+        self.v_second["pRh"] = v["Rinf"] * (v["Rinf"] + v["Rh"]) / v["Rh"]
+        self.v_second["pQh"] = Qh * (v["Rh"] / (v["Rinf"] + v["Rh"]))**2
+        self.v_second["pRm"] = (v["Rinf"] + v["Rh"]) * (v["Rinf"] + v["Rh"] + v["Rm"]) / v["Rm"]
+        self.v_second["pQm"] = Qm * (v["Rm"] / (v["Rinf"] + v["Rh"] + v["Rm"]))**2
+        self.v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"]) * (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]) / v["Rl"]
+        self.v_second["pQl"] = Ql * (v["Rl"] / (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
+
+    # ----------------------------------------------------
+    # Circuit Methods
+    # ----------------------------------------------------
+    def _inductor(self, freq, linf):
+        if linf == 0:
+            raise ValueError("Inductance (linf) cannot be zero.")
+        if freq < 0:
+            raise ValueError("Frequency cannot be negative.")
+        result = (2 * np.pi * freq) * linf * 1j
+        return result
+
+    def _q_from_f0(self, r, f0, p):
+        if r == 0:
+            raise ValueError("Resistance r cannot be zero.")
+        if f0 <= 0:
+            raise ValueError("Resonant frequency f0 must be positive.")
+        result = 1.0 / (r * (2.0 * np.pi * f0)**p)
+        return result
+
+    def _cpe(self, freq, q, pf, pi):
+        if q == 0:
+            raise ValueError("Parameter q cannot be zero.")
+        if freq < 0:
+            raise ValueError("Frequency must be non-negative for CPE model.")
+        if freq == 0 and pf > 0:
+            raise ValueError("freq=0 and pf>0 results in division by zero in CPE.")
+        if freq == 0 and pf < 0:
+            raise ValueError("freq=0 and pf<0 is undefined (0 to a negative power).")
+
+        phase_factor = (1j) ** pi
+        omega_exp = (2.0 * np.pi * freq) ** pf
+        result = 1.0 / (q * phase_factor * omega_exp)
+        return result
+
+    def _parallel(self, z_1, z_2):
+        if z_1 == 0 or z_2 == 0:
+            raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
+        denominator = (1 / z_1) + (1 / z_2)
+        result = 1 / denominator
+        return result
+
+# Rinf needs to be able to be negative
+class ModelCircuitSeries(ModelCircuit):
+    # Mostly for testing purposes
+    def run_model(self, v: dict, freq_array: np.ndarray):
+        """
+        Alternative model path for testing (not used in cost functions directly).
+        """
+        self._calculate_secondary_variables(v)
+
+        zr_list = []
+        zi_list = []
+
+        for freq in freq_array:
+            zinf = self._inductor(freq, v["Linf"]) + v["Rinf"]
+
+            z_cpeh = self._cpe(freq, self.q["Qh"], v["Ph"], v["Ph"])
+            zarch = self._parallel(z_cpeh, v["Rh"])
+
+            z_cpem = self._cpe(freq, self.q["Qm"], v["Pm"], v["Pm"])
+            zarcm = self._parallel(z_cpem, v["Rm"])
+
+            z_cpel = self._cpe(freq, self.q["Ql"], v["Pl"], v["Pl"])
+            zarcl = self._parallel(z_cpel, v["Rl"])
+
+            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
+            zarce = self._parallel(z_cpee, v["Re"])
+
+            # Evaluate final formula
+            z_total = zinf + zarch + zarcm + zarcl + zarce
+
+            zr_list.append(z_total.real)
+            zi_list.append(z_total.imag)
+
+        return np.array(zr_list), np.array(zi_list)
+
+class ModelCircuitParallel(ModelCircuit):
+    def run_model(self, v: dict, freq_array: np.ndarray):
+        """
+        The main model used in cost functions.
+        """
+        v_l = v.copy()
+
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+
+        self._calculate_secondary_variables(v_l)
+        v2 = self.v_second
+
+        zr_list = []
+        zi_list = []
+
+        for f in freq_array:
+            zinf = self._inductor(f, v_l["Linf"])
+
+            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
+            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
+            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
+
+            z_lines = self._parallel(z_line_m, z_line_l)
+            z_rock = self._parallel(z_lines, v2["R0"])
+            zparallel = self._parallel(z_line_h, z_rock)
+
+            z_cpee = self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"])
+            zarce = self._parallel(z_cpee, v_l["Re"])
+
+            z_total = zinf + zparallel + zarce
+            zr_list.append(z_total.real)
+            zi_list.append(z_total.imag)
+
+        return np.array(zr_list), np.array(zi_list)
+
+############################################################################3
+
+    
 class ModelManual(QObject):
     """
     This class replicates the circuit calculation by evaluating
@@ -42,12 +203,11 @@ class ModelManual(QObject):
             "Z_real": np.zeros(5),
             "Z_imag": np.zeros(5),
         }
+        
+        self._model_circuit=ModelCircuitParallel()
+        
         self.disabled_variables = set()
-        self.negative_rinf = False
 
-        # We'll keep a copy of the secondary variables from the last run
-        self._q = {}
-        self._v_second = {}
         
     # ----------------------------------------------------
     # Public Method
@@ -64,19 +224,38 @@ class ModelManual(QObject):
         
     def set_rinf_negative(self, state: bool):
         
-        self.negative_rinf= state
+        self._model_circuit.negative_rinf= state
+        
+    def switch_circuit_model(self, state: bool):
+            
+        neg_rinf, old_q, old_vsec = self._model_circuit.init_parameters()
+
+        if state:
+            # If 'state' is True, choose ModelCircuitSeries
+            self._model_circuit = ModelCircuitSeries(
+                negative_rinf=neg_rinf,
+                q=dict(old_q),       # optionally copy to avoid reference confusion
+                v_second=dict(old_vsec)
+            )
+        else:
+            # If 'state' is False, choose ModelCircuitParallel
+            self._model_circuit = ModelCircuitParallel(
+                negative_rinf=neg_rinf,
+                q=dict(old_q),         # optionally copy to avoid reference confusion
+                v_second=dict(old_vsec)
+            )
         
     def fit_model_cole(self, v_initial_guess):
         """
         Fit the model using the 'Cole' cost function.
         """
-        return self._fit_model(self._cost_function_cole, v_initial_guess)
+        return self._fit_model(self._residual_cole, v_initial_guess)
     
     def fit_model_bode(self, v_initial_guess):
         """
         Fit the model using the 'Bode' cost function.
         """
-        return self._fit_model(self._cost_function_bode, v_initial_guess)      
+        return self._fit_model(self._residual_bode, v_initial_guess)
         
     def run_model_manual(self,v):
         """
@@ -89,11 +268,11 @@ class ModelManual(QObject):
         """
         
         freq_array = self._experiment_data["freq"] 
-        z_real, z_imag = self._run_model(v, freq_array)
+        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
         
         # 2) Compute the special frequencies based on the slider dict 
         special_freq = self._get_special_freqs(v)
-        spec_zr, spec_zi = self._run_model(v, special_freq)
+        spec_zr, spec_zi = self._model_circuit.run_model(v, special_freq)
         
         # 3) Create a new CalculationResult
         result = CalculationResult(
@@ -114,76 +293,68 @@ class ModelManual(QObject):
         Return the most recent dictionary of secondary variables
         that was computed in run_model.
         """
-        return dict(self._v_second)
+        return dict(self._model_circuit.v_second)
 
     def get_model_parameters(self):
-        return self._q | self._v_second  
+        return self._model_circuit.q | self._model_circuit.v_second  
     
     
     # ----------------------------------------------------
     # Fit Methods
     # ----------------------------------------------------
-    # Private Methods
-    def _fit_model(self, cost_func, v_given):
-        
-        #Select th keys of variables to be optimized (those not locked)
+
+    def _fit_model(self, residual_func, v_given):
+        # 1) Identify free / locked parameters
         all_keys = list(v_given.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
         
-        # for readability v will be actual values and x will be logs
-        # x represents the free v that minimize will "guess"
-        # x0 represents the initial guesses for the free.
-        # This line prepares them as the log of the free keys
-        x0 =self._scale_v_to_x(free_keys, v_given)
+        # 2) Build the initial guess vector x0 (scaled)
+        x0 = self._scale_v_to_x(free_keys, v_given)
 
-#remember to set the limmits as logs as well, I think?
-        #This line sets the bounds. Note, Nelder-Mead ignores bounds. Boudns work for "SLSQP", "trust-constr", or "TNC"
+        # 3) Build numeric bounds (in scaled space)
         lower_bounds, upper_bounds = self._build_bounds(free_keys)
-        bounds = Bounds(lower_bounds, upper_bounds)
-        
-        #wraps cost function for use. Defined nested for a more complete view of fit_model's functioning
-        #minimize "sends" different values for x_guessing.
-        #cost wrapper wraps them into dictionary form, which is what the _run_model
-        #and cost functions need to run, runs the cost function, and returns it's result.
-        def _cost_wrapper(x_guessing):
-            #print(x_guessing)
-            try:
-                free_v_dict = self._descale_x_to_v(free_keys,x_guessing)
-                
-                locked_v_dict = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
-                full_v_dict = free_v_dict | locked_v_dict
-                
-                cost = cost_func(full_v_dict)
-                return cost
-            
-            except ValueError:
-                # Force a huge cost whenever errors are thrown, etc.
-                return 1e20
 
-        result = opt.minimize(
-            _cost_wrapper,  #Objective function:_cost_wrapper (returns a single scalar)
-            x0=x0,          #x0 (starting values for FREE parameters).
-#            method='Nelder-Mead',
-#            method="BFGS",
-            method='L-BFGS-B',
-#            method="TNC",
-#            method="SLSQP",
-            bounds=bounds,
-#            options={'maxfev': 2000}
+        # 4) Wrap the user’s chosen residual function to feed the correct parameters
+        def _residual_wrapper(x_guessing):
+            try:
+                # Convert from scaled space to actual parameter dict
+                free_v_dict = self._descale_x_to_v(free_keys, x_guessing)
+                locked_v_dict = {
+                    k: v_given[k]
+                    for k in self.disabled_variables
+                    if k in all_keys
+                }
+                full_v_dict = free_v_dict | locked_v_dict
+                # Return the residual vector
+                return residual_func(full_v_dict)
+            except ValueError:
+                # If there's an exception, produce a large dummy residual
+                return np.ones(10_000) * 1e6
+        
+        # 5) Call `least_squares` with the residual function
+        result = opt.least_squares(
+            _residual_wrapper,
+            x0=x0,
+            bounds=(lower_bounds, upper_bounds),
+            method='trf',  # or 'dogbox', 'lm' (though 'lm' ignores bounds)
+            # You can pass options here as well:
+            # options={'max_nfev': 1000, 'xtol': 1e-10, ...}
         )
 
         if not result.success:
-            print("Optimization failed:", result.message)
+            print("Least-squares optimization failed:", result.message)
             raise RuntimeError("Optimization did not converge.")
-
-        best_fit_free = self._descale_x_to_v(free_keys , result.x)
-        best_fit_locked = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
+        
+        # 6) Convert the best-fit scaled parameters back to normal space
+        best_fit_free = self._descale_x_to_v(free_keys, result.x)
+        best_fit_locked = {
+            k: v_given[k] for k in self.disabled_variables if k in all_keys
+        }
         best_fit_dict = best_fit_free | best_fit_locked
         
-        print("Final cost:", result.fun)
-        print("Number of iterations:", result.nit)
-        print("Number of function evaluations:", result.nfev)
-        print("Optimization success:", result.success)
+#        print("Final cost (sum of squares):", np.sum(result.fun**2))
+#        print("Number of iterations:", result.nit)
+#        print("Number of function evaluations:", result.nfev)
         
         self.model_manual_values.emit(best_fit_dict)
         return best_fit_dict
@@ -215,193 +386,45 @@ class ModelManual(QObject):
                 
         return lower_bounds, upper_bounds
    
-    def _cost_function_cole(self, v: dict) -> float:
+    def _residual_cole(self, v: dict) -> np.ndarray:
         """
-        EIS cost function with separate comparisons for real and imaginary parts.
+        Returns the residual vector [real_res1, real_res2, ..., imag_res1, imag_res2, ...].
         """
-        
         freq_array = self._experiment_data["freq"]
         
-        z_real, z_imag = self._run_model(v, freq_array)
+        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
+        
+        # Residual vectors
+        real_res = z_real - exp_real
+        imag_res = z_imag - exp_imag
+        return np.concatenate([real_res, imag_res])
 
-        diff_real = (z_real - exp_real) ** 2
-        diff_imag = (z_imag - exp_imag) ** 2
-
-        return np.sum(diff_real + diff_imag)
-    
-    def _cost_function_bode(self, v: dict) -> float:
+    def _residual_bode(self, v: dict) -> np.ndarray:
         """
-        Bode cost function that compares magnitude and phase.
+        Similar approach: create magnitude & phase residual vectors, then concatenate.
         """
         freq_array = self._experiment_data["freq"]
         
-        z_real, z_imag = self._run_model(v, freq_array)
-        z_absolute = np.sqrt(z_real**2 + z_imag**2)
+        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
+        z_abs = np.sqrt(z_real**2 + z_imag**2)
         z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
-
+        
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
-        exp_absolute = np.sqrt(exp_real**2 + exp_imag**2)
+        exp_abs = np.sqrt(exp_real**2 + exp_imag**2)
         exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
-
-        diff_absolute = (exp_absolute - z_absolute) ** 2
-        diff_phase_deg = (exp_phase_deg - z_phase_deg) ** 2
-
-        return np.sum(diff_absolute + diff_phase_deg)
-
-    # ----------------------------------------------------
-    # Models
-    # ----------------------------------------------------
-    # Mostly for testing purposes
-    def _run_model_series(self, v: dict, freq_array: np.ndarray):
         
-        """
-        Alternative model path for testing (not used in cost functions directly).
-        """
-        self._calculate_secondary_variables(v)
+        res_abs = z_abs - exp_abs
+        res_phase = z_phase_deg - exp_phase_deg
+        return np.concatenate([res_abs, res_phase])
 
-        zr_list = []
-        zi_list = []
 
-        # Combine the user’s slider dictionary with v_seco
-        for freq in freq_array:
-            zinf = self._inductor(freq, v["Linf"]) + v["Rinf"]
-            
-            z_cpeh = self._cpe(freq, self._q["Qh"], v["Ph"], v["Ph"])
-            zarch = self._parallel(z_cpeh, v["Rh"])
-            
-            z_cpem = self._cpe(freq, self._q["Qm"], v["Pm"], v["Pm"])
-            zarcm =  self._parallel(z_cpem, v["Rm"])
-            
-            z_cpel = self._cpe(freq, self._q["Ql"], v["Pl"], v["Pl"])
-            zarcl = self._parallel(z_cpel, v["Rl"])
-            
-            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
-            zarce = self._parallel(z_cpee, v["Re"])
-
-            # Evaluate final formula
-            z_total = zinf + zarch + zarcm + zarcl + zarce
-
-            zr_list.append(z_total.real)
-            zi_list.append(z_total.imag)
-
-        # Update the arrays
-        return np.array(zr_list), np.array(zi_list)
-
-    #MM CHECK THAT HIS DOE SNOT CAUSE CHAOS
-    def _run_model(self, v: dict, freq_array: np.ndarray):
-        """
-        The main model used in cost functions.
-        """
-        
-        v_l = v.copy()
-    
-        if self.negative_rinf:
-            v_l['Rinf'] = -v_l['Rinf']
-    
-        self._calculate_secondary_variables(v_l)  
-        v2 = self._v_second
-    
-        zr_list = []
-        zi_list = []
-    
-        for f in freq_array:
-            # Inductor
-            zinf = self._inductor(f, v_l["Linf"])
-    
-            # Parallel system
-            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
-            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
-            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
-    
-            z_lines = self._parallel(z_line_m, z_line_l)
-            z_rock = self._parallel(z_lines, v2["R0"])
-            zparallel = self._parallel(z_line_h, z_rock)
-    
-            z_cpee = self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"])
-            zarce = self._parallel(z_cpee, v_l["Re"])
-    
-            z_total = zinf + zparallel + zarce
-            zr_list.append(z_total.real)
-            zi_list.append(z_total.imag)
-    
-        return np.array(zr_list), np.array(zi_list)
-
-    # ----------------------------------------------------
-    # Circuit Methods
-    # ----------------------------------------------------
-
-    def _inductor(self, freq, linf):
-        if linf == 0:
-            raise ValueError("Inductance (linf) cannot be zero.")
-        if freq < 0:
-            raise ValueError("Frequency cannot be negative.")
-        
-        result = (2 * np.pi * freq) * linf *1j
-        return result
-        
-    def _q_from_f0(self, r , f0, p):
-        if r == 0:
-            raise ValueError("Resistance r cannot be zero.")
-        if f0 <= 0:
-            raise ValueError("Resonant frequency f0 must be positive.")
-    
-        result= 1.0 / (r * (2.0 * np.pi * f0)**p)
-        return result
-    
-    def _cpe(self, freq , q, pf, pi):
-        if q == 0:
-            raise ValueError("Parameter q cannot be zero.")
-        if freq < 0:
-            raise ValueError("Frequency must be non-negative for CPE model.")
-        if freq == 0 and pf > 0:
-            raise ValueError("freq=0 and pf>0 results in division by zero in CPE.")
-        if freq == 0 and pf < 0:
-            raise ValueError("freq=0 and pf<0 is undefined (0 to a negative power).")
-        
-        phase_factor = (1j)**pi
-        omega_exp = (2.0 * np.pi * freq)**pf
-        result= 1.0 / (q * phase_factor * omega_exp)
-        return result
-        
-    def _parallel(self,z_1, z_2):
-        if z_1 == 0 or z_2 == 0:
-            raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
-
-        denominator= (1/z_1) + (1/z_2)
-        result= 1/denominator
-        return result    
 
     # ----------------------------------------------------
     # Private Helpers
     # ----------------------------------------------------
-    
-    def _calculate_secondary_variables(self, v):
-        """
-        Computes 'series' and 'parallel' secondary variables
-        Returns a dict of newly calculated secondary variables.
-        """
-        
-        #print(v)
-        Qh = self._q_from_f0( v["Rh"], v["Fh"], v["Ph"])
-        Qm = self._q_from_f0( v["Rm"], v["Fm"], v["Pm"])
-        Ql = self._q_from_f0( v["Rl"], v["Fl"], v["Pl"])
-        
-        self._q["Qh"]=Qh
-        self._q["Qm"]=Qm
-        self._q["Ql"]=Ql
-        #print(self._q)
-        
-        self._v_second["R0"] = v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]
-        self._v_second["pRh"] = v["Rinf"]*(v["Rinf"] + v["Rh"])/v["Rh"]
-        self._v_second["pQh"] = Qh*(v["Rh"]/(v["Rinf"] + v["Rh"]))**2
-        self._v_second["pRm"] = (v["Rinf"] + v["Rh"])*(v["Rinf"] + v["Rh"] +v["Rm"])/v["Rm"]
-        self._v_second["pQm"] = Qm*(v["Rm"]/(v["Rinf"] + v["Rh"] + v["Rm"]))**2
-        self._v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"])*(v["Rinf"] + v["Rh"] + v["Rm"] +v["Rl"])/v["Rl"]
-        self._v_second["pQl"] = Ql*(v["Rl"]/(v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
-
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
         Pseudocode that yields 3 freq points based on your domain logic.
