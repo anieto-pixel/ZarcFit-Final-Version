@@ -180,6 +180,11 @@ class ModelManual(QObject):
         best_fit_locked = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
         best_fit_dict = best_fit_free | best_fit_locked
         
+        print("Final cost:", result.fun)
+        print("Number of iterations:", result.nit)
+        print("Number of function evaluations:", result.nfev)
+        print("Optimization success:", result.success)
+        
         self.model_manual_values.emit(best_fit_dict)
         return best_fit_dict
 
