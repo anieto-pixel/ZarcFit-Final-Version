@@ -248,7 +248,6 @@ class MainWidget(QWidget):
             lambda: self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
             )
 
-
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.widget_buttons.fdown_button.click)  # Should map to down
         self.widget_buttons.fdown_button.clicked.connect(self.freq_slider.downMax)  # Should decrease freq

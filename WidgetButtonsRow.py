@@ -53,7 +53,10 @@ class WidgetButtonsRow(QWidget):
         self._setup_connections()
 
     def _setup_layout(self):
-        layout = QVBoxLayout()
+        layout = QVBoxLayout()        
+        layout.setSpacing(0)                # Remove spacing between buttons
+        layout.setContentsMargins(0, 0, 0, 0) # Remove margins around the layout
+
         for button in self._buttons_list:
             layout.addWidget(button)
 
