@@ -150,6 +150,7 @@ class ModelCircuitParallel(ModelCircuit):
         """
         The main model used in cost functions.
         """
+        
         v_l = v.copy()
 
         if self.negative_rinf:
@@ -438,9 +439,6 @@ class ModelManual(QObject):
 
     def _scale_v_to_x(self,keys, v):
         "Receives a list of keys and a dictionary. Returns a scaled list"
-#        print(" _scale_v_to_x")
-#        print(v)
-#        print("**********************")
         
         x = []
         for k in keys:
@@ -450,15 +448,9 @@ class ModelManual(QObject):
             else:
                 # Logarithmic scaling
                 x.append(np.log10(v[k]))
-#        print(x)
-#        print("=====================")
         return x
     
     def _descale_x_to_v(self, keys, x):
-#        print("_descale_x_to_v")
-#        print(x)
-#        print("**********************")
-        
         "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
         v = {}
         for i, k in enumerate(keys):
@@ -466,8 +458,6 @@ class ModelManual(QObject):
                 v[k] = x[i] / 10.0
             else:
                 v[k] = 10.0 ** (x[i])
-#        print(v)
-#        print("=====================")
         return v
    
    

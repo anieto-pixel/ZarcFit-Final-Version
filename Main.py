@@ -232,6 +232,23 @@ class MainWidget(QWidget):
         shortcut_f9.activated.connect(self.widget_buttons.f9_button.click)
         self.widget_buttons.f9_button.toggled.connect(self.model_manual.set_rinf_negative)
 
+        shortcut_f10 = QShortcut(QKeySequence(Qt.Key_F10), self)
+        shortcut_f10.activated.connect(self.widget_buttons.f10_button.click)
+        self.widget_buttons.f10_button.toggled.connect(self.model_manual.switch_circuit_model)
+        
+        shortcut_f11 = QShortcut(QKeySequence(Qt.Key_F11), self)
+        shortcut_f11.activated.connect(self.widget_buttons.f11_button.click)
+        self.widget_buttons.f11_button.clicked.connect(
+            lambda: self.widget_sliders.get_slider('Pei').set_value_exact(0.0)
+            )
+        
+        shortcut_f12 = QShortcut(QKeySequence(Qt.Key_F12), self)
+        shortcut_f12.activated.connect(self.widget_buttons.f12_button.click)
+        self.widget_buttons.f12_button.clicked.connect(
+            lambda: self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
+            )
+
+
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.widget_buttons.fdown_button.click)  # Should map to down
         self.widget_buttons.fdown_button.clicked.connect(self.freq_slider.downMax)  # Should decrease freq

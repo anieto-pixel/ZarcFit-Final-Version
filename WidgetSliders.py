@@ -52,6 +52,64 @@ class WidgetSliders(QWidget):
         self._connect_signals()
 
     # -----------------------------------------------------------------------
+    #  Public Methods
+    # -----------------------------------------------------------------------
+    def get_slider(self, key):
+
+        """Retrieves a slider by its key."""
+        return self.sliders.get(key)
+    
+    def get_sliders_keys(self):
+        """Retrieves a slider by its key."""
+        return self.sliders.keys()
+
+    def get_all_values(self):
+        dict_to_emit={} 
+        
+        for key, default_value in self.slider_default_values.items():
+            slider = self.sliders[key] 
+            dict_to_emit[key]=slider.get_value()
+
+        return dict_to_emit
+
+    def set_default_values(self):
+        """Resets all sliders to their default positions."""
+        
+        dict_to_emit={}
+        
+        for key, default_value in self.slider_default_values.items():
+        
+            slider = self.sliders[key]
+            slider.set_value(default_value)
+            
+            dict_to_emit[key]=slider.get_value()
+
+            
+        self.all_sliders_reseted.emit(dict_to_emit)
+            
+    def set_all_variables(self, dictionary):
+        """
+        Receives a dict of { variable_key: value }, checks that it matches
+        this widget's slider keys, then updates each slider.
+        """
+        
+        # 1) Ensure keys match
+        if set(dictionary.keys()) != set(self.sliders.keys()):
+            raise ValueError(
+                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
+            )
+
+        # 2) Update each slider and emit
+        dict_to_emit={}
+        for key, val in dictionary.items():
+            
+            slider = self.sliders[key]
+            slider.set_value_exact(val)
+            dict_to_emit[key]=slider.get_value()
+            
+        self.all_sliders_reseted.emit(dict_to_emit)
+
+    # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
 
@@ -113,63 +171,6 @@ class WidgetSliders(QWidget):
             slider.was_disabled.connect(partial(self.slider_was_disabled.emit, key))
  
 
-    # -----------------------------------------------------------------------
-    #  Public Methods
-    # -----------------------------------------------------------------------
-    def get_slider(self, key):
-        """Retrieves a slider by its key."""
-        return self.sliders.get(key)
-    
-    def get_sliders_keys(self):
-        """Retrieves a slider by its key."""
-        return self.sliders.keys()
-
-    def get_all_values(self):
-        dict_to_emit={} 
-        
-        for key, default_value in self.slider_default_values.items():
-            slider = self.sliders[key] 
-            dict_to_emit[key]=slider.get_value()
-
-        return dict_to_emit
-
-    def set_default_values(self):
-        """Resets all sliders to their default positions."""
-        
-        dict_to_emit={}
-        
-        for key, default_value in self.slider_default_values.items():
-        
-            slider = self.sliders[key]
-            slider.set_value(default_value)
-            
-            dict_to_emit[key]=slider.get_value()
-
-            
-        self.all_sliders_reseted.emit(dict_to_emit)
-            
-    def set_all_variables(self, dictionary):
-        """
-        Receives a dict of { variable_key: value }, checks that it matches
-        this widget's slider keys, then updates each slider.
-        """
-        
-        # 1) Ensure keys match
-        if set(dictionary.keys()) != set(self.sliders.keys()):
-            raise ValueError(
-                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
-            )
-
-        # 2) Update each slider and emit
-        dict_to_emit={}
-        for key, val in dictionary.items():
-            
-            slider = self.sliders[key]
-            slider.set_value_exact(val)
-            dict_to_emit[key]=slider.get_value()
-            
-        self.all_sliders_reseted.emit(dict_to_emit)
-            
 
 # -----------------------------------------------------------------------
 #  Quick Test

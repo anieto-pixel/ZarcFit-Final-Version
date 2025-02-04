@@ -32,6 +32,10 @@ class WidgetButtonsRow(QWidget):
         self.f7_button = QPushButton("F7 Recover")
         self.f8_button = QPushButton("F8 Default")
         self.f9_button = QPushButton("F9 -Rinf", checkable=True)
+        self.f10_button = QPushButton("F10 Series", checkable=True)
+        self.f11_button = QPushButton("F11 Tail Right")
+        self.f12_button = QPushButton("F12 Tail left")
+        
         self.fup_button = QPushButton("PageUp")
         self.fdown_button = QPushButton("PageDown")
 
@@ -40,9 +44,9 @@ class WidgetButtonsRow(QWidget):
             self.f1_button, self.f2_button, self.f3_button,
             self.f4_button, self.f5_button, self.f6_button,
             self.f7_button, self.f8_button, self.f9_button,
+            self.f10_button, self.f11_button, self.f12_button,
             self.fup_button, self.fdown_button
         ]
-        
 
         # Initialize
         self._setup_layout()
@@ -82,11 +86,12 @@ class WidgetButtonsRow(QWidget):
 
     def _on_checkable_toggled(self, state):
         """
-        Handles f9_button toggle behavior.
+        Handles checkable buttons behaviour
         """
-        #MM LOGIC TO MAKE THIS GENERAL CAN WAIT, HARDCODE FOR NOW
+        button = self.sender()
         # Update background color based on state
-        self.f9_button.setStyleSheet("QPushButton { background-color: red; }" if state else "QPushButton { background-color: none; }")
+        button.setStyleSheet("QPushButton { background-color: red; }" if state 
+                             else "QPushButton { background-color: none; }")
         
 
     def _flash_button_green(self, button, duration=500):
