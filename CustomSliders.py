@@ -27,9 +27,10 @@ class CustomSliders(QWidget):
         self.colour = colour
         self.disabled_colour = "gray"
         self.number_of_tick_intervals = number_of_tick_intervals
+        self.is_disabled=False
 
         # Main slider
-        self._slider = QSlider(Qt.Vertical, self)
+        self._slider = QSlider(Qt.Vertical, self) #enabled by default
         
         # Disable button with label overlay
         self._disable_button = QPushButton(str(self._slider.value()), self)
@@ -97,16 +98,16 @@ class CustomSliders(QWidget):
         """)
         
     def _toggle_slider(self):
-        if self._slider.isEnabled():
-            self._slider.setEnabled(False)
-            self._update_slider_style(self.disabled_colour)
+        if not self.is_disabled:
+            self.is_disabled=True
+            #self._update_slider_style(self.disabled_colour)
             self._disable_button.setStyleSheet("background-color: gray;  border: none;")
             
             self.was_disabled.emit(True)
             
         else:
-            self._slider.setEnabled(True)
-            self._update_slider_style(self.colour)
+            self.is_disabled=False
+            #self._update_slider_style(self.colour)
             self._disable_button.setStyleSheet("background-color: none;")
             
             self.was_disabled.emit(False)
