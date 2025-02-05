@@ -192,10 +192,11 @@ class PhaseGraph(ParentGraph):
         y_top=2
         x_low=-1.5
         x_top=6
-        # Fix y-axis between -2 and 2
+        # Fix y-axis 
         self.setYRange(y_low, y_top, padding=0.08)
-        # Fix x-axis between -2 and 6
+        # Fix x-axis 
         self.setXRange(x_low, x_top, padding=0.05)
+        self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
@@ -225,10 +226,11 @@ class BodeGraph(ParentGraph):
         y_top=7
         x_low=-1.5
         x_top=6
-        # Fix y-axis between -2 and 2
+        # Fix y-axis
         self.setYRange(y_low, y_top, padding=0.08)
-        # Fix x-axis between -2 and 6
+        # Fix x-axis
         self.setXRange(x_low, x_top, padding=0.05)
+        self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
