@@ -186,7 +186,16 @@ class PhaseGraph(ParentGraph):
         self.setTitle("Phase (Log Scale of Degrees)")
         self.setLabel('bottom', "log10(Freq[Hz])")#log
         self.setLabel('left', "log10(|Phase|)")
-        #fix y
+        
+        #fix axis
+        y_low=-2
+        y_top=2
+        x_low=-1.5
+        x_top=6
+        # Fix y-axis between -2 and 2
+        self.setYRange(y_low, y_top, padding=0.08)
+        # Fix x-axis between -2 and 6
+        self.setXRange(x_low, x_top, padding=0.05)
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
@@ -210,6 +219,16 @@ class BodeGraph(ParentGraph):
         self.setTitle("Bode Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
+        
+        #fix axis
+        y_low=3
+        y_top=7
+        x_low=-1.5
+        x_top=6
+        # Fix y-axis between -2 and 2
+        self.setYRange(y_low, y_top, padding=0.08)
+        # Fix x-axis between -2 and 6
+        self.setXRange(x_low, x_top, padding=0.05)
 
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """

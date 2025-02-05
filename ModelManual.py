@@ -338,6 +338,7 @@ class ModelManual(QObject):
             x0=x0,
             bounds=(lower_bounds, upper_bounds),
             method='trf',
+            #method='dogbox',
             max_nfev=2000,    # pass directly
         )
 
@@ -389,8 +390,8 @@ class ModelManual(QObject):
         freq_array = self._experiment_data["freq"]
         
         z_real, z_imag = self._model_circuit.run_model(v, freq_array)
-        exp_real = self._experiment_data["Z_real"]
-        exp_imag = self._experiment_data["Z_imag"]
+        exp_real = self._experiment_data["Z_real"] 
+        exp_imag = self._experiment_data["Z_imag"] 
         
         # Residual vectors
         real_res = z_real - exp_real
