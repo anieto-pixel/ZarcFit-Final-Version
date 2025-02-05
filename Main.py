@@ -230,7 +230,7 @@ class MainWidget(QWidget):
         
         shortcut_f9 = QShortcut(QKeySequence(Qt.Key_F9), self)
         shortcut_f9.activated.connect(self.widget_buttons.f9_button.click)
-        self.widget_buttons.f9_button.toggled.connect(self.model_manual.set_rinf_negative)
+        self.widget_buttons.f9_button.toggled.connect(self._handle_rinf_negative)
 
         shortcut_f10 = QShortcut(QKeySequence(Qt.Key_F10), self)
         shortcut_f10.activated.connect(self.widget_buttons.f10_button.click)
@@ -367,6 +367,11 @@ class MainWidget(QWidget):
         
         self.widget_sliders.set_default_values()
         self._handle_set_allfreqs()
+        
+    def _handle_rinf_negative(self, state):
+        
+        self.model_manual.set_rinf_negative(state)
+        self.widget_sliders.get_slider('Rinf').toggle_red_frame(state)
 
     def _print_model_parameters(self):
         """

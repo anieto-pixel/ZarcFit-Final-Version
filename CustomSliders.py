@@ -172,6 +172,26 @@ class CustomSliders(QWidget):
         """
         self._slider.setValue(int(value))
 
+    def toggle_red_frame(self, state):
+        """
+        It sets a thick red frame around the label of the slider
+        if there is not one, and erases it if there is one.
+        """
+        
+        # Define the red border style we want to toggle
+        red_border_style = "border: 3px solid red;"
+        current_style = self._disable_button.styleSheet()
+        
+        if state==False:
+            # Remove the red border
+            new_style = current_style.replace(red_border_style, "")
+            self._disable_button.setStyleSheet(new_style)
+        else:
+            # Append the red border to the current style
+            new_style = current_style + " " + red_border_style
+            self._disable_button.setStyleSheet(new_style)
+
+
     def value_changed(self):
         """
         Exposes the slider's valueChanged signal for external listeners.
