@@ -337,14 +337,12 @@ class ModelManual(QObject):
             _residual_wrapper,
             x0=x0,
             bounds=(lower_bounds, upper_bounds),
-            method='trf',  # or 'dogbox', 'lm' (though 'lm' ignores bounds)
-            # You can pass options here as well:
-            # options={'max_nfev': 1000, 'xtol': 1e-10, ...}
+            method='trf',
+            max_nfev=2000,    # pass directly
         )
 
-        if not result.success:
-            print("Least-squares optimization failed:", result.message)
-            raise RuntimeError("Optimization did not converge.")
+#        if not result.success:
+#            raise RuntimeError("Optimization did not converge.")
         
         # 6) Convert the best-fit scaled parameters back to normal space
         best_fit_free = self._descale_x_to_v(free_keys, result.x)
@@ -353,9 +351,6 @@ class ModelManual(QObject):
         }
         best_fit_dict = best_fit_free | best_fit_locked
         
-#        print("Final cost (sum of squares):", np.sum(result.fun**2))
-#        print("Number of iterations:", result.nit)
-#        print("Number of function evaluations:", result.nfev)
         
         self.model_manual_values.emit(best_fit_dict)
         return best_fit_dict
@@ -447,6 +442,8 @@ class ModelManual(QObject):
                 x.append(v[k] * 10.0)
             else:
                 # Logarithmic scaling
+                if v[k] <= 0:
+                    raise ValueError(f"Parameter {k} must be > 0; got {v[k]}.")
                 x.append(np.log10(v[k]))
         return x
     

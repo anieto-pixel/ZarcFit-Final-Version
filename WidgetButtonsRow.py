@@ -10,7 +10,6 @@ from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QMessageBox, 
     )
 from PyQt5.QtGui import QColor, QPalette
-
 import sys
 
 
@@ -31,11 +30,14 @@ class WidgetButtonsRow(QWidget):
         self.f6_button = QPushButton("F6 file>")
         self.f7_button = QPushButton("F7 Recover")
         self.f8_button = QPushButton("F8 Default")
-        self.f9_button = QPushButton("F9 -Rinf", checkable=True)
-        self.f10_button = QPushButton("F10 Series", checkable=True)
+        
+        # Checkable buttons
+        self.f9_button = QPushButton("F9 +Rinf", checkable=True)
+        self.f10_button = QPushButton("F10 Parallel", checkable=True)
+
         self.f11_button = QPushButton("F11 Tail Right")
         self.f12_button = QPushButton("F12 Tail left")
-        
+
         self.fup_button = QPushButton("PageUp")
         self.fdown_button = QPushButton("PageDown")
 
@@ -48,33 +50,32 @@ class WidgetButtonsRow(QWidget):
             self.fup_button, self.fdown_button
         ]
 
-        # Initialize
         self._setup_layout()
         self._setup_connections()
 
     def _setup_layout(self):
-        layout = QVBoxLayout()        
-        layout.setSpacing(0)                # Remove spacing between buttons
-        layout.setContentsMargins(0, 0, 0, 0) # Remove margins around the layout
-
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
         for button in self._buttons_list:
             layout.addWidget(button)
 
         self.setLayout(layout)
         self.setMaximumWidth(150)
-        self.setMinimumSize(90, 35 * len(self._buttons_list))
+        self.setMinimumSize(130, 30 * len(self._buttons_list))
 
     def _setup_connections(self):
-        # Connect non toggable to a generic click handler
+        # Connect non-toggable to a generic click handler
         for btn in self._buttons_list:
             if not btn.isCheckable():
                 btn.clicked.connect(self._on_regular_button_clicked)
             else:
-                btn.toggled.connect(self._on_checkable_toggled)       
+                btn.toggled.connect(self._on_checkable_toggled)
 
     def _on_regular_button_clicked(self):
         """
-        Generic slot for all buttons except f9.
+        Generic slot for all buttons except f9, f10 (those are checkable).
         Briefly flashes green if 'task is successful'.
         Shows an error message if not.
         """
@@ -83,21 +84,42 @@ class WidgetButtonsRow(QWidget):
         order_is_correct = True  # Replace with real check
 
         if order_is_correct:
-            self._flash_button_green(button)
+            self._flash_button_green(button, duration=1500)  # <-- Longer duration
         else:
             QMessageBox.warning(self, "Error", "Order not correctly executed!")
 
     def _on_checkable_toggled(self, state):
         """
-        Handles checkable buttons behaviour
+        Handles checkable buttons behavior:
+          - Changes text based on on/off
+          - Red background when on, none when off
         """
         button = self.sender()
-        # Update background color based on state
-        button.setStyleSheet("QPushButton { background-color: red; }" if state 
-                             else "QPushButton { background-color: none; }")
-        
 
-    def _flash_button_green(self, button, duration=500):
+        # Example logic per button; if you want different text for each,
+        # branch according to which button was toggled:
+        if button is self.f9_button:
+            if state:
+                button.setText("F9 -Rinf")
+                button.setStyleSheet("QPushButton { background-color: red; }")
+            else:
+                button.setText("F9 +Rinf")
+                button.setStyleSheet("QPushButton { background-color: none; }")
+
+        elif button is self.f10_button:
+            if state:
+                button.setText("F10 Series")
+                button.setStyleSheet("QPushButton { background-color: red; }")
+            else:
+                button.setText("F10 Parallel")
+                button.setStyleSheet("QPushButton { background-color: none; }")
+
+        # If you have many checkable buttons, you can adapt the above
+        # to a dictionary-based approach to map 'button' to the appropriate
+        # on/off text instead of a hard-coded if/elif chain.
+
+    def _flash_button_green(self, button, duration=1500):
+        """Briefly flashes the button green for `duration` ms."""
         effect = QGraphicsColorizeEffect()
         effect.setColor(QColor(0, 150, 0, 255))  # darker green
         effect.setStrength(1.0)
@@ -105,10 +127,6 @@ class WidgetButtonsRow(QWidget):
         
         # Remove the effect after 'duration' ms
         QTimer.singleShot(duration, lambda: button.setGraphicsEffect(None))
-
-
-    # (Optional) Public methods or signals could go here
-
 
 # -----------------------------------------------------------------------
 #  Quick Test
