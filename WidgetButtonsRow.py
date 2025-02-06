@@ -35,8 +35,8 @@ class WidgetButtonsRow(QWidget):
         self.f9_button = QPushButton("F9 +Rinf", checkable=True)
         self.f10_button = QPushButton("F10 Parallel", checkable=True)
 
-        self.f11_button = QPushButton("F11 Tail Right")
-        self.f12_button = QPushButton("F12 Tail left")
+        self.f11_button = QPushButton("F11 Tail Right", checkable=True)
+        self.f12_button = QPushButton("F12 Gauss Prior", checkable=True)
 
         self.fup_button = QPushButton("PageUp")
         self.fdown_button = QPushButton("PageDown")
@@ -112,6 +112,22 @@ class WidgetButtonsRow(QWidget):
                 button.setStyleSheet("QPushButton { background-color: red; }")
             else:
                 button.setText("F10 Parallel")
+                button.setStyleSheet("QPushButton { background-color: none; }")
+                
+        elif button is self.f11_button:
+            if state:
+                button.setText("F11 Right")
+                button.setStyleSheet("QPushButton { background-color: red; }")
+            else:
+                button.setText("F11 Left")
+                button.setStyleSheet("QPushButton { background-color: none; }")
+                
+        elif button is self.f12_button:
+            if state:
+                button.setText("F12 Gauss On")
+                button.setStyleSheet("QPushButton { background-color: red; }")
+            else:
+                button.setText("F12 Gauss Off")
                 button.setStyleSheet("QPushButton { background-color: none; }")
 
         # If you have many checkable buttons, you can adapt the above

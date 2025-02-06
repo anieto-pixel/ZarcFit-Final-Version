@@ -209,7 +209,7 @@ class ModelManual(QObject):
         
         self.disabled_variables = set()
         
-        self.gaussian_prior=False
+        self.gaussian_prior = False
     
     # ----------------------------------------------------
     # Public Method
@@ -256,14 +256,14 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Cole' cost function.
         """
-        return self._fit_model(self._residual_cole, v_initial_guess, prior_weight=10000)
+        return self._fit_model(self._residual_cole, v_initial_guess, prior_weight=9000000)
     
     def fit_model_bode(self, v_initial_guess):
         #MM should pass sigma here, probably?
         """
         Fit the model using the 'Bode' cost function.
         """
-        return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=5)
+        return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=500)
         
     def run_model_manual(self,v):
         """
@@ -360,6 +360,8 @@ class ModelManual(QObject):
 
             # d) Optionally add Gaussian prior
             if self.gaussian_prior:
+                print("Gaussian Prior")
+                
                 prior_residual=self._compute_gaussian_prior(
                     x_guessing, x0, lower_bounds, upper_bounds, prior_weight
                 )
@@ -484,7 +486,7 @@ class ModelManual(QObject):
         
         return weight
         
-    def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=10):
+    def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=5):
         # Compute sigmas (scaled standard deviations)
         print(prior_weight)
         sigmas = np.array([
