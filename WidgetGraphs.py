@@ -53,52 +53,20 @@ class ParentGraph(pg.PlotWidget):
         # Plot objects for static (base) and dynamic (manual) lines
         self._static_plot = None
         self._dynamic_plot = None
+        
 
         # Initial display
         self._refresh_graph()
-
-    def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
-        Default: returns (Z_real, Z_imag). Subclasses override this.
-        """
-        return Z_real, Z_imag
-
-    def _refresh_plot(self, data_dict, plot_item):
-        """
-        Updates a single plot (static or dynamic) with new data.
-        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
-        """
-        x, y = self._prepare_xy(
-            data_dict['freq'],
-            data_dict['Z_real'],
-            data_dict['Z_imag']
-        )
-        if plot_item:
-            plot_item.setData(x, y)
-
-    def _refresh_graph(self):
-        """Clears and re-displays both the static and dynamic plots."""
-        self.clear()
-
-        # Static plot
-        self._static_plot = self.plot(
-            pen='g',             # green line connecting points
-            symbol='o',          # circle marker
-            symbolSize=5,        # smaller points
-            symbolBrush='g'      # green fill for markers
-        )
-        self._refresh_plot(self._base_data, self._static_plot)
-
-        # Dynamic plot
-        self._dynamic_plot = self.plot(
-            pen='b',             # blue line connecting points
-            symbol='o',          # circle marker
-            symbolSize=7,        # smaller points
-            symbolBrush=None     # blue fill
-        )
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
-
+        
+        self._initial_range = self.getViewBox().viewRange()
+        # Randy's request. Ignore blueline in auto scale
+#        self._dynamic_plot.setData(self._manual_data, ignoreBounds=True)
+        self._dynamic_plot.ignoreBounds = True
+     
+    ###################
+    # Public Methods
+    ######################
+        
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points within [f_min, f_max].
@@ -173,6 +141,57 @@ class ParentGraph(pg.PlotWidget):
                 symbolPen=color
             )
             self._special_items.append(plot_item)
+        
+        
+        
+        
+    #####################
+    # Private methods
+    #################
+        
+
+    def _prepare_xy(self, freq, Z_real, Z_imag):
+        """
+        Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
+        Default: returns (Z_real, Z_imag). Subclasses override this.
+        """
+        return Z_real, Z_imag
+
+    def _refresh_plot(self, data_dict, plot_item):
+        """
+        Updates a single plot (static or dynamic) with new data.
+        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
+        """
+        x, y = self._prepare_xy(
+            data_dict['freq'],
+            data_dict['Z_real'],
+            data_dict['Z_imag']
+        )
+        if plot_item:
+            plot_item.setData(x, y)
+
+    def _refresh_graph(self):
+        """Clears and re-displays both the static and dynamic plots."""
+        self.clear()
+
+        # Static plot
+        self._static_plot = self.plot(
+            pen='g',             # green line connecting points
+            symbol='o',          # circle marker
+            symbolSize=5,        # smaller points
+            symbolBrush='g'      # green fill for markers
+        )
+        self._refresh_plot(self._base_data, self._static_plot)
+
+        # Dynamic plot
+        self._dynamic_plot = self.plot(
+            pen='b',             # blue line connecting points
+            symbol='o',          # circle marker
+            symbolSize=7,        # smaller points
+            symbolBrush=None     # blue fill
+        )
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
             
 
 class PhaseGraph(ParentGraph):

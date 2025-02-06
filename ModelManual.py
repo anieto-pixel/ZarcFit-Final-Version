@@ -208,8 +208,9 @@ class ModelManual(QObject):
         self._model_circuit=ModelCircuitParallel()
         
         self.disabled_variables = set()
-
         
+        self.gaussian_prior=True
+    
     # ----------------------------------------------------
     # Public Method
     # ----------------------------------------------------    
@@ -225,7 +226,11 @@ class ModelManual(QObject):
         
     def set_rinf_negative(self, state: bool):
         
-        self._model_circuit.negative_rinf= state
+        self._model_circuit.negative_rinf = state
+        
+    def set_gaussian_prior(self, state: bool):
+            
+        self.gaussian_prior = state
         
     def switch_circuit_model(self, state: bool):
             
@@ -303,58 +308,80 @@ class ModelManual(QObject):
     # ----------------------------------------------------
     # Fit Methods
     # ----------------------------------------------------
-
+    
     def _fit_model(self, residual_func, v_given):
-        # 1) Identify free / locked parameters
+        """
+        Fit the model using a residual function plus (optionally) a Gaussian prior
+        that penalizes deviation from the initial guess in scaled space.
+        """
+        # 1) Determine free vs. locked parameters
         all_keys = list(v_given.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
-        
-        # 2) Build the initial guess vector x0 (scaled)
+    
+        # 2) Build the initial guess vector (scaled) and bounds (scaled)
         x0 = self._scale_v_to_x(free_keys, v_given)
-
-        # 3) Build numeric bounds (in scaled space)
         lower_bounds, upper_bounds = self._build_bounds(free_keys)
-
-        # 4) Wrap the user’s chosen residual function to feed the correct parameters
+    
+        # 3) Define the function that least_squares() will minimize
         def _residual_wrapper(x_guessing):
+            """
+            Converts x_guessing back to parameter dict, computes the model residual,
+            and optionally adds a Gaussian-prior penalty.
+            """
             try:
-                # Convert from scaled space to actual parameter dict
+                # Re-map from scaled to actual parameter values
                 free_v_dict = self._descale_x_to_v(free_keys, x_guessing)
                 locked_v_dict = {
-                    k: v_given[k]
-                    for k in self.disabled_variables
-                    if k in all_keys
+                    k: v_given[k] for k in self.disabled_variables if k in all_keys
                 }
-                full_v_dict = free_v_dict | locked_v_dict
-                # Return the residual vector
-                return residual_func(full_v_dict)
+                full_v_dict = {**locked_v_dict, **free_v_dict}
+    
+                # Core model residual
+                model_residual = residual_func(full_v_dict)
+    
             except ValueError:
-                # If there's an exception, produce a large dummy residual
+                # MM Consider smooth penalty instead of this
                 return np.ones(10_000) * 1e6
-        
-        # 5) Call `least_squares` with the residual function
+    
+            # ----- Gaussian Prior Block -----
+            if self.gaussian_prior:
+                gaussian_fraction = 10  # sigma is 10% of the scaled param range
+                prior_weight = 0.005       # increase/decrease as desired (used 1000)
+    
+                # sigmas in scaled space
+                sigmas = np.array([
+                    (ub - lb) * gaussian_fraction
+                    for lb, ub in zip(lower_bounds, upper_bounds)
+                ], dtype=float)
+    
+                prior_residual = prior_weight * ((x_guessing - x0) / sigmas)
+    
+            else:
+                prior_residual = np.array([], dtype=float)
+            # -------------------------------
+    
+            return np.concatenate([model_residual, prior_residual])
+    
+        # 4) Run the solver
         result = opt.least_squares(
             _residual_wrapper,
             x0=x0,
             bounds=(lower_bounds, upper_bounds),
             method='trf',
-            #method='dogbox',
-            max_nfev=2000,    # pass directly
+            max_nfev=2000
         )
-
-#        if not result.success:
-#            raise RuntimeError("Optimization did not converge.")
-        
-        # 6) Convert the best-fit scaled parameters back to normal space
+    
+        #if not result.success:
+        #   raise RuntimeError("Optimization did not converge: " + result.message)
+    
+        # 5) prepare results
         best_fit_free = self._descale_x_to_v(free_keys, result.x)
-        best_fit_locked = {
-            k: v_given[k] for k in self.disabled_variables if k in all_keys
-        }
-        best_fit_dict = best_fit_free | best_fit_locked
+        best_fit_locked = {k: v_given[k] for k in self.disabled_variables if k in all_keys}
+        best_fit = {**best_fit_locked, **best_fit_free}
         
-        
-        self.model_manual_values.emit(best_fit_dict)
-        return best_fit_dict
+        self.model_manual_values.emit(best_fit)
+        return best_fit
+                
 
     def _build_bounds(self, free_keys):
         lower_bounds = []
@@ -387,21 +414,35 @@ class ModelManual(QObject):
         """
         Returns the residual vector [real_res1, real_res2, ..., imag_res1, imag_res2, ...].
         """
+        print("cole")
+        
         freq_array = self._experiment_data["freq"]
         
         z_real, z_imag = self._model_circuit.run_model(v, freq_array)
         exp_real = self._experiment_data["Z_real"] 
         exp_imag = self._experiment_data["Z_imag"] 
         
-        # Residual vectors
-        real_res = z_real - exp_real
-        imag_res = z_imag - exp_imag
-        return np.concatenate([real_res, imag_res])
+        # Residual vectors. original
+#        real_res = z_real - exp_real
+#        imag_res = z_imag - exp_imag
+        # Residual vectors. Loged
+#        real_res = np.log10(abs(z_real+ 1e-10)) - np.log10(abs(exp_real+ 1e-10))
+#        imag_res = np.log10(abs(z_imag+ 1e-10)) - np.log10(abs(exp_imag+ 1e-10))
+        # Residual vectors. divided?
+        real_res = (z_real/1000) - (exp_real/1000)
+        imag_res = (z_imag/1000) - (exp_imag/1000)
+        print(real_res,imag_res)
+        
+        w = self._weight_function(v)
+        
+        return np.concatenate([real_res*w, imag_res*w]) #consider treating as 2 separate weights?
 
     def _residual_bode(self, v: dict) -> np.ndarray:
         """
         Similar approach: create magnitude & phase residual vectors, then concatenate.
         """
+        print("bode")
+    
         freq_array = self._experiment_data["freq"]
         
         z_real, z_imag = self._model_circuit.run_model(v, freq_array)
@@ -413,11 +454,28 @@ class ModelManual(QObject):
         exp_abs = np.sqrt(exp_real**2 + exp_imag**2)
         exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
         
-        res_abs = z_abs - exp_abs
-        res_phase = z_phase_deg - exp_phase_deg
-        return np.concatenate([res_abs, res_phase])
+        res_abs = np.log10(z_abs) - np.log10(exp_abs)
+        res_phase = np.log10(np.abs(z_phase_deg) + 1e-10) - np.log10(np.abs(exp_phase_deg) + 1e-10)
+        print(res_abs,res_phase)
+        
+        w = self._weight_function(v)
+        
+        return np.concatenate([res_abs*w, res_phase*w])
 
 
+    def _weight_function(self, v):
+        """
+        Assigns dynamic weights to errors based on certain parameters.
+        - Parameters like 'Rh', 'Rm', 'Rl' are crucial and should be weighted.
+        - Uses exponential functions similar to ZarcPy.
+        """
+        weight = 1
+        weight *= 1 + 3 * np.exp(-15 * v["Ph"])  # Prioritize high-frequency behavior
+        weight *= 1 + 3 * np.exp(-15 * v["Pm"])  # Mid-frequency effects
+        weight *= 1 + 3 * np.exp(-15 * v["Pl"])  # Low-frequency components
+        weight *= 1 + 3 * np.exp(-15 * v["Pef"])  # Modified Zarc components
+        
+        return weight
 
     # ----------------------------------------------------
     # Private Helpers
