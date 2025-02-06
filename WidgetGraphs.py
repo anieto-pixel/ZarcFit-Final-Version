@@ -232,7 +232,8 @@ class ParentGraph(pg.PlotWidget):
 
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
-        
+
+
 
     ###########################
     # Auto-Scaling Functionality
@@ -243,20 +244,40 @@ class ParentGraph(pg.PlotWidget):
         If enabled, immediately re-auto-range the view.
         """
         if checked:
-            # Immediately re-auto range when enabled.
-            self.plotItem.autoRange()
-        # (If toggled off, we simply leave the view as is.)
-    
+            self._apply_auto_scale()  # ----- WISH 2: Apply auto-scale only using the green plot data -----
+
     def _on_view_range_changed(self, view_box, view_range):
         """
         Called when the view's range changes.
         If auto-scale is enabled and the change did not originate from an auto-range call,
-        then re-apply auto-range. (The flag _auto_range_in_progress avoids recursion.)
+        then re-apply auto-range.
         """
         if self.auto_scale_button.isChecked() and not self._auto_range_in_progress:
+            self._apply_auto_scale()  # ----- WISH 2: Apply auto-scale only using the green plot data -----
+
+                 
+    def _apply_auto_scale(self):
+        """
+        Auto-scales the view based solely on the static (green) plot data.
+        This version uses _prepare_xy to compute the correct plotting coordinates.
+        """
+        # Get the plotted (transformed) coordinates for the green plot.
+        x_data, y_data = self._prepare_xy(
+            self._base_data['freq'],
+            self._base_data['Z_real'],
+            self._base_data['Z_imag']
+        )
+        # Ensure there is data to process.
+        if x_data.size and y_data.size:
+            x_min, x_max = np.min(x_data), np.max(x_data)
+            y_min, y_max = np.min(y_data), np.max(y_data)
             self._auto_range_in_progress = True
-            # Reapply auto-range based solely on the static (green) plot
-            self.plotItem.autoRange()
+            # Use the ViewBox's setRange method without the animate parameter.
+            self.plotItem.getViewBox().setRange(
+                xRange=(x_min, x_max),
+                yRange=(y_min, y_max),
+                padding=0.1
+            )
             self._auto_range_in_progress = False
 
 
