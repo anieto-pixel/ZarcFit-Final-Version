@@ -53,11 +53,25 @@ class ParentGraph(pg.PlotWidget):
         # Plot objects for static (base) and dynamic (manual) lines
         self._static_plot = None
         self._dynamic_plot = None
+        
+        # It is small and embedded in the top left corner.
+        self.auto_scale_button = QPushButton("Auto-scale", self)
+        self.auto_scale_button.setCheckable(True)
+        self.auto_scale_button.setGeometry(10, 10, 10,10)
+        self.auto_scale_button.toggled.connect(self.handle_auto_scale_toggle)
+        
+        # Flag to avoid recursive auto-ranging calls
+        #MM ?
+        self._auto_range_in_progress = False
+        
+        # Connect view changes to our handler so that we can re-auto range
+        # if the button is toggled on.
+        self.plotItem.getViewBox().sigRangeChanged.connect(self.on_view_range_changed)
+        
 
         # Initial display
         self._refresh_graph()
-        
-        # Randy's request. Ignore blueline in auto scale
+        self.auto_scale_button.setChecked(True)
 
      
     ###################
@@ -164,10 +178,31 @@ class ParentGraph(pg.PlotWidget):
             plot_item.setData(x, y)
 
     def _refresh_graph(self):
-        """Clears and re-displays both the static and dynamic plots."""
-        self.clear()
-
-        # Static plot
+        """
+        Clears and re-displays both the static and dynamic plots.
+        Explicitly removes old plot items to avoid duplicate-addition warnings.
+        """
+        # Remove previous static plot if it exists
+        if self._static_plot is not None:
+            try:
+                self.removeItem(self._static_plot)
+            except Exception as e:
+                print("Error removing static plot:", e)
+            self._static_plot = None
+    
+        # Remove previous dynamic plot if it exists
+        if self._dynamic_plot is not None:
+            try:
+                self.removeItem(self._dynamic_plot)
+            except Exception as e:
+                print("Error removing dynamic plot:", e)
+            self._dynamic_plot = None
+    
+        # Alternatively, you can also call self.clear() if you are sure that you don't
+        # have other non-plot items that would be removed inadvertently.
+        # self.clear()
+    
+        # Create and add the static plot (green)
         self._static_plot = self.plot(
             pen='g',             # green line connecting points
             symbol='o',          # circle marker
@@ -175,17 +210,46 @@ class ParentGraph(pg.PlotWidget):
             symbolBrush='g'      # green fill for markers
         )
         self._refresh_plot(self._base_data, self._static_plot)
-
-        # Dynamic plot
-        self._dynamic_plot = self.plot(
-            pen='b',             # blue line connecting points
-            symbol='o',          # circle marker
-            symbolSize=7,        # smaller points
-            symbolBrush=None     # blue fill
+    
+        # Create the dynamic plot (blue) as a PlotCurveItem and exclude it from auto-ranging
+        self._dynamic_plot = pg.PlotCurveItem(
+            pen='b',
+            symbol='o',
+            symbolSize=7,
+            symbolBrush=None
         )
-        # Exclude the dynamic plot from auto-ranging:
-
+    
+        # Add the dynamic plot to the widget
+        self.addItem(self._dynamic_plot)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+        
+        
+    ###########################
+    # Auto-Scaling Functionality
+    ###########################
+
+    def handle_auto_scale_toggle(self, checked):
+        """
+        Called when the auto-scale button is toggled.
+        If enabled, immediately re-auto-range the view.
+        """
+        if checked:
+            # Immediately re-auto range when enabled.
+            self.plotItem.autoRange()
+        # (If toggled off, we simply leave the view as is.)
+    
+    def on_view_range_changed(self, view_box, view_range):
+        """
+        Called when the view's range changes.
+        If auto-scale is enabled and the change did not originate from an auto-range call,
+        then re-apply auto-range. (The flag _auto_range_in_progress avoids recursion.)
+        """
+        if self.auto_scale_button.isChecked() and not self._auto_range_in_progress:
+            self._auto_range_in_progress = True
+            # Reapply auto-range based solely on the static (green) plot
+            self.plotItem.autoRange()
+            self._auto_range_in_progress = False
 
             
 
