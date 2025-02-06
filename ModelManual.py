@@ -25,7 +25,7 @@ class CalculationResult:
     
 import numpy as np
 
-class ModelCircuit(object):
+class ModelCircuitParent(object):
     def __init__(self, negative_rinf=False, q=None, v_second=None):
         super().__init__()
         # --- FIX #1: Avoid mutable default arguments, properly assign attributes.
@@ -111,7 +111,7 @@ class ModelCircuit(object):
         return result
 
 # Rinf needs to be able to be negative
-class ModelCircuitSeries(ModelCircuit):
+class ModelCircuitSeries(ModelCircuitParent):
     # Mostly for testing purposes
     def run_model(self, v: dict, freq_array: np.ndarray):
         """
@@ -145,7 +145,7 @@ class ModelCircuitSeries(ModelCircuit):
 
         return np.array(zr_list), np.array(zi_list)
 
-class ModelCircuitParallel(ModelCircuit):
+class ModelCircuitParallel(ModelCircuitParent):
     def run_model(self, v: dict, freq_array: np.ndarray):
         """
         The main model used in cost functions.
@@ -209,7 +209,7 @@ class ModelManual(QObject):
         
         self.disabled_variables = set()
         
-        self.gaussian_prior=True
+        self.gaussian_prior=False
     
     # ----------------------------------------------------
     # Public Method
@@ -252,16 +252,18 @@ class ModelManual(QObject):
             )
         
     def fit_model_cole(self, v_initial_guess):
+        #MM should pass sigma here, probably?
         """
         Fit the model using the 'Cole' cost function.
         """
-        return self._fit_model(self._residual_cole, v_initial_guess)
+        return self._fit_model(self._residual_cole, v_initial_guess, prior_weight=10000)
     
     def fit_model_bode(self, v_initial_guess):
+        #MM should pass sigma here, probably?
         """
         Fit the model using the 'Bode' cost function.
         """
-        return self._fit_model(self._residual_bode, v_initial_guess)
+        return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=5)
         
     def run_model_manual(self,v):
         """
@@ -309,11 +311,14 @@ class ModelManual(QObject):
     # Fit Methods
     # ----------------------------------------------------
     
-    def _fit_model(self, residual_func, v_given):
+    def _fit_model(self, residual_func, v_given, prior_weight=0):
         """
         Fit the model using a residual function plus (optionally) a Gaussian prior
         that penalizes deviation from the initial guess in scaled space.
         """
+        #0) Warning if initial guess is not valid
+        if not self._valid_guess(v_given):print("Invalid Initial Guess will prevent fit")
+        
         # 1) Determine free vs. locked parameters
         all_keys = list(v_given.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
@@ -327,40 +332,44 @@ class ModelManual(QObject):
             """
             Converts x_guessing back to parameter dict, computes the model residual,
             and optionally adds a Gaussian-prior penalty.
+            
             """
+            # a) Re-map from scaled to actual parameter values
+            free_v_dict = self._descale_x_to_v(free_keys, x_guessing)
+            locked_v_dict = {
+                k: v_given[k] for k in self.disabled_variables if k in all_keys
+            }
+            full_v_dict = {**locked_v_dict, **free_v_dict}
+            
+            # b) Enforces validity crieria 
+            if not self._valid_guess(full_v_dict):
+                penalty= np.ones(2*len(self._experiment_data["freq"])) * 1e6
+                
+                if self.gaussian_prior:
+                    penalty = np.concatenate([penalty, np.ones(len(free_keys)) * 1e6])
+                return penalty
+            
+            # c) Run Core model residual function
             try:
-                # Re-map from scaled to actual parameter values
-                free_v_dict = self._descale_x_to_v(free_keys, x_guessing)
-                locked_v_dict = {
-                    k: v_given[k] for k in self.disabled_variables if k in all_keys
-                }
-                full_v_dict = {**locked_v_dict, **free_v_dict}
-    
-                # Core model residual
                 model_residual = residual_func(full_v_dict)
     
             except ValueError:
                 # MM Consider smooth penalty instead of this
                 return np.ones(10_000) * 1e6
-    
-            # ----- Gaussian Prior Block -----
+            
+
+            # d) Optionally add Gaussian prior
             if self.gaussian_prior:
-                gaussian_fraction = 10  # sigma is 10% of the scaled param range
-                prior_weight = 0.005       # increase/decrease as desired (used 1000)
-    
-                # sigmas in scaled space
-                sigmas = np.array([
-                    (ub - lb) * gaussian_fraction
-                    for lb, ub in zip(lower_bounds, upper_bounds)
-                ], dtype=float)
-    
-                prior_residual = prior_weight * ((x_guessing - x0) / sigmas)
-    
+                prior_residual=self._compute_gaussian_prior(
+                    x_guessing, x0, lower_bounds, upper_bounds, prior_weight
+                )
             else:
                 prior_residual = np.array([], dtype=float)
-            # -------------------------------
-    
+            
+            # e) Return
             return np.concatenate([model_residual, prior_residual])
+        
+            # -------------------------------
     
         # 4) Run the solver
         result = opt.least_squares(
@@ -414,7 +423,7 @@ class ModelManual(QObject):
         """
         Returns the residual vector [real_res1, real_res2, ..., imag_res1, imag_res2, ...].
         """
-        print("cole")
+        #print("cole")
         
         freq_array = self._experiment_data["freq"]
         
@@ -431,7 +440,6 @@ class ModelManual(QObject):
         # Residual vectors. divided?
         real_res = (z_real/1000) - (exp_real/1000)
         imag_res = (z_imag/1000) - (exp_imag/1000)
-        print(real_res,imag_res)
         
         w = self._weight_function(v)
         
@@ -441,7 +449,7 @@ class ModelManual(QObject):
         """
         Similar approach: create magnitude & phase residual vectors, then concatenate.
         """
-        print("bode")
+        #print("bode")
     
         freq_array = self._experiment_data["freq"]
         
@@ -456,12 +464,11 @@ class ModelManual(QObject):
         
         res_abs = np.log10(z_abs) - np.log10(exp_abs)
         res_phase = np.log10(np.abs(z_phase_deg) + 1e-10) - np.log10(np.abs(exp_phase_deg) + 1e-10)
-        print(res_abs,res_phase)
+        #print(res_abs,res_phase)
         
         w = self._weight_function(v)
         
         return np.concatenate([res_abs*w, res_phase*w])
-
 
     def _weight_function(self, v):
         """
@@ -476,6 +483,23 @@ class ModelManual(QObject):
         weight *= 1 + 3 * np.exp(-15 * v["Pef"])  # Modified Zarc components
         
         return weight
+        
+    def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=10):
+        # Compute sigmas (scaled standard deviations)
+        print(prior_weight)
+        sigmas = np.array([
+            (ub - lb) * gaussian_fraction for lb, ub in zip(lower_bounds, upper_bounds)
+        ], dtype=float)
+        
+        # Compute prior residual
+        prior_residual = prior_weight * ((x_guessing - x0) / sigmas)
+        
+        return prior_residual
+    
+    def _valid_guess(self, v_dict):
+        """Test validity criteria Fh > Fm > Fl"""
+        
+        return (v_dict["Fh"] >= v_dict["Fm"] and v_dict["Fm"] >= v_dict["Fl"])
 
     # ----------------------------------------------------
     # Private Helpers

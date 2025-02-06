@@ -53,15 +53,12 @@ class ParentGraph(pg.PlotWidget):
         # Plot objects for static (base) and dynamic (manual) lines
         self._static_plot = None
         self._dynamic_plot = None
-        
 
         # Initial display
         self._refresh_graph()
         
-        self._initial_range = self.getViewBox().viewRange()
         # Randy's request. Ignore blueline in auto scale
-#        self._dynamic_plot.setData(self._manual_data, ignoreBounds=True)
-        self._dynamic_plot.ignoreBounds = True
+
      
     ###################
     # Public Methods
@@ -142,14 +139,10 @@ class ParentGraph(pg.PlotWidget):
             )
             self._special_items.append(plot_item)
         
-        
-        
-        
     #####################
     # Private methods
     #################
-        
-
+    
     def _prepare_xy(self, freq, Z_real, Z_imag):
         """
         Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
@@ -190,6 +183,8 @@ class ParentGraph(pg.PlotWidget):
             symbolSize=7,        # smaller points
             symbolBrush=None     # blue fill
         )
+        # Exclude the dynamic plot from auto-ranging:
+
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
             
