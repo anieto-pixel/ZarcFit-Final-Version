@@ -17,10 +17,9 @@ class ListSliderRange(QtWidgets.QSlider):
     QSlider is still integer-based, but now those integers represent log10(value).
     """
     #valueChanged = pyqtSignal(object, object)
-    sliderMoved = pyqtSignal(float, float)
+    sliderMoved = pyqtSignal(int, int, float, float)
 
     def __init__(self, values_list=[0.0], *args):
-        print("CREATEEEEE")
         
         super(ListSliderRange, self).__init__(*args)
 
@@ -72,7 +71,7 @@ class ListSliderRange(QtWidgets.QSlider):
             self.update()
     
     def setValue(self, value):
-        print(value)
+
         if value not in self.values_list:
             return  # Ignore if value is not in the list
 
@@ -110,20 +109,30 @@ class ListSliderRange(QtWidgets.QSlider):
         new_low = self.low()+1
         if new_low < self.high():
             self.setLow(new_low)
-        self.sliderMoved.emit(self.low(), self.high())
+        self.sliderMoved.emit(self._low, self._high,
+                              self.values_list[self._low] ,
+                              self.values_list [self._high]
+                              )
 
     def downMax(self):
         """Example: shift upper handle downward by a certain factor in linear space."""
         new_high = self.high() -1
         if new_high > self.low():
             self.setHigh(new_high)
-        self.sliderMoved.emit(self.low(), self.high())
+        self.sliderMoved.emit(self._low, self._high,
+                              self.values_list[self._low] ,
+                              self.values_list [self._high]
+                              )
 
     def default(self):
         """Reset slider to the full float range."""
-        self.setLow(self._min)
-        self.setHigh(self._max)
-        self.sliderMoved.emit(self.low(), self.high())
+        self._low = self.minimum()
+        self._high = self.maximum()
+        self.update()
+        self.sliderMoved.emit(self._low, self._high,
+                              self.values_list[self._low] ,
+                              self.values_list [self._high]
+                              )
 
     # -----------------------------------------------------------------------
     # Painting: we want ticks spaced in exponent (log) scale
@@ -154,12 +163,6 @@ class ListSliderRange(QtWidgets.QSlider):
 
     def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
         
-        
-        print(f"maximum {self.maximum()}")
-        print(f"minimum {self.minimum()}")
-        print(f" low {self._low}")
-        print(f" high {self._high}")
-         
         step = math.ceil((self.maximum() - self.minimum()) / (self.number_of_ticks - 1))
         if(step):
 #        """
@@ -316,7 +319,10 @@ class ListSliderRange(QtWidgets.QSlider):
         self.update()
 
         # Emit float positions in normal (non-log) space
-        self.sliderMoved.emit(self.low(), self.high())
+        self.sliderMoved.emit(self._low, self._high,
+                              self.values_list[self._low] ,
+                              self.values_list [self._high]
+                              )
 
     def __pick(self, pt):
         return pt.x() if self.orientation() == Qt.Horizontal else pt.y()

@@ -85,8 +85,6 @@ class MainWidget(QWidget):
         self._connect_listeners()
         self._initialize_hotkeys_and_buttons()
 
-        print("second initialization")
-
         "initialization 2.0 I guess? No flying idea of how to call or organice this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
         self.widget_output_file.setup_current_file(self.config.output_file)
@@ -187,8 +185,8 @@ class MainWidget(QWidget):
         self.widget_sliders.slider_was_disabled.connect(self.model_manual.set_disabled_variables)
         
         # Connects freq slider to handle_frequencies method
-        self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
-        
+        self.freq_slider.sliderMoved.connect(self._handle_frequency_update) 
+       
         # Connects model manual with handler 
         self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
         self.model_manual.model_manual_values.connect(self.widget_sliders.set_all_variables)
@@ -264,10 +262,6 @@ class MainWidget(QWidget):
         Called when WidgetInputFile emits new file data.
         """
         
-        print("_update_file_data")
-        print(len(Z_real))
-        print(Z_real)
-        
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
         self.model_manual.initialize_expdata(self.file_data)
@@ -311,36 +305,16 @@ class MainWidget(QWidget):
         v_second = self.model_manual.get_latest_secondaries()
         self.widget_at_bottom._update_text(v_second)
         
-    def _handle_frequency_update(self, bottom_index, top_index):
-        
-        """
-        freq = self.file_data['freq']  # Assume freq is a list of frequencies
-    
-        # Initialize index_bottom to start from the last index (highest frequency)
-        index_bottom = len(freq) - 1
-        while index_bottom > 0 and freq[index_bottom] < bottom:
-            index_bottom -= 1
-    
-        # Initialize index_top to start from the first index (lowest frequency)
-        index_top = 0
-        while index_top < len(freq) and freq[index_top] > top:
-            index_top += 1  # Increment index_top to avoid infinite loop
+    def _handle_frequency_update(self, bottom_i, top_i, f_max, f_min):    
 
-        # Ensure index_top and index_bottom are within bounds
-        index_top = min(len(freq) - 1, index_top)
-        index_bottom = max(0, index_bottom)
-    
-        # Create a mask to filter the arrays
-        freq_filtered = freq[index_top:index_bottom + 1] 
-        z_real_filtered = freq[index_top:index_bottom + 1] 
-        z_imag_filtered = freq[index_top:index_bottom + 1] 
+        freq_filtered = self.file_data['freq'][bottom_i : top_i + 1]
+        z_real_filtered = self.file_data["Z_real"][bottom_i : top_i + 1] 
+        z_imag_filtered = self.file_data["Z_imag"][bottom_i : top_i + 1] 
 
         new_data = { "freq": freq_filtered,"Z_real": z_real_filtered,"Z_imag": z_imag_filtered}
 
         self.model_manual.initialize_expdata(new_data)
-        self.widget_graphs.apply_filter_frequency_range(bottom, top)
-        """
-        
+        self.widget_graphs.apply_filter_frequency_range(f_min, f_max)
         
     def _handle_set_allfreqs(self):
         
