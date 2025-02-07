@@ -16,10 +16,10 @@ class ListSliderRange(QtWidgets.QSlider):
     A two-handle slider for *log10* ranges.
     QSlider is still integer-based, but now those integers represent log10(value).
     """
-    valueChanged = pyqtSignal(object, object)
-    positionChanged = pyqtSignal(float, float)
+    #valueChanged = pyqtSignal(object, object)
+    sliderMoved = pyqtSignal(float, float)
 
-    def __init__(self, values_list=[], *args):
+    def __init__(self, values_list=[0.0], *args):
         super(ListSliderRange, self).__init__(*args)
 
         self.values_list=values_list
@@ -47,34 +47,48 @@ class ListSliderRange(QtWidgets.QSlider):
         return self._low
     
     def low_value(self):
-        return self.values_list[self._low]
+        if 0 <= self._low < len(self.values_list):
+            return self.values_list[self._low]
+        return None
 
     def setLow(self, low: int):
-        self._low = low
-        self.update()
+        if low<self._high:
+            self._low = low
+            self.update()
         
-    def setValue(self, value):
-        if value not in self.values_list:
-            return  # Ignore if value is not in the list
-        
-        index = self.values_list.index(value)
-        
-        # Decide which handle to move based on proximity
-        if abs(index - self._low) <= abs(index - self._high):
-            self.setLow(index)
-        else:
-            self.setHigh(index)
-        
-        self.update()
-
     def high(self):
         return self._high
     
     def high_value(self):
-        return self.values_list[self._high]
+        if 0 <= self._high < len(self.values_list):
+            return self.values_list[self._high]
+        return None
+    
+    def setHigh(self, high: int):
+        if self._low<high:
+            self._high = high
+            self.update()
+    
+    def setValue(self, value):
+        print(value)
+        if value not in self.values_list:
+            return  # Ignore if value is not in the list
+
+        index = self.values_list.index(value)
+        
+        # Decide which handle to move
+        if abs(index - self._low) <= abs(index - self._high):
+            self.setLow(index)
+        else:
+            self.setHigh(index)
+            
+        self.update()
 
     def setList(self, values_list: list):
-        self.values_list=values_list
+        if (not values_list) or (len(values_list)<1):
+            values_list = [0.0]
+        else:
+            self.values_list=values_list
 
     def upMin(self):
         """Example: shift lower handle upward by a certain factor in linear space."""
@@ -319,55 +333,38 @@ class ListSliderRange(QtWidgets.QSlider):
                                              slider_max - slider_min,
                                              opt.upsideDown)
 
-# Minimal demo
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
+    win = QtWidgets.QMainWindow()
 
-    # Create a central widget with a vertical layout.
-    centralWidget = QtWidgets.QWidget()
-    layout = QtWidgets.QVBoxLayout(centralWidget)
+    central_widget = QtWidgets.QWidget()
+    layout = QtWidgets.QVBoxLayout(central_widget)
 
-    # Create a label to display the slider's current low and high values.
-    statusLabel = QtWidgets.QLabel("Low: N/A, High: N/A")
-    statusLabel.setAlignment(Qt.AlignCenter)
+    slider = ListSliderRange([1, 5, 10, 15, 20])
+    slider.sliderMoved.connect(lambda low, high: print(f"Low={low}, High={high}"))
 
-    # Create the ListSliderRange with a sample list.
-    # (For example, a list of numbers from 0 to 100.)
-    values = list(range(0, 101))
-    slider = ListSliderRange(values)
-    slider.setOrientation(Qt.Horizontal)
-    slider.setMinimumWidth(300)
+    btn_empty = QtWidgets.QPushButton("Set Empty List")
+    btn_empty.clicked.connect(lambda: slider.setList([]))
 
-    # Update the label whenever the slider is moved.
-    def update_status(low, high):
-        statusLabel.setText(f"Low: {slider.low_value()}, High: {slider.high_value()}")
-    slider.sliderMoved.connect(update_status)
+    btn_single = QtWidgets.QPushButton("Set Single Item")
+    btn_single.clicked.connect(lambda: slider.setList([10]))
 
-    # Create buttons to demonstrate the slider methods.
-    btnIncreaseLower = QtWidgets.QPushButton("Increase Lower")
-    btnDecreaseUpper = QtWidgets.QPushButton("Decrease Upper")
-    btnReset = QtWidgets.QPushButton("Reset")
+    btn_multi = QtWidgets.QPushButton("Set Multi")
+    btn_multi.clicked.connect(lambda: slider.setList([10, 20, 30, 40, 50]))
 
-    btnIncreaseLower.clicked.connect(slider.upMin)
-    btnDecreaseUpper.clicked.connect(slider.downMax)
-    btnReset.clicked.connect(slider.default)
+    btn_up = QtWidgets.QPushButton("UpMin")
+    btn_up.clicked.connect(slider.upMin)
 
-    # Lay out the buttons horizontally.
-    btnLayout = QtWidgets.QHBoxLayout()
-    btnLayout.addWidget(btnIncreaseLower)
-    btnLayout.addWidget(btnDecreaseUpper)
-    btnLayout.addWidget(btnReset)
+    btn_down = QtWidgets.QPushButton("DownMax")
+    btn_down.clicked.connect(slider.downMax)
 
-    # Add the slider, label, and button layout to the main layout.
     layout.addWidget(slider)
-    layout.addWidget(statusLabel)
-    layout.addLayout(btnLayout)
+    layout.addWidget(btn_empty)
+    layout.addWidget(btn_single)
+    layout.addWidget(btn_multi)
+    layout.addWidget(btn_up)
+    layout.addWidget(btn_down)
 
-    # Create the main window and set the central widget.
-    mainWindow = QtWidgets.QMainWindow()
-    mainWindow.setCentralWidget(centralWidget)
-    mainWindow.setWindowTitle("ListSliderRange Demo")
-    mainWindow.resize(400, 200)
-    mainWindow.show()
-
+    win.setCentralWidget(central_widget)
+    win.show()
     sys.exit(app.exec_())

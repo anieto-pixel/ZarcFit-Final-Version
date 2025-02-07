@@ -22,6 +22,7 @@ from PyQt5.QtGui import QFontMetrics, QFont
 # Updated Imports with Renamed Classes
 from ConfigImporter import ConfigImporter
 from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+from CustomListSliders import ListSliderRange
 from RangeSlider import RangeSlider
 from ModelManual import ModelManual, CalculationResult
 from WidgetOutputFile import WidgetOutputFile
