@@ -304,9 +304,10 @@ class MainWidget(QWidget):
         v_second = self.model_manual.get_latest_secondaries()
         self.widget_at_bottom._update_text(v_second)
         
-    def _handle_frequency_update(self, bottom, top):
+    def _handle_frequency_update(self, bottom_index, top_index):
         
-        freq = self.file_data["freq"]  # Assume freq is a list of frequencies
+        """
+        freq = self.file_data['freq']  # Assume freq is a list of frequencies
     
         # Initialize index_bottom to start from the last index (highest frequency)
         index_bottom = len(freq) - 1
@@ -331,6 +332,8 @@ class MainWidget(QWidget):
 
         self.model_manual.initialize_expdata(new_data)
         self.widget_graphs.apply_filter_frequency_range(bottom, top)
+        """
+        
         
     def _handle_set_allfreqs(self):
         
