@@ -10,6 +10,141 @@ import math
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
 
+class ListSlider(QtWidgets.QSlider):
+    """
+    A single-handle slider that maps a list of discrete values.
+    """
+    sliderMoved = pyqtSignal(int, object)  # Emits (index, value)
+
+    def __init__(self, values_list=[0.0], *args, **kwargs):
+        super(ListSlider, self).__init__(*args, **kwargs)
+        self.values_list = values_list
+        self.setOrientation(Qt.Horizontal)
+        self.setTickPosition(QtWidgets.QSlider.TicksAbove)
+        
+        # The slider’s integer range corresponds to indices in the list.
+        self.setMinimum(0)
+        self.setMaximum(len(self.values_list) - 1)
+        self.setValue(self.minimum())
+        
+        self.setMinimumWidth(100)
+        self.number_of_ticks = 20
+
+    def get_value(self):
+        idx = self.value()
+        if 0 <= idx < len(self.values_list):
+            return self.values_list[idx]
+        return None
+
+    def setListValue(self, value):
+        """
+        Overridden so that you can either pass an index (int) or an actual value.
+        """
+        index = self.values_list.index(value)
+        super(ListSlider, self).setValue(index)
+
+        self.update()
+
+    def setList(self, values_list: list):
+        """
+        Change the list of valid values.
+        """
+        if len(values_list) < 1:
+            self.values_list = [0.0]
+        else:
+            self.values_list = values_list
+        self.setMinimum(0)
+        self.setMaximum(len(self.values_list) - 1)
+        self.setValue(self.minimum())
+        self.update()
+
+    def up(self):
+        current = self.value()
+        new_val = current + 1
+        if new_val <= self.maximum():
+            self.setValue(new_val)
+            self.sliderMoved.emit(new_val, self.values_list[new_val])
+
+    def down(self):
+        current = self.value()
+        new_val = current - 1
+        if new_val >= self.minimum():
+            self.setValue(new_val)
+            self.sliderMoved.emit(new_val, self.values_list[new_val])
+
+    # ---------------------------------------------------------------------
+    # Painting (adapted from your code but with only one handle)
+    # ---------------------------------------------------------------------
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        style = QtWidgets.QApplication.style()
+
+        # 1) Draw the groove.
+        opt = QtWidgets.QStyleOptionSlider()
+        self.initStyleOption(opt)
+        opt.sliderValue = 0
+        opt.sliderPosition = 0
+        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
+        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
+        groove_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
+                                           QtWidgets.QStyle.SC_SliderGroove, self)
+
+        # 2) Draw the ticks and labels.
+        self._draw_ticks_and_labels(painter, groove_rect, style, opt)
+
+        # 3) Draw the handle.
+        self._draw_handle(painter, style, opt)
+
+    def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
+        step = math.ceil((self.maximum() - self.minimum()) / (self.number_of_ticks - 1))
+        if step:
+            painter.setPen(QtGui.QPen(QtCore.Qt.black))
+            painter.setFont(QtGui.QFont("Arial", 7))
+
+            tick_length = 8
+            head_thickness = 5
+
+            if opt.orientation == Qt.Horizontal:
+                slider_min = groove_rect.x()
+                slider_max = groove_rect.right()
+                available = slider_max - slider_min
+                text_offset = groove_rect.bottom() + 15
+                tick_offset = groove_rect.bottom() + 2
+            else:
+                slider_min = groove_rect.y() + head_thickness
+                slider_max = groove_rect.bottom() - head_thickness
+                available = slider_max - slider_min
+                text_offset = groove_rect.right() - 20
+                tick_offset = groove_rect.right() - 35
+
+            for i in range(self.minimum(), self.maximum() + 1, step):
+                pixel_offset = style.sliderPositionFromValue(
+                    self.minimum(), self.maximum(), i, available, opt.upsideDown
+                )
+                # Show the actual value from the list.
+                label = f"{self.values_list[i]}"
+                if opt.orientation == Qt.Horizontal:
+                    x = slider_min + pixel_offset
+                    painter.drawLine(x, tick_offset, x, tick_offset + tick_length)
+                    text_rect = QtCore.QRect(x - 15, text_offset, 30, 12)
+                    painter.drawText(text_rect, QtCore.Qt.AlignCenter, label)
+                else:
+                    y = slider_min + pixel_offset
+                    painter.drawLine(tick_offset, y, tick_offset + tick_length, y)
+                    text_rect = QtCore.QRect(text_offset, y - 6, 50, 12)
+                    painter.drawText(text_rect, QtCore.Qt.AlignVCenter, label)
+
+    def _draw_handle(self, painter, style, opt):
+        value = self.value()
+        opt.sliderPosition = value
+        opt.sliderValue = value
+        opt.subControls = QtWidgets.QStyle.SC_SliderHandle
+        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
+
+
+
+
+
 
 class ListSliderRange(QtWidgets.QSlider):
     """
@@ -70,7 +205,7 @@ class ListSliderRange(QtWidgets.QSlider):
             self._high = high
             self.update()
     
-    def setValue(self, value):
+    def setListValue(self, value):
 
         if value not in self.values_list:
             return  # Ignore if value is not in the list
@@ -350,6 +485,9 @@ class ListSliderRange(QtWidgets.QSlider):
                                              slider_max - slider_min,
                                              opt.upsideDown)
 
+# ---------------------------------------------------------------------
+# Testing both classes.
+# ---------------------------------------------------------------------
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     win = QtWidgets.QMainWindow()
@@ -357,30 +495,48 @@ if __name__ == "__main__":
     central_widget = QtWidgets.QWidget()
     layout = QtWidgets.QVBoxLayout(central_widget)
 
-    slider = ListSliderRange([1, 5, 10, 15, 20])
-    slider.sliderMoved.connect(lambda low, high: print(f"Low={low}, High={high}"))
+    # ----- Test for ListSlider (Single Handle) -----
+    single_slider = ListSlider([0, 10, 20, 30, 40])
+    single_slider.sliderMoved.connect(lambda idx, val: print(f"ListSlider moved: index={idx}, value={val}"))
+    layout.addWidget(QtWidgets.QLabel("ListSlider (Single Handle)"))
+    layout.addWidget(single_slider)
+    btn_single_empty = QtWidgets.QPushButton("Set Single Slider Empty List")
+    btn_single_empty.clicked.connect(lambda: single_slider.setList([]))
+    btn_single_multi = QtWidgets.QPushButton("Set Single Slider Multi")
+    btn_single_multi.clicked.connect(lambda: single_slider.setList([5, 15, 25, 35, 45]))
+    btn_single_up = QtWidgets.QPushButton("Single Slider Up")
+    btn_single_up.clicked.connect(single_slider.up)
+    btn_single_down = QtWidgets.QPushButton("Single Slider Down")
+    btn_single_down.clicked.connect(single_slider.down)
+    layout.addWidget(btn_single_empty)
+    layout.addWidget(btn_single_multi)
+    layout.addWidget(btn_single_up)
+    layout.addWidget(btn_single_down)
 
-    btn_empty = QtWidgets.QPushButton("Set Empty List")
-    btn_empty.clicked.connect(lambda: slider.setList([]))
-
-    btn_single = QtWidgets.QPushButton("Set Single Item")
-    btn_single.clicked.connect(lambda: slider.setList([10]))
-
-    btn_multi = QtWidgets.QPushButton("Set Multi")
-    btn_multi.clicked.connect(lambda: slider.setList([10, 20, 30, 40, 50]))
-
-    btn_up = QtWidgets.QPushButton("UpMin")
-    btn_up.clicked.connect(slider.upMin)
-
-    btn_down = QtWidgets.QPushButton("DownMax")
-    btn_down.clicked.connect(slider.downMax)
-
-    layout.addWidget(slider)
-    layout.addWidget(btn_empty)
-    layout.addWidget(btn_single)
-    layout.addWidget(btn_multi)
-    layout.addWidget(btn_up)
-    layout.addWidget(btn_down)
+    # ----- Test for ListSliderRange (Dual Handle) -----
+    range_slider = ListSliderRange([1, 5, 10, 15, 20])
+    range_slider.sliderMoved.connect(
+        lambda low, high, low_val, high_val: print(
+            f"RangeSlider moved: Low={low} ({low_val}), High={high} ({high_val})"
+        )
+    )
+    layout.addWidget(QtWidgets.QLabel("ListSliderRange (Dual Handle)"))
+    layout.addWidget(range_slider)
+    btn_range_empty = QtWidgets.QPushButton("Set Range Slider Empty List")
+    btn_range_empty.clicked.connect(lambda: range_slider.setList([]))
+    btn_range_single = QtWidgets.QPushButton("Set Range Slider Single Item")
+    btn_range_single.clicked.connect(lambda: range_slider.setList([10]))
+    btn_range_multi = QtWidgets.QPushButton("Set Range Slider Multi")
+    btn_range_multi.clicked.connect(lambda: range_slider.setList([10, 20, 30, 40, 50]))
+    btn_range_up = QtWidgets.QPushButton("Range Slider UpMin")
+    btn_range_up.clicked.connect(range_slider.upMin)
+    btn_range_down = QtWidgets.QPushButton("Range Slider DownMax")
+    btn_range_down.clicked.connect(range_slider.downMax)
+    layout.addWidget(btn_range_empty)
+    layout.addWidget(btn_range_single)
+    layout.addWidget(btn_range_multi)
+    layout.addWidget(btn_range_up)
+    layout.addWidget(btn_range_down)
 
     win.setCentralWidget(central_widget)
     win.show()
