@@ -9,7 +9,12 @@ import sys
 import math
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import QApplication, QSlider, QVBoxLayout, QWidget
 
+
+# ---------------------------------------------------------------------
+# Single-handle slider that maps a list of discrete values.
+# ---------------------------------------------------------------------
 class ListSlider(QtWidgets.QSlider):
     """
     A single-handle slider that maps a list of discrete values.
@@ -21,16 +26,47 @@ class ListSlider(QtWidgets.QSlider):
         self.values_list = values_list
         self.setOrientation(Qt.Horizontal)
         self.setTickPosition(QtWidgets.QSlider.TicksAbove)
-        
+        self.setTickInterval(1)  # Ensure ticks are generated
+
         # The slider’s integer range corresponds to indices in the list.
         self.setMinimum(0)
         self.setMaximum(len(self.values_list) - 1)
         self.setValue(self.minimum())
         
-        self.setMinimumWidth(100)
-        self.number_of_ticks = 20
+        self.setTickPosition(QSlider.TicksBelow)  # Options: NoTicks, TicksAbove, TicksBelow, TicksBothSides
+        self.setTickInterval(int(len(self.values_list)/10))
+        
+        #makes it thick
+        #Colorea la estela
+        #deja la parte del frente blanca?
+        #pone el tick de forma visible
+        self.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #bbb;
+                background: white;
+                height: 10px; /* Increase this value */
+                border-radius: 4px;
+                margin: 2px 0; /* Ensures enough space for ticks */
+            }
+            QSlider::sub-page:horizontal {
+                background: #0078D7;  /* Change to any color */
+                border-radius: 4px;
+            }
+            QSlider::add-page:horizontal {
+                background: #bbb;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background: #005999;
+                border: 1px solid #0078D7;
+                width: 16px;
+                margin: -5px 0;
+                border-radius: 8px;
+            }
 
-    def get_value(self):
+        """)
+
+    def getListValue(self):
         idx = self.value()
         if 0 <= idx < len(self.values_list):
             return self.values_list[idx]
@@ -38,12 +74,12 @@ class ListSlider(QtWidgets.QSlider):
 
     def setListValue(self, value):
         """
-        Overridden so that you can either pass an index (int) or an actual value.
+        Sets the slider based on the given value from the list.
         """
-        index = self.values_list.index(value)
-        super(ListSlider, self).setValue(index)
-
-        self.update()
+        if value in self.values_list:
+            index = self.values_list.index(value)
+            super(ListSlider, self).setValue(index)
+            self.update()
 
     def setList(self, values_list: list):
         """
@@ -73,77 +109,8 @@ class ListSlider(QtWidgets.QSlider):
             self.sliderMoved.emit(new_val, self.values_list[new_val])
 
     # ---------------------------------------------------------------------
-    # Painting (adapted from your code but with only one handle)
+    # Custom painting: draw a filled groove, ticks with labels, and the handle.
     # ---------------------------------------------------------------------
-    def paintEvent(self, event):
-        painter = QtGui.QPainter(self)
-        style = QtWidgets.QApplication.style()
-
-        # 1) Draw the groove.
-        opt = QtWidgets.QStyleOptionSlider()
-        self.initStyleOption(opt)
-        opt.sliderValue = 0
-        opt.sliderPosition = 0
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
-        groove_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
-                                           QtWidgets.QStyle.SC_SliderGroove, self)
-
-        # 2) Draw the ticks and labels.
-        self._draw_ticks_and_labels(painter, groove_rect, style, opt)
-
-        # 3) Draw the handle.
-        self._draw_handle(painter, style, opt)
-
-    def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
-        step = math.ceil((self.maximum() - self.minimum()) / (self.number_of_ticks - 1))
-        if step:
-            painter.setPen(QtGui.QPen(QtCore.Qt.black))
-            painter.setFont(QtGui.QFont("Arial", 7))
-
-            tick_length = 8
-            head_thickness = 5
-
-            if opt.orientation == Qt.Horizontal:
-                slider_min = groove_rect.x()
-                slider_max = groove_rect.right()
-                available = slider_max - slider_min
-                text_offset = groove_rect.bottom() + 15
-                tick_offset = groove_rect.bottom() + 2
-            else:
-                slider_min = groove_rect.y() + head_thickness
-                slider_max = groove_rect.bottom() - head_thickness
-                available = slider_max - slider_min
-                text_offset = groove_rect.right() - 20
-                tick_offset = groove_rect.right() - 35
-
-            for i in range(self.minimum(), self.maximum() + 1, step):
-                pixel_offset = style.sliderPositionFromValue(
-                    self.minimum(), self.maximum(), i, available, opt.upsideDown
-                )
-                # Show the actual value from the list.
-                label = f"{self.values_list[i]}"
-                if opt.orientation == Qt.Horizontal:
-                    x = slider_min + pixel_offset
-                    painter.drawLine(x, tick_offset, x, tick_offset + tick_length)
-                    text_rect = QtCore.QRect(x - 15, text_offset, 30, 12)
-                    painter.drawText(text_rect, QtCore.Qt.AlignCenter, label)
-                else:
-                    y = slider_min + pixel_offset
-                    painter.drawLine(tick_offset, y, tick_offset + tick_length, y)
-                    text_rect = QtCore.QRect(text_offset, y - 6, 50, 12)
-                    painter.drawText(text_rect, QtCore.Qt.AlignVCenter, label)
-
-    def _draw_handle(self, painter, style, opt):
-        value = self.value()
-        opt.sliderPosition = value
-        opt.sliderValue = value
-        opt.subControls = QtWidgets.QStyle.SC_SliderHandle
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
-
-
-
-
 
 
 class ListSliderRange(QtWidgets.QSlider):
@@ -496,10 +463,12 @@ if __name__ == "__main__":
     layout = QtWidgets.QVBoxLayout(central_widget)
 
     # ----- Test for ListSlider (Single Handle) -----
-    single_slider = ListSlider([0, 10, 20, 30, 40])
+    single_slider = ListSlider([0, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40])
+    single_slider.setMinimumHeight(60)  # Ensure enough vertical space
     single_slider.sliderMoved.connect(lambda idx, val: print(f"ListSlider moved: index={idx}, value={val}"))
     layout.addWidget(QtWidgets.QLabel("ListSlider (Single Handle)"))
     layout.addWidget(single_slider)
+
     btn_single_empty = QtWidgets.QPushButton("Set Single Slider Empty List")
     btn_single_empty.clicked.connect(lambda: single_slider.setList([]))
     btn_single_multi = QtWidgets.QPushButton("Set Single Slider Multi")
@@ -508,13 +477,17 @@ if __name__ == "__main__":
     btn_single_up.clicked.connect(single_slider.up)
     btn_single_down = QtWidgets.QPushButton("Single Slider Down")
     btn_single_down.clicked.connect(single_slider.down)
+    btn_single_test = QtWidgets.QPushButton("Test Single Slider getListValue")
+    btn_single_test.clicked.connect(lambda: print(f"Single slider value: {single_slider.getListValue()}"))
     layout.addWidget(btn_single_empty)
     layout.addWidget(btn_single_multi)
     layout.addWidget(btn_single_up)
     layout.addWidget(btn_single_down)
+    layout.addWidget(btn_single_test)
 
     # ----- Test for ListSliderRange (Dual Handle) -----
     range_slider = ListSliderRange([1, 5, 10, 15, 20])
+    range_slider.setMinimumHeight(100)  # Give more vertical space for two handles and ticks
     range_slider.sliderMoved.connect(
         lambda low, high, low_val, high_val: print(
             f"RangeSlider moved: Low={low} ({low_val}), High={high} ({high_val})"
@@ -522,6 +495,7 @@ if __name__ == "__main__":
     )
     layout.addWidget(QtWidgets.QLabel("ListSliderRange (Dual Handle)"))
     layout.addWidget(range_slider)
+
     btn_range_empty = QtWidgets.QPushButton("Set Range Slider Empty List")
     btn_range_empty.clicked.connect(lambda: range_slider.setList([]))
     btn_range_single = QtWidgets.QPushButton("Set Range Slider Single Item")
@@ -532,11 +506,16 @@ if __name__ == "__main__":
     btn_range_up.clicked.connect(range_slider.upMin)
     btn_range_down = QtWidgets.QPushButton("Range Slider DownMax")
     btn_range_down.clicked.connect(range_slider.downMax)
+    btn_range_test = QtWidgets.QPushButton("Test Range Slider Values")
+    btn_range_test.clicked.connect(
+        lambda: print(f"Range slider low_value: {range_slider.low_value()}, high_value: {range_slider.high_value()}")
+    )
     layout.addWidget(btn_range_empty)
     layout.addWidget(btn_range_single)
     layout.addWidget(btn_range_multi)
     layout.addWidget(btn_range_up)
     layout.addWidget(btn_range_down)
+    layout.addWidget(btn_range_test)
 
     win.setCentralWidget(central_widget)
     win.show()

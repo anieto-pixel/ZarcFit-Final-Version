@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSignal, Qt
 from ConfigImporter import ConfigImporter
-
+from CustomListSliders import ListSlider
 
 class WidgetInputFile(QWidget):
     """
@@ -36,6 +36,9 @@ class WidgetInputFile(QWidget):
         self._folder_path = None
         self._files = []
         self._current_index = -1
+        
+        #Slider
+        self._slider = ListSlider()
 
         # UI elements
         self.select_folder_button = QPushButton("Select Input Folder")
@@ -132,6 +135,7 @@ class WidgetInputFile(QWidget):
         layout.addWidget(self.previous_button)
         layout.addWidget(self.file_label)
         layout.addWidget(self.next_button)
+        layout.addWidget(self._slider)
         self.setLayout(layout)
 
     def _select_folder(self):
@@ -165,6 +169,7 @@ class WidgetInputFile(QWidget):
                 )
                 self.previous_button.setEnabled(False)
                 self.next_button.setEnabled(False)
+            self._slider.setList(self._files)
 
     def _update_file_display(self):
         """
