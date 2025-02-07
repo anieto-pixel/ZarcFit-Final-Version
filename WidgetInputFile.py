@@ -37,9 +37,6 @@ class WidgetInputFile(QWidget):
         self._files = []
         self._current_index = -1
         
-        #Slider
-        self._slider = ListSlider()
-
         # UI elements
         self.select_folder_button = QPushButton("Select Input Folder")
         self.select_folder_button.clicked.connect(self._select_folder)
@@ -54,7 +51,11 @@ class WidgetInputFile(QWidget):
 
         self.file_label = QLabel("No file selected")
         self.file_label.setAlignment(Qt.AlignCenter)
-
+        
+        self._slider = ListSlider()
+        self._slider.setMinimumWidth(600)
+        
+        self._slider.valueChanged.connect(self._handle_slider_update)
         # Build the UI layout
         self._initialize_ui() 
         self._validate_parameters()
@@ -90,6 +91,11 @@ class WidgetInputFile(QWidget):
             raise ValueError(f"Configuration must include parameters: {missing}")
         else:
             self.config_p=self._cast_config_parameters(self.config_p)
+
+    def _handle_slider_update(self, index):
+        self._current_index=index
+        self._update_file_display()
+        self._update_navigation_buttons()
 
     def setup_current_file(self, current_file):
         """

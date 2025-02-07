@@ -19,7 +19,6 @@ class ListSlider(QtWidgets.QSlider):
     """
     A single-handle slider that maps a list of discrete values.
     """
-    sliderMoved = pyqtSignal(int, object)  # Emits (index, value)
 
     def __init__(self, values_list=[0.0], *args, **kwargs):
         super(ListSlider, self).__init__(*args, **kwargs)
@@ -99,14 +98,14 @@ class ListSlider(QtWidgets.QSlider):
         new_val = current + 1
         if new_val <= self.maximum():
             self.setValue(new_val)
-            self.sliderMoved.emit(new_val, self.values_list[new_val])
+            #self.sliderMoved.emit(new_val, self.values_list[new_val])
 
     def down(self):
         current = self.value()
         new_val = current - 1
         if new_val >= self.minimum():
             self.setValue(new_val)
-            self.sliderMoved.emit(new_val, self.values_list[new_val])
+            #self.sliderMoved.emit(new_val, self.values_list[new_val])
 
     # ---------------------------------------------------------------------
     # Custom painting: draw a filled groove, ticks with labels, and the handle.
