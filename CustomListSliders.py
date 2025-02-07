@@ -20,6 +20,8 @@ class ListSliderRange(QtWidgets.QSlider):
     sliderMoved = pyqtSignal(float, float)
 
     def __init__(self, values_list=[0.0], *args):
+        print("CREATEEEEE")
+        
         super(ListSliderRange, self).__init__(*args)
 
         self.values_list=values_list
@@ -85,11 +87,11 @@ class ListSliderRange(QtWidgets.QSlider):
         self.update()
 
     def setList(self, values_list: list):
-        print("called set list")
-        if (not values_list) or (len(values_list)<1):
+
+        if (len(values_list)<1):
             values_list = [0.0]
+            
         else:
-            print("else")
             self.values_list=values_list
             # Update the slider range so it matches the new list length
             self.setMinimum(0)
@@ -151,8 +153,14 @@ class ListSliderRange(QtWidgets.QSlider):
         self._draw_handles(painter, style, opt)
 
     def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
+        
+        
+        print(f"maximum {self.maximum()}")
+        print(f"minimum {self.minimum()}")
+        print(f" low {self._low}")
+        print(f" high {self._high}")
          
-        step = math.ceil((self._high - self._low) / (self.number_of_ticks - 1))
+        step = math.ceil((self.maximum() - self.minimum()) / (self.number_of_ticks - 1))
         if(step):
 #        """
             painter.setPen(QtGui.QPen(QtCore.Qt.black))
@@ -173,15 +181,6 @@ class ListSliderRange(QtWidgets.QSlider):
                 available = slider_max - slider_min
                 text_offset = groove_rect.right() - 20
                 tick_offset = groove_rect.right() - 35
-    
-            # We'll space ticks in exponent. E.g. from log10(fmin) to log10(fmax).
-            # We want self.number_of_ticks values between _log_min and _log_max.
-           
-            step = math.ceil((self._high - self._low) / (self.number_of_ticks - 1))
-    
-            print(self.minimum(), self.maximum() + 1, step)        
-    
-    #        print(range(self.minimum(), self.maximum() + 1, step)[3])
     
             for i in range(self.minimum(), self.maximum() + 1, step):
                 pixel_offset = style.sliderPositionFromValue(
@@ -240,7 +239,6 @@ class ListSliderRange(QtWidgets.QSlider):
         painter.setBrush(QtGui.QBrush(highlight))
         painter.setPen(QtGui.QPen(highlight, 0))
         painter.drawRect(span_rect.intersected(groove_rect))
-
 
     def _draw_handles(self, painter, style, opt):
         for value in [self._low, self._high]:

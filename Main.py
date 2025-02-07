@@ -23,7 +23,6 @@ from PyQt5.QtGui import QFontMetrics, QFont
 from ConfigImporter import ConfigImporter
 from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
 from CustomListSliders import ListSliderRange
-from RangeSlider import RangeSlider
 from ModelManual import ModelManual, CalculationResult
 from WidgetOutputFile import WidgetOutputFile
 from WidgetInputFile import WidgetInputFile
@@ -47,7 +46,7 @@ class MainWidget(QWidget):
         self.widget_output_file = WidgetOutputFile(self.config.variables_to_print)
 
         self.widget_graphs = WidgetGraphs()
-        self.freq_slider=RangeSlider()
+        self.freq_slider=ListSliderRange()
 
         self.widget_sliders = WidgetSliders(
             self.config.slider_configurations,
@@ -85,6 +84,8 @@ class MainWidget(QWidget):
         """Connect signals to handlers"""
         self._connect_listeners()
         self._initialize_hotkeys_and_buttons()
+
+        print("second initialization")
 
         "initialization 2.0 I guess? No flying idea of how to call or organice this part"
         self.widget_input_file.setup_current_file(self.config.input_file)
@@ -263,9 +264,14 @@ class MainWidget(QWidget):
         Called when WidgetInputFile emits new file data.
         """
         
+        print("_update_file_data")
+        print(len(Z_real))
+        print(Z_real)
+        
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
         self.model_manual.initialize_expdata(self.file_data)
+        self.freq_slider.setList(freq)
         
         self._handle_set_default
         self._update_sliders_data()
