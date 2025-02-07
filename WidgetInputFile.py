@@ -179,6 +179,9 @@ class WidgetInputFile(QWidget):
         if 0 <= self._current_index < len(self._files):
             current_file = self._files[self._current_index]
             self.file_label.setText(current_file)
+            
+            #Set the slider
+            self._slider.setValue(self._current_index)
 
             # Build full path and extract the file's content
             file_path = os.path.join(self._folder_path, current_file)
@@ -199,6 +202,8 @@ class WidgetInputFile(QWidget):
             self._current_index -= 1
             self._update_file_display()
             self._update_navigation_buttons()
+            
+            self._slider.down()
 
     def _show_next_file(self):
         """
@@ -208,6 +213,8 @@ class WidgetInputFile(QWidget):
             self._current_index += 1
             self._update_file_display()
             self._update_navigation_buttons()
+            
+            self._slider.up()
 
     def _extract_content(self, file_path: str):
         #print("_extract_content")
