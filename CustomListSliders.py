@@ -85,10 +85,23 @@ class ListSliderRange(QtWidgets.QSlider):
         self.update()
 
     def setList(self, values_list: list):
+        print("called set list")
         if (not values_list) or (len(values_list)<1):
             values_list = [0.0]
         else:
+            print("else")
             self.values_list=values_list
+            # Update the slider range so it matches the new list length
+            self.setMinimum(0)
+            # If you want valid indices only, use (len(...)-1) as the max:
+            self.setMaximum(len(self.values_list) - 1)
+        
+            # Clamp the current low/high so they're not out of the new range
+            self._low = self.minimum()
+            self._high = self.maximum()
+        
+            # Redraw with the new range
+            self.update()
 
     def upMin(self):
         """Example: shift lower handle upward by a certain factor in linear space."""
