@@ -10,6 +10,7 @@ import inspect
 import numpy as np
 from datetime import datetime
 from sympy import pi
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QSplitter, QLabel, QShortcut
@@ -101,11 +102,20 @@ class MainWidget(QWidget):
         Builds the top bar containing the file input and file output widgets.
         """
         layout = QHBoxLayout()
-        layout.addWidget(self.widget_input_file)
-        layout.addStretch()
-        layout.addWidget(self.widget_output_file)
-        layout.setContentsMargins(0, 0, 0, 0)
+    
+        # Set size policies so that widget_input_file expands.
+        self.widget_input_file.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred
+        )
+        self.widget_output_file.setSizePolicy(
+            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred
+        )
+    
+        # Add the widgets with stretch factors.
+        layout.addWidget(self.widget_input_file, 1)   # This widget gets all extra space.
+        layout.addWidget(self.widget_output_file, 0)    # This widget stays at its preferred size.
         
+        layout.setContentsMargins(0, 0, 0, 0)
         container = QWidget()
         container.setLayout(layout)
         return container
@@ -360,8 +370,6 @@ class MainWidget(QWidget):
         else:
             self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
     
-    
-    
 
     def _print_model_parameters(self):
         """
@@ -373,9 +381,8 @@ class MainWidget(QWidget):
 
         main_dictionary=self.v_sliders|date|file
         model_dictionary = self.model_manual.get_model_parameters()
-        graph_dictionary= self.widget_graphs.get_special_points()
 
-        self.widget_output_file.write_to_file(main_dictionary | model_dictionary| graph_dictionary)
+        self.widget_output_file.write_to_file(main_dictionary | model_dictionary)
 
 
     ####################################################
