@@ -38,7 +38,7 @@ class ModelCircuitParent(object):
         self.v_second = v_second
 
     def run_model(self, v: dict, freq_array: np.ndarray):
-        return np.array([]), np.array([])
+        return np.array([])
 
     def init_parameters(self):
         return self.negative_rinf, self.q, self.v_second
@@ -117,50 +117,50 @@ class ModelCircuitSeries(ModelCircuitParent):
         """
         Alternative model path for testing (not used in cost functions directly).
         """
-        self._calculate_secondary_variables(v)
+        v_l = v.copy()
+        
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+        self._calculate_secondary_variables(v_l)
 
-        zr_list = []
-        zi_list = []
+        z = []
 
         for freq in freq_array:
-            zinf = self._inductor(freq, v["Linf"]) + v["Rinf"]
+            zinf = self._inductor(freq, v_l["Linf"]) + v_l["Rinf"]
 
-            z_cpeh = self._cpe(freq, self.q["Qh"], v["Ph"], v["Ph"])
-            zarch = self._parallel(z_cpeh, v["Rh"])
+            z_cpeh = self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"])
+            zarch = self._parallel(z_cpeh, v_l["Rh"])
 
-            z_cpem = self._cpe(freq, self.q["Qm"], v["Pm"], v["Pm"])
-            zarcm = self._parallel(z_cpem, v["Rm"])
+            z_cpem = self._cpe(freq, self.q["Qm"], v_l["Pm"], v_l["Pm"])
+            zarcm = self._parallel(z_cpem, v_l["Rm"])
 
-            z_cpel = self._cpe(freq, self.q["Ql"], v["Pl"], v["Pl"])
-            zarcl = self._parallel(z_cpel, v["Rl"])
+            z_cpel = self._cpe(freq, self.q["Ql"], v_l["Pl"], v_l["Pl"])
+            zarcl = self._parallel(z_cpel, v_l["Rl"])
 
-            z_cpee = self._cpe(freq, v["Qe"], v["Pef"], v["Pei"])
-            zarce = self._parallel(z_cpee, v["Re"])
+            z_cpee = self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"])
+            zarce = self._parallel(z_cpee, v_l["Re"])
 
             # Evaluate final formula
             z_total = zinf + zarch + zarcm + zarcl + zarce
 
-            zr_list.append(z_total.real)
-            zi_list.append(z_total.imag)
+            z.append(z_total)
 
-        return np.array(zr_list), np.array(zi_list)
+        return np.array(z)
 
 class ModelCircuitParallel(ModelCircuitParent):
     def run_model(self, v: dict, freq_array: np.ndarray):
         """
         The main model used in cost functions.
         """
-        
         v_l = v.copy()
 
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
-
         self._calculate_secondary_variables(v_l)
-        v2 = self.v_second
 
-        zr_list = []
-        zi_list = []
+        v2 = self.v_second
+        
+        z = []
 
         for f in freq_array:
             zinf = self._inductor(f, v_l["Linf"])
@@ -177,10 +177,9 @@ class ModelCircuitParallel(ModelCircuitParent):
             zarce = self._parallel(z_cpee, v_l["Re"])
 
             z_total = zinf + zparallel + zarce
-            zr_list.append(z_total.real)
-            zi_list.append(z_total.imag)
+            z.append(z_total)
 
-        return np.array(zr_list), np.array(zi_list)
+        return np.array(z)
 
 ############################################################################3
 
@@ -279,11 +278,13 @@ class ModelManual(QObject):
         """
         
         freq_array = self._experiment_data["freq"] 
-        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
+        z = self._model_circuit.run_model(v, freq_array)
+        z_real, z_imag =z.real, z.imag
         
         # 2) Compute the special frequencies based on the slider dict 
         special_freq = self._get_special_freqs(v)
-        spec_zr, spec_zi = self._model_circuit.run_model(v, special_freq)
+        spec_z = self._model_circuit.run_model(v, special_freq)
+        spec_zr, spec_zi = spec_z.real, spec_z.imag
         
         # 3) Create a new CalculationResult
         result = CalculationResult(
@@ -438,7 +439,9 @@ class ModelManual(QObject):
         
         freq_array = self._experiment_data["freq"]
         
-        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
+        z = self._model_circuit.run_model(v, freq_array)
+        z_real, z_imag=z.real, z.imag
+        
         exp_real = self._experiment_data["Z_real"] 
         exp_imag = self._experiment_data["Z_imag"] 
         
@@ -459,7 +462,9 @@ class ModelManual(QObject):
     
         freq_array = self._experiment_data["freq"]
         
-        z_real, z_imag = self._model_circuit.run_model(v, freq_array)
+        z = self._model_circuit.run_model(v, freq_array)
+        z_real, z_imag =z.real, z.imag
+        
         z_abs = np.sqrt(z_real**2 + z_imag**2)
         z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
         
