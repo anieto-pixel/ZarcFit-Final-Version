@@ -256,6 +256,8 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Cole' cost function.
         """
+        
+        print("cole")
         return self._fit_model(self._residual_cole, v_initial_guess, prior_weight=9000000)
     
     def fit_model_bode(self, v_initial_guess):
@@ -263,6 +265,7 @@ class ModelManual(QObject):
         """
         Fit the model using the 'Bode' cost function.
         """
+        print("bode")
         return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=500)
         
     def run_model_manual(self,v):
@@ -341,13 +344,7 @@ class ModelManual(QObject):
             }
             full_v_dict = {**locked_v_dict, **free_v_dict}
             
-            # b) Enforces validity crieria 
-            if not self._valid_guess(full_v_dict):
-                penalty= np.ones(2*len(self._experiment_data["freq"])) * 1e6
-                
-                if self.gaussian_prior:
-                    penalty = np.concatenate([penalty, np.ones(len(free_keys)) * 1e6])
-                return penalty
+
             
             # c) Run Core model residual function
             try:
@@ -361,6 +358,17 @@ class ModelManual(QObject):
             # d) Optionally add Gaussian prior
             if self.gaussian_prior:
                 print("Gaussian Prior")
+                
+                # b) Enforces validity crieria 
+                if not self._valid_guess(full_v_dict):
+                    penalty= np.ones(2*len(self._experiment_data["freq"])) * 1e6
+                    
+                    if self.gaussian_prior:
+                        penalty = np.concatenate([penalty, np.ones(len(free_keys)) * 1e6])
+                    return penalty
+                
+                
+                print("actual gaussain part")
                 
                 prior_residual=self._compute_gaussian_prior(
                     x_guessing, x0, lower_bounds, upper_bounds, prior_weight
@@ -391,6 +399,7 @@ class ModelManual(QObject):
         best_fit = {**best_fit_locked, **best_fit_free}
         
         self.model_manual_values.emit(best_fit)
+        
         return best_fit
                 
 
@@ -434,14 +443,9 @@ class ModelManual(QObject):
         exp_imag = self._experiment_data["Z_imag"] 
         
         # Residual vectors. original
-#        real_res = z_real - exp_real
-#        imag_res = z_imag - exp_imag
-        # Residual vectors. Loged
-#        real_res = np.log10(abs(z_real+ 1e-10)) - np.log10(abs(exp_real+ 1e-10))
-#        imag_res = np.log10(abs(z_imag+ 1e-10)) - np.log10(abs(exp_imag+ 1e-10))
-        # Residual vectors. divided?
-        real_res = (z_real/1000) - (exp_real/1000)
-        imag_res = (z_imag/1000) - (exp_imag/1000)
+        real_res = z_real - exp_real
+        imag_res = z_imag - exp_imag
+
         
         w = self._weight_function(v)
         
