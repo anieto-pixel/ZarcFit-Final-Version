@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # manual_model.py
 
+import scipy.signal as sig
 import numpy as np
 import scipy.optimize as opt
 from scipy.optimize import Bounds
@@ -16,29 +17,105 @@ class CalculationResult:
     """
     Container for main and special impedance data.
     """
-    main_freq:      np.ndarray   # The frequency array used for the main curve
-    main_z_real:    np.ndarray
-    main_z_imag:    np.ndarray
-    special_freq:   np.ndarray   # The 3 special frequencies
-    special_z_real: np.ndarray
-    special_z_imag: np.ndarray
+    main_freq:      np.ndarray = None  # The frequency array used for the main curve
+    main_z_real:    np.ndarray = None
+    main_z_imag:    np.ndarray = None
+    
+    special_freq:   np.ndarray = None  # The 3 special frequencies
+    special_z_real: np.ndarray = None
+    special_z_imag: np.ndarray = None
+    
+    timedomain_freq:   np.ndarray = None   # Elements used for the time domain plot
+    timedomain_volt:   np.ndarray = None
+    timedomain_time:   np.ndarray = None
+    
     
 import numpy as np
 
 class ModelCircuitParent(object):
+    
     def __init__(self, negative_rinf=False, q=None, v_second=None):
+        
         super().__init__()
+        
         # --- FIX #1: Avoid mutable default arguments, properly assign attributes.
         if q is None:
             q = {}
+            
         if v_second is None:
             v_second = {}
+            
         self.negative_rinf = negative_rinf
         self.q = q
         self.v_second = v_second
 
     def run_model(self, v: dict, freq_array: np.ndarray):
         return np.array([])
+    
+    def run_time_domain(self, v: dict, freq_array: np.ndarray, crit_time=2):
+        
+        timedomain_freq = None
+        timedomain_volt = None
+        timedomain_time = None
+        
+        # 1) Fix some parameters
+#        v_copy_fixed={}
+        v_copy_fixed = {
+#            'Linf': 10**0, 'Rinf': 10**8, 'Re'  : 10**8,
+            'Qe'   : 10**2, 'Pef'  : 10**1.0, 'Pei': 10**3.2,
+        }
+        v_copy = v.copy()
+        for key, fixed_value in v_copy_fixed.items():
+            if key in v_copy:
+                v_copy[key] = fixed_value
+                       
+        # 2) Define frequency sampling to match "Compute_Chargeability_Voltage_over_I0"
+        N = len(freq_array)
+        
+        # Define sampling_rate, then generate frequencies from 0 to Fs/2
+        sampling_rate = N / (1.1 * crit_time)
+        timedomain_freq = np.linspace(0, sampling_rate / 2, N)
+        timedomain_freq = timedomain_freq[1:]
+                
+        # 3) Run the model to get frequency-domain impedance Z
+        z = self.run_model(v_copy, timedomain_freq)  # <--- frequency-domain impedance
+    
+        # 4) Perform IFFT to get the unfiltered time-domain response
+        z_tilde_unfiltered = np.fft.irfft(z, n=N)
+        
+        # Determine time-step from Fs and build time array
+        # Normalize so that the zero-frequency component is accounted for
+        t = np.linspace(0, N / sampling_rate, N)
+        dt = t[1] - t[0]
+        z_tilde_unfiltered /= dt
+        
+        # 5) Filter in the TIME domain (Butterworth)
+        b, a = sig.butter(2, 0.45, fs=1)
+        timedomain_z = sig.filtfilt(b, a, z_tilde_unfiltered)
+
+        # 6) Limit time range to 'crit_time'
+        # Find first index where t exceeds crit_time
+        w_crit = np.where(t > crit_time)[0][0]
+        timedomain_time = t[:w_crit]
+        timedomain_z = timedomain_z[:w_crit]
+
+        # 7) Compute the final step response: 1 - ∫Z/∫∞Z
+        # The integral up to 'crit_time' for normalization:
+        Vm = np.sum(timedomain_z * dt)
+        
+        # Discrete integration to form the step response
+        dV = timedomain_z * dt
+        partial_sum = 0.0
+        V_of_t = []
+        for val in dV:
+            partial_sum += val
+            V_of_t.append(partial_sum)
+        
+        V_of_t = np.array(V_of_t)
+        timedomain_volt = 1.0 - (V_of_t / Vm)
+
+        return timedomain_freq, timedomain_time, timedomain_volt       
+
 
     def init_parameters(self):
         return self.negative_rinf, self.q, self.v_second
@@ -148,6 +225,7 @@ class ModelCircuitSeries(ModelCircuitParent):
         return np.array(z)
 
 class ModelCircuitParallel(ModelCircuitParent):
+    
     def run_model(self, v: dict, freq_array: np.ndarray):
         """
         The main model used in cost functions.
@@ -286,15 +364,32 @@ class ModelManual(QObject):
         spec_z = self._model_circuit.run_model(v, special_freq)
         spec_zr, spec_zi = spec_z.real, spec_z.imag
         
-        # 3) Create a new CalculationResult
+        # 3) Compute time domain values
+        
+        tdomain_freq, tdomain_volt, tdomain_time = self._model_circuit.run_time_domain(v, freq_array)
+        
+        # 4) Create a new CalculationResult
         result = CalculationResult(
             main_freq = freq_array,
             main_z_real   = z_real,
             main_z_imag   = z_imag,
+            
             special_freq  = special_freq,
             special_z_real = spec_zr,
-            special_z_imag = spec_zi
+            special_z_imag = spec_zi,
+            
+            timedomain_freq = tdomain_freq,
+            timedomain_volt = tdomain_volt,
+            timedomain_time = tdomain_time
         )
+        
+#        print("----------------------")
+#        print(tdomain_freq)
+#        print('====================')
+#        print(tdomain_volt)
+#        print('++++++++++++++++++++')
+#        print(tdomain_time)
+#        print('********************')
         
         self.model_manual_result.emit(result)
 
@@ -403,7 +498,6 @@ class ModelManual(QObject):
         
         return best_fit
                 
-
     def _build_bounds(self, free_keys):
         lower_bounds = []
         upper_bounds = []
@@ -497,7 +591,7 @@ class ModelManual(QObject):
         
     def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=5):
         # Compute sigmas (scaled standard deviations)
-        print(prior_weight)
+
         sigmas = np.array([
             (ub - lb) * gaussian_fraction for lb, ub in zip(lower_bounds, upper_bounds)
         ], dtype=float)

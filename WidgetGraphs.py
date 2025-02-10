@@ -168,6 +168,7 @@ class ParentGraph(pg.PlotWidget):
         Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
         Default: returns (Z_real, Z_imag). Subclasses override this.
         """
+        print("using old version")
         return Z_real, Z_imag
 
     def _refresh_plot(self, data_dict, plot_item):
@@ -373,9 +374,10 @@ class TimeGraph(ParentGraph):
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Amplitude")
-    
+        
+    """   
     def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
+
         Going from freq-domain data (Z_real + j*Z_imag)
         to a time-domain signal by inverse FFT.
     
@@ -383,7 +385,7 @@ class TimeGraph(ParentGraph):
         2) We define sampling frequency Fs = df * N, where N = len(freq).
         3) Then the time array is t = [0, 1/Fs, 2/Fs, ..., (N-1)/Fs].
         4) We do z_time = ifft(Z(f)), and plot the real part as the time signal.
-        """
+
         n = len(freq)
         if n < 2:
             return np.array([0]), np.array([0])
@@ -409,7 +411,7 @@ class TimeGraph(ParentGraph):
         z_time_real = np.real(z_time)
     
         return t, z_time_real
-
+        """
 
 class WidgetGraphs(QWidget):
     """
@@ -497,7 +499,6 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
-        self._tab_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
     
         # Unpack the 3 special points
         freq_sp   = calc_result.special_freq
@@ -508,7 +509,12 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
-        self._tab_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        
+        # Unpack the elements of the time domain and plot them:
+        timedomain_freq = calc_result.timedomain_freq  # Elements used for the time domain plot
+        timedomain_volt = calc_result.timedomain_volt
+        timedomain_time = calc_result.timedomain_time
+        self._tab_graph.update_parameters_manual(timedomain_freq, timedomain_volt, timedomain_time)
 
     def get_special_points(self):
         return {}
