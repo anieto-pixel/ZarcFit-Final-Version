@@ -274,6 +274,8 @@ class MainWidget(QWidget):
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_front_graphs(freq, Z_real, Z_imag)
+        freqs_uniform, t, volt_time = self.model_manual.transform_to_time_domain()
+        self.widget_graphs.update_timedomain_graph( freqs_uniform, t, volt_time)
         self.model_manual.initialize_expdata(self.file_data)
         self.freq_slider.setList(freq)
         
@@ -372,7 +374,6 @@ class MainWidget(QWidget):
         else:
             self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
     
-
     def _print_model_parameters(self):
         """
         Called when Print is requested 

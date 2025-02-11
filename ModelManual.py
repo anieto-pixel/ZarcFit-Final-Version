@@ -66,6 +66,9 @@ class ModelCircuitParent(object):
         """
         return np.array([])
     
+    def run_rock (self, v: dict, freq_array: np.ndarray):
+        return np.array([])
+    
     """
     def run_time_domain(self, v: dict, freq_array: np.ndarray, crit_time=2):
         
@@ -243,10 +246,38 @@ class ModelCircuitSeries(ModelCircuitParent):
             z.append(z_total)
 
         return np.array(z)
+    
+    def run_rock(self, v: dict, freq_array: np.ndarray):
+        v_l = v.copy()
+        
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+        self._calculate_secondary_variables(v_l)
+
+        z = []
+
+        for freq in freq_array:
+            z_cpeh = self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"])
+            zarch = self._parallel(z_cpeh, v_l["Rh"])
+
+            z_cpem = self._cpe(freq, self.q["Qm"], v_l["Pm"], v_l["Pm"])
+            zarcm = self._parallel(z_cpem, v_l["Rm"])
+
+            z_cpel = self._cpe(freq, self.q["Ql"], v_l["Pl"], v_l["Pl"])
+            zarcl = self._parallel(z_cpel, v_l["Rl"])
+
+            # Evaluate final formula
+            z_total = zarch + zarcm + zarcl 
+
+            z.append(z_total)
+
+        return np.array(z)
+    
 
 class ModelCircuitParallel(ModelCircuitParent):
     
     def run_model(self, v: dict, freq_array: np.ndarray):
+        
         """
         The main model used in cost functions.
         """
@@ -278,6 +309,34 @@ class ModelCircuitParallel(ModelCircuitParent):
             z.append(z_total)
 
         return np.array(z)
+    
+    
+    def run_rock(self, v: dict, freq_array: np.ndarray):
+        v_l = v.copy()
+
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+        self._calculate_secondary_variables(v_l)
+
+        v2 = self.v_second
+        
+        z = []
+
+        for f in freq_array:
+
+            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
+            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
+            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
+
+            z_lines = self._parallel(z_line_m, z_line_l)
+            z_rock = self._parallel(z_lines, v2["R0"])
+            zparallel = self._parallel(z_line_h, z_rock)
+
+            z_total = zparallel 
+            z.append(z_total)
+
+        return np.array(z)
+    
 
 ############################################################################3
 
@@ -397,7 +456,7 @@ class ModelManual(QObject):
         
         # 3) Compute time domain values
         
-        tdomain_freq, tdomain_volt, tdomain_time = self.run_time_domain(v, freq_array)
+        tdomain_freq, tdomain_volt, tdomain_time = self.run_time_domain(v)
         
         # 4) Create a new CalculationResult
         result = CalculationResult(
@@ -427,36 +486,60 @@ class ModelManual(QObject):
         return result
 
     #Run time domain, or calculates the exp data as time domain
-    def run_time_domain(self, v: dict, crit_time=2):
-        crit_time=2
+    def run_time_domain(self, v: dict, crit_time=2.0, n_points=2**6):
+    
+        # 1) Frequency resolution & Nyquist frequency
+        dt = crit_time / n_points   # time step
+        df = 1.0 / crit_time        # frequency step. Why this?
         
-        # 1) Fix some parameters
-        v_copy_fixed = {
-#            'Linf': 10**0, 'Rinf': 10**8, 'Re'  : 10**8,
-            'Qe'   : 10**2, 'Pef'  : 10**1.0, 'Pei': 10**3.2,
-        }
-        v_copy = v.copy()
-        for key, fixed_value in v_copy_fixed.items():
-            if key in v_copy:
-                v_copy[key] = fixed_value
-                       
-        # 2) Define frequency sampling to match "Compute_Chargeability_Voltage_over_I0"
-        timedomain_freq = self._prepare_time_domain_frequencies(crit_time)
-        # 3) Run the model to get frequency-domain impedance Z
-        timedomain_z = self._model_circuit.run_model(v_copy, timedomain_freq)
-        #4) the rest of the stuff
-        timedomain_time, timedomain_volt= self._fourier_trasnform(timedomain_freq,timedomain_z,crit_time)
+        # 2) Build the uniform frequency array for the single-sided transform
+        #divides he numebr of poitns by two, rounds down, and adds one
+        #creates an array from 1 to (n_points // 2)
+        freq_indices = np.arange(1, (n_points // 2) + 1)  
 
-        return timedomain_freq, timedomain_time, timedomain_volt       
+        #results in an array of len(freq_indices) spaced in even df increments
+        #since  df is 0.5 hz, you get alternating 0.5hz distances 
+        freqs_uniform = freq_indices * df  # shape (n_points//2,)
+        
+        #range of frequencies the data is from
+        freq = self._experiment_data["freq"]
+        f_min, f_max = freq[0], freq[-1]
 
-    def transform_to_time_domain(self, crit_time=2):
+        def clamp_freq(f):return np.clip(f, f_min, f_max)
+        print( freqs_uniform)
+
+        z_total = self._model_circuit.run_rock(v, freqs_uniform)
+
+        # 5) Use real IFFT. `irfft` expects single-sided data of length (N//2 + 1).
+        volt_time = np.fft.irfft(z_total, n=n_points)
+
+         # 6) Build the time array
+        t = np.arange(n_points) * dt
+        return freqs_uniform, t, volt_time
+
+#        return timedomain_freq, timedomain_time, timedomain_volt       
+
+    def transform_to_time_domain(self, crit_time=2.0, n_points=1024):
+        """
+        Single-sided transform that excludes f=0
+        """
         
-        timedomain_freq = self._prepare_time_domain_frequencies(crit_time)
-        timedomain_z = self._extrapolate_points_for_tine_domain(timedomain_freq)
+        # 1) Time/frequency spacing
+        dt = crit_time / n_points
+        df = 1.0 / crit_time
+        # We'll skip f=0 in the data, but we must still build an array of length (n_points//2+1) for irfft.
+
+        # 2) freq_indices from 1..(n_points//2)
+        freq_indices = np.arange(1, (n_points // 2) + 1)
+        freqs_uniform = freq_indices * df
         
-        timedomain_time, timedomain_volt= self._fourier_transform(timedomain_freq,timedomain_z,crit_time)
+        # 3) Interpolate measured data
+        z_interp= self._interpolate_points_for_time_domain(freqs_uniform)
+
+        t, volt_time = self._fourier_trasnform( n_points, z_interp, dt, df )
+
+        return freqs_uniform, t, volt_time
         
-        return timedomain_freq, timedomain_time, timedomain_volt
 
     #Get atributes or values from the model 
     def get_latest_secondaries(self):
@@ -671,76 +754,39 @@ class ModelManual(QObject):
 
     def _prepare_time_domain_frequencies(self, crit_time):
         
-        freq= self._experiment_data["freq"]
-        
-        N = len(freq)
-        
-        # Define sampling_rate, then generate frequencies from 0 to Fs/2
-        sampling_rate = N / (1.1 * crit_time)
-        timedomain_freq = np.linspace(0, sampling_rate / 2, N)
-        timedomain_freq = timedomain_freq[1:]
-        
-        return timedomain_freq
+        pass
 
-    def _extrapolate_points_for_time_domain(self, timedomain_freq):
+    def _interpolate_points_for_time_domain(self, freqs_uniform):
+        # 3) Interpolate measured data
         freq = self._experiment_data["freq"]
-        z_real = self._experiment_data["Z_real"]  # Remove the comma to avoid tuple issues
-        z_imag = self._experiment_data["Z_imag"]  # Remove the comma
-    
-        # Interpolation functions
-        func_z_real = interp1d(freq, z_real, kind='cubic', bounds_error=False, fill_value="extrapolate")
-        func_z_imag = interp1d(freq, z_imag, kind='cubic', bounds_error=False, fill_value="extrapolate")
-    
-        # Extrapolate to the new time domain frequency points
-        z_real_extrap = func_z_real(timedomain_freq)  # Pass timedomain_freq, not z_real
-        z_imag_extrap = func_z_imag(timedomain_freq)  # Pass timedomain_freq, not z_imag
-    
-        # Create complex array
-        z_extrap = z_real_extrap + 1j * z_imag_extrap  # Use 1j instead of j
-    
-        return z_extrap 
+        z_real = self._experiment_data["Z_real"]
+        z_imag = self._experiment_data["Z_imag"]
+        f_min, f_max = freq[0], freq[-1]
 
-    def _fourier_trasnform(self, timedomain_freq,timedomain_z,crit_time):#Needs breaking down
+        def clamp_freq(f):
+            return np.clip(f, f_min, f_max)
+    
+        z_real_interp = np.interp(clamp_freq(freqs_uniform), freq, z_real)
+        z_imag_interp = np.interp(clamp_freq(freqs_uniform), freq, z_imag)
+        z_interp = z_real_interp + 1j * z_imag_interp
         
-                
-        N=len(timedomain_freq)
-        sampling_rate = N/ (1.1 * crit_time)
-        
-        # 4) Perform IFFT to get the unfiltered time-domain response
-        z_tilde_unfiltered = np.fft.irfft(timedomain_z, n=N)
-        
-        # Determine time-step from Fs and build time array
-        # Normalize so that the zero-frequency component is accounted for
-        t = np.linspace(0, N / sampling_rate, N)
-        dt = t[1] - t[0]
-        z_tilde_unfiltered /= dt
-        
-        # 5) Filter in the TIME domain (Butterworth)
-        b, a = sig.butter(2, 0.45, fs=1)
-        timedomain_z = sig.filtfilt(b, a, z_tilde_unfiltered)
+        return z_interp
 
-        # 6) Limit time range to 'crit_time'
-        # Find first index where t exceeds crit_time
-        w_crit = np.where(t > crit_time)[0][0]
-        timedomain_time = t[:w_crit]
-        timedomain_z = timedomain_z[:w_crit]
-
-        # 7) Compute the final step response: 1 - ∫Z/∫∞Z
-        # The integral up to 'crit_time' for normalization:
-        Vm = np.sum(timedomain_z * dt)
-        
-        # Discrete integration to form the step response
-        dV = timedomain_z * dt
-        partial_sum = 0.0
-        V_of_t = []
-        for val in dV:
-            partial_sum += val
-            V_of_t.append(partial_sum)
-        
-        V_of_t = np.array(V_of_t)
-        timedomain_volt = 1.0 - (V_of_t / Vm)
-        
-        return timedomain_time, timedomain_volt
+    def _fourier_trasnform(self, n_points, z_interp, dt, df ):#Needs breaking down
+        # 4) Build the single-sided array for IRFFT
+         volt_spectrum = np.zeros(n_points//2 + 1, dtype=complex)
+         volt_spectrum[1:] = z_interp  # DC bin set to 0, skipping f=0 data
+     
+         # 5) Real IFFT for an n_points-length time series
+         volt_time = np.fft.irfft(volt_spectrum, n=n_points)
+     
+         # 6) Build time array
+         t = np.arange(n_points) * dt
+     
+         # Optionally build a "full" frequency array if you want to keep track
+         #freqs_full = np.arange(n_points//2 + 1) * df
+         
+         return t, volt_time
         
         
     

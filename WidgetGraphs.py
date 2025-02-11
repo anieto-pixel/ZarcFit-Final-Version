@@ -378,7 +378,6 @@ class TimeGraph(ParentGraph):
         self._refresh_graph()
 
     def _prepare_xy(self, freq, time, volt):
-        print("called")
         # Swap the order: x-axis is time, y-axis is voltage.
         return time, volt
 
