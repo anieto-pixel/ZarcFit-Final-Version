@@ -538,7 +538,8 @@ class ModelManual(QObject):
 
         t, volt_time = self._fourier_trasnform( n_points, z_interp, dt, df )
 
-        return freqs_uniform, t, volt_time
+        #return freqs_uniform, t, volt_time
+        return [1, 10, 100, 1000, 10000], [1, 10, 100, 1000, 10000],[1, 10, 100, 1000, 10000]
         
 
     #Get atributes or values from the model 
