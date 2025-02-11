@@ -273,7 +273,7 @@ class MainWidget(QWidget):
         """
         
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
-        self.widget_graphs.update_graphs(freq, Z_real, Z_imag)
+        self.widget_graphs.update_front_graphs(freq, Z_real, Z_imag)
         self.model_manual.initialize_expdata(self.file_data)
         self.freq_slider.setList(freq)
         
@@ -329,13 +329,15 @@ class MainWidget(QWidget):
     def _handle_set_allfreqs(self):
         
         self.freq_slider.default()
-        self.widget_graphs.update_graphs(
+        self.model_manual.initialize_expdata(self.file_data)
+        self.widget_graphs.update_front_graphs(
             self.file_data['freq'], 
             self.file_data['Z_real'], 
             self.file_data['Z_imag']
             )
-        self.model_manual.initialize_expdata(self.file_data)
-        
+        self.widget_graphs.update_timedomain_graph(
+            self.model_manual.transform_to_time_domain()
+            )
         self._update_sliders_data()
 
     def _handle_recover_file_values(self):

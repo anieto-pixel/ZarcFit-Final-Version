@@ -373,148 +373,150 @@ class TimeGraph(ParentGraph):
         super().__init__()
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
-        self.setLabel('left', "Amplitude")
+        self.setLabel('left', "Voltage")
         # Rebuild the graph to remove the static plot.
         self._refresh_graph()
 
-    def _prepare_xy(self, freq, volt, time):
+    def _prepare_xy(self, freq, time, volt):
         print("called")
         # Swap the order: x-axis is time, y-axis is voltage.
         return time, volt
 
-    def _refresh_graph(self):
-        # Clear the plot and create only the dynamic (blue) plot.
-        self.clear()
-        self._dynamic_plot = self.plot(
-            pen='b',             # blue line
-            symbol='o',          # circle markers
-            symbolSize=7,        # marker size
-            symbolBrush=None     # blue fill (None means default blue pen)
-        )
-        # Update only the dynamic plot with manual data.
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
-
-    def _apply_auto_scale(self):
-        # Auto-scale using the dynamic plot's (manual) data.
-        x_data, y_data = self._prepare_xy(
-            self._manual_data['freq'],
-            self._manual_data['Z_real'],
-            self._manual_data['Z_imag']
-        )
-        if x_data.size and y_data.size:
-            x_min, x_max = np.min(x_data), np.max(x_data)
-            y_min, y_max = np.min(y_data), np.max(y_data)
-            self._auto_range_in_progress = True
-            self.plotItem.getViewBox().setRange(
-                xRange=(x_min, x_max),
-                yRange=(y_min, y_max),
-                padding=0.1
-            )
-            self._auto_range_in_progress = False
 
 class WidgetGraphs(QWidget):
     """
     A widget that displays three graphs side by side:
       - A large Cole-Cole graph
       - Two smaller graphs (Bode and Phase) stacked vertically
+      - A Time-Domain graph in a separate tab
     """
+
     def __init__(self):
+        
         super().__init__()
+        self._init_graphs()
+        self._init_ui()
 
-        self._big_graph = ColeColeGraph()
-        self._small_graph_1 = BodeGraph()
-        self._small_graph_2 = PhaseGraph()
-        self._tab_graph = TimeGraph()
+    # ------------------------------------------
+    # Graph Update Methods
+    # ------------------------------------------
 
-        # Create the tab widget
-        self._tab_widget = QTabWidget()
-        self._tab_widget.addTab(self._big_graph, "Cole Graph")
-        self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
-        self._tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    def update_front_graphs(self, freq, Z_real, Z_imag):
+        """Updates the base (static) data for all graphs."""
+        
+        self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
+        self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
+        
+    def update_timedomain_graph(self, freq, time, voltage):
+        """Updates the base (static) data for all graphs."""
+        
+        self._tab_graph.update_parameters_base(freq, time, voltage)
 
-        # Remove QTabWidget's own frame so we can control the framing exactly
-        self._tab_widget.setStyleSheet("QTabWidget::pane { border: none; }")
+    def update_manual_plot(self, calc_result: CalculationResult):
+        """Updates the manual (dynamic) data for all graphs."""
+        
+        # Unpack main arrays
+        freq_main = calc_result.main_freq
+        z_real_main = calc_result.main_z_real
+        z_imag_main = calc_result.main_z_imag
 
-        # The height of the tab bar
-        tab_bar_height = self._tab_widget.tabBar().sizeHint().height()
+        # Update manual parameters for all graphs
+        self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
 
-        # LEFT SIDE: QTabWidget inside a QFrame
-        left_frame = QFrame()
-        left_frame.setFrameShape(QFrame.StyledPanel)
-        left_frame.setFrameShadow(QFrame.Raised)
-        left_layout = QVBoxLayout(left_frame)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(0)
-        left_layout.addWidget(self._tab_widget)
+        # Unpack and update special points
+        freq_sp = calc_result.special_freq
+        z_real_sp = calc_result.special_z_real
+        z_imag_sp = calc_result.special_z_imag
 
-        # RIGHT SIDE: two smaller graphs, also in a QFrame
-        right_frame = QFrame()
-        right_frame.setFrameShape(QFrame.StyledPanel)
-        right_frame.setFrameShadow(QFrame.Raised)
-        right_layout = QVBoxLayout(right_frame)
-        # Push down by the tab bar height to align the top edges of the "graph area"
-        right_layout.setContentsMargins(0, tab_bar_height, 0, 0)
-        right_layout.setSpacing(0)
-        right_layout.addWidget(self._small_graph_1)
-        right_layout.addWidget(self._small_graph_2)
+        self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
 
-        # MAIN LAYOUT
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(10)
-        main_layout.addWidget(left_frame)
-        main_layout.addWidget(right_frame)
-        self.setLayout(main_layout)
+        # Update time-domain graph
+        self._tab_graph.update_parameters_manual(
+            calc_result.timedomain_freq,
+            calc_result.timedomain_time,
+            calc_result.timedomain_volt
+        )
 
     def apply_filter_frequency_range(self, f_min, f_max):
-        """
-        Filters out data outside [f_min, f_max] for all three graphs.
-        """
+        """Filters out data outside [f_min, f_max] for all graphs."""
         
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
         self._tab_graph.filter_frequency_range(f_min, f_max)
 
-    def update_graphs(self, freq, Z_real, Z_imag):
-        """
-        Updates the 'base' (static) data for all three graphs simultaneously.
-        """
-        self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
-        self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
-        self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
-#        self._tab_graph.update_parameters_base(freq, Z_real, Z_imag)
-
-    def update_manual_plot(self, calc_result: CalculationResult):
-        """
-        Updates the 'manual' (dynamic) data for all three graphs.
-        """
-        # Unpack main arrays
-        freq_main   = calc_result.main_freq
-        z_real_main = calc_result.main_z_real
-        z_imag_main = calc_result.main_z_imag
+    # ------------------------------------------
+    # Private Methods for UI Creation
+    # ------------------------------------------
     
-        # Pass them as 'manual/dynamic' data to each graph
-        self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
-        self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
-        self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
-    
-        # Unpack the 3 special points
-        freq_sp   = calc_result.special_freq
-        z_real_sp = calc_result.special_z_real
-        z_imag_sp = calc_result.special_z_imag
-    
-        # Plot those 3 points in each graph. We'll create a new function to handle that:
-        self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
-        self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
-        self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+    def _init_graphs(self):
+        """Initializes graph widgets."""
         
-        print("called update parameters")
-        # Unpack the elements of the time domain and plot them:
-        timedomain_freq = calc_result.timedomain_freq  # Elements used for the time domain plot
-        timedomain_volt = calc_result.timedomain_volt
-        timedomain_time = calc_result.timedomain_time
-        self._tab_graph.update_parameters_manual(timedomain_freq, timedomain_volt, timedomain_time)
+        self._big_graph = ColeColeGraph()
+        self._small_graph_1 = BodeGraph()
+        self._small_graph_2 = PhaseGraph()
+        self._tab_graph = TimeGraph()
+    
+    # Private Methods for UI Creation
+    def _init_ui(self):
+        """Initializes and sets up the UI layout."""
+        
+        # Create the tab widget
+        self._tab_widget = QTabWidget()
+        self._tab_widget.addTab(self._big_graph, "Cole Graph")
+        self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
+        self._tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tab_widget.setStyleSheet("QTabWidget::pane { border: none; }")  # Remove default border
+
+        # Determine tab bar height for alignment
+        tab_bar_height = self._tab_widget.tabBar().sizeHint().height()
+
+        # Create layout components using helper methods
+        left_panel = self._create_left_panel()
+        right_panel = self._create_right_panel(tab_bar_height)
+
+        # MAIN LAYOUT: Places left and right panels side by side
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(10)
+        main_layout.addWidget(left_panel)
+        main_layout.addWidget(right_panel)
+        
+        self.setLayout(main_layout)
+
+    def _create_left_panel(self):
+        """Creates the left panel containing the QTabWidget inside a QFrame."""
+        frame = self._create_frame()
+        layout = self._create_vbox_layout(frame, margins=(0, 0, 0, 0))
+        layout.addWidget(self._tab_widget)
+        return frame
+
+    def _create_right_panel(self, tab_bar_height):
+        """Creates the right panel containing the two smaller graphs."""
+        frame = self._create_frame()
+        layout = self._create_vbox_layout(frame, margins=(0, tab_bar_height, 0, 0))
+        layout.addWidget(self._small_graph_1)
+        layout.addWidget(self._small_graph_2)
+        return frame
+
+    def _create_frame(self):
+        """Creates and returns a styled QFrame."""
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setFrameShadow(QFrame.Raised)
+        return frame
+
+    def _create_vbox_layout(self, parent, margins=(0, 0, 0, 0)):
+        """Creates and returns a QVBoxLayout with the specified margins."""
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(0)
+        return layout
 
 
 # -----------------------------------------------------------------------

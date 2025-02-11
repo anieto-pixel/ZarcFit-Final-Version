@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 # manual_model.py
 
-import scipy.signal as sig
+import inspect
+import logging
+from dataclasses import dataclass
+
 import numpy as np
 import scipy.optimize as opt
+import scipy.signal as sig
+from scipy.interpolate import interp1d
 from scipy.optimize import Bounds
-import logging
-import inspect
-from dataclasses import dataclass
-from PyQt5.QtCore import QObject, pyqtSignal, QCoreApplication
+
+from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
+
 
 # "Bounds are sacled. Need to add padding for 0 values, handle Qei, and implement a way of making Rinf negative"
 
@@ -29,9 +33,6 @@ class CalculationResult:
     timedomain_time:   np.ndarray = None
     timedomain_volt:   np.ndarray = None
 
-    
-    
-import numpy as np
 
 class ModelCircuitParent(object):
     
@@ -39,20 +40,33 @@ class ModelCircuitParent(object):
         
         super().__init__()
         
-        # --- FIX #1: Avoid mutable default arguments, properly assign attributes.
+        """Avoid mutable default arguments, properly assign attributes."""
         if q is None:
             q = {}
-            
         if v_second is None:
             v_second = {}
             
+        """Attributes"""
         self.negative_rinf = negative_rinf
         self.q = q
         self.v_second = v_second
+        
+    # ------------------------------------------
+    # Public Methods
+    # ------------------------------------------
+
+    def init_parameters(self):
+        """Returns the current state of the model's atributes"""
+        return self.negative_rinf, self.q, self.v_second
 
     def run_model(self, v: dict, freq_array: np.ndarray):
+        """
+        Contains the model of an electric circuit that uses the received values v as variables
+        and returns the impedance array of the cercuit
+        """
         return np.array([])
     
+    """
     def run_time_domain(self, v: dict, freq_array: np.ndarray, crit_time=2):
         
         timedomain_freq = None
@@ -116,21 +130,19 @@ class ModelCircuitParent(object):
         timedomain_volt = 1.0 - (V_of_t / Vm)
 
         return timedomain_freq, timedomain_time, timedomain_volt       
-
-
-    def init_parameters(self):
-        return self.negative_rinf, self.q, self.v_second
+    """
 
     # ------------------------------------------
-    # Variable Calculations
+    # Private Methods
     # ------------------------------------------
+    
+    # Calculates secondary variables used by the model
     def _calculate_secondary_variables(self, v):
         """
         Computes 'series' and 'parallel' secondary variables
         Returns a dict of newly calculated secondary variables.
         """
-        # --- FIX #2: Method name mismatch: renamed 'self.q_from_f0' calls
-        # to 'self._q_from_f0' for consistency.
+        
         Qh = self._q_from_f0(v["Rh"], v["Fh"], v["Ph"])
         Qm = self._q_from_f0(v["Rm"], v["Fm"], v["Pm"])
         Ql = self._q_from_f0(v["Rl"], v["Fl"], v["Pl"])
@@ -147,10 +159,10 @@ class ModelCircuitParent(object):
         self.v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"]) * (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]) / v["Rl"]
         self.v_second["pQl"] = Ql * (v["Rl"] / (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]))**2
 
-    # ----------------------------------------------------
-    # Circuit Methods
-    # ----------------------------------------------------
+    # Circuit Methods. Simulates the effect of various circuit elements
     def _inductor(self, freq, linf):
+        """Returns the impedance of an inductor at certain freq and inductance"""
+        
         if linf == 0:
             raise ValueError("Inductance (linf) cannot be zero.")
         if freq < 0:
@@ -159,6 +171,8 @@ class ModelCircuitParent(object):
         return result
 
     def _q_from_f0(self, r, f0, p):
+        """Returns the q of a cpe given the f0"""
+        
         if r == 0:
             raise ValueError("Resistance r cannot be zero.")
         if f0 <= 0:
@@ -167,6 +181,8 @@ class ModelCircuitParent(object):
         return result
 
     def _cpe(self, freq, q, pf, pi):
+        """Returns the impedance of a CPE for a certain freq"""
+        
         if q == 0:
             raise ValueError("Parameter q cannot be zero.")
         if freq < 0:
@@ -182,6 +198,9 @@ class ModelCircuitParent(object):
         return result
 
     def _parallel(self, z_1, z_2):
+        """Returns the impedance of two parallel components, 
+        given the impedanc eof the components"""
+        
         if z_1 == 0 or z_2 == 0:
             raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
         denominator = (1 / z_1) + (1 / z_2)
@@ -190,7 +209,7 @@ class ModelCircuitParent(object):
 
 # Rinf needs to be able to be negative
 class ModelCircuitSeries(ModelCircuitParent):
-    # Mostly for testing purposes
+
     def run_model(self, v: dict, freq_array: np.ndarray):
         """
         Alternative model path for testing (not used in cost functions directly).
@@ -276,27 +295,36 @@ class ModelManual(QObject):
     def __init__(self):
 
         super().__init__()
-
+        
+        """Atributes"""
+        
         self._experiment_data = {
             "freq": np.array([1, 10, 100, 1000, 10000]),
             "Z_real": np.zeros(5),
             "Z_imag": np.zeros(5),
         }
-        
+
+        self.disabled_variables = set()
+        self.gaussian_prior = False        
         self._model_circuit=ModelCircuitParallel()
         
-        self.disabled_variables = set()
-        
-        self.gaussian_prior = False
     
     # ----------------------------------------------------
     # Public Method
     # ----------------------------------------------------    
 
+    #Initialization of experimental values
     def initialize_expdata(self, file_data: dict):
+        """sets the experiment_data dictionary to an external dictionary"""
+        #test that the name of the keys are consistent
+        
         self._experiment_data= file_data
         
+    #Setter methods. Set atributes
     def set_disabled_variables(self, key, disabled):
+        """takes the key of a variable, 
+        disables/enables it for the fit"""
+        
         if disabled:
             self.disabled_variables.add(key)  
         else:
@@ -328,7 +356,8 @@ class ModelManual(QObject):
                 q=dict(old_q),         # optionally copy to avoid reference confusion
                 v_second=dict(old_vsec)
             )
-        
+          
+    # Methods to call from the user to request fits
     def fit_model_cole(self, v_initial_guess):
         #MM should pass sigma here, probably?
         """
@@ -346,6 +375,7 @@ class ModelManual(QObject):
         print("bode")
         return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=500)
         
+    #Runs the model "manually" from outside
     def run_model_manual(self,v):
         """
         Main entry point to run the model with the given slider/fit parameters `v`.
@@ -367,7 +397,7 @@ class ModelManual(QObject):
         
         # 3) Compute time domain values
         
-        tdomain_freq, tdomain_volt, tdomain_time = self._model_circuit.run_time_domain(v, freq_array)
+        tdomain_freq, tdomain_volt, tdomain_time = self.run_time_domain(v, freq_array)
         
         # 4) Create a new CalculationResult
         result = CalculationResult(
@@ -396,6 +426,39 @@ class ModelManual(QObject):
 
         return result
 
+    #Run time domain, or calculates the exp data as time domain
+    def run_time_domain(self, v: dict, crit_time=2):
+        crit_time=2
+        
+        # 1) Fix some parameters
+        v_copy_fixed = {
+#            'Linf': 10**0, 'Rinf': 10**8, 'Re'  : 10**8,
+            'Qe'   : 10**2, 'Pef'  : 10**1.0, 'Pei': 10**3.2,
+        }
+        v_copy = v.copy()
+        for key, fixed_value in v_copy_fixed.items():
+            if key in v_copy:
+                v_copy[key] = fixed_value
+                       
+        # 2) Define frequency sampling to match "Compute_Chargeability_Voltage_over_I0"
+        timedomain_freq = self._prepare_time_domain_frequencies(crit_time)
+        # 3) Run the model to get frequency-domain impedance Z
+        timedomain_z = self._model_circuit.run_model(v_copy, timedomain_freq)
+        #4) the rest of the stuff
+        timedomain_time, timedomain_volt= self._fourier_trasnform(timedomain_freq,timedomain_z,crit_time)
+
+        return timedomain_freq, timedomain_time, timedomain_volt       
+
+    def transform_to_time_domain(self, crit_time=2):
+        
+        timedomain_freq = self._prepare_time_domain_frequencies(crit_time)
+        timedomain_z = self._extrapolate_points_for_tine_domain(timedomain_freq)
+        
+        timedomain_time, timedomain_volt= self._fourier_transform(timedomain_freq,timedomain_z,crit_time)
+        
+        return timedomain_freq, timedomain_time, timedomain_volt
+
+    #Get atributes or values from the model 
     def get_latest_secondaries(self):
         """
         Return the most recent dictionary of secondary variables
@@ -405,13 +468,13 @@ class ModelManual(QObject):
 
     def get_model_parameters(self):
         return self._model_circuit.q | self._model_circuit.v_second  
-    
-    
+        
     # ----------------------------------------------------
-    # Fit Methods
+    # Private Methods
     # ----------------------------------------------------
-    
-    def _fit_model(self, residual_func, v_given, prior_weight=0):
+
+    # Fit Related Private Methods
+    def _fit_model(self, residual_func, v_given, prior_weight=0):#this method needs breaking down, it is scary
         """
         Fit the model using a residual function plus (optionally) a Gaussian prior
         that penalizes deviation from the initial guess in scaled space.
@@ -441,7 +504,6 @@ class ModelManual(QObject):
             }
             full_v_dict = {**locked_v_dict, **free_v_dict}
             
-
             
             # c) Run Core model residual function
             try:
@@ -498,34 +560,7 @@ class ModelManual(QObject):
         self.model_manual_values.emit(best_fit)
         
         return best_fit
-                
-    def _build_bounds(self, free_keys):
-        lower_bounds = []
-        upper_bounds = []
-        
-        dictionary_lower = {
-            'Linf':1e-12,'Rinf': 1e-2, 
-            'Rh': 1e-2,'Fh': 1e-2,'Ph': 0.0, 
-            'Rm': 1e-2,'Fm': 1e-2, 'Pm': 0.0,
-            'Rl': 1e-2,'Fl': 1e-2,'Pl': 0.0,
-            'Re': 1e-2,'Qe': 1e-8,'Pef': 0.0, 'Pei': -3.2,
-        }
-        
-        dictionary_upper= {
-            'Linf':1e-3,'Rinf':1e8,
-            'Rh': 1e8,'Fh': 1e8,'Ph': 1.0,
-            'Rm': 1e8,'Fm': 1e8,'Pm': 1.0,
-            'Rl': 1e8,'Fl': 1e8,'Pl': 1.0,
-            'Re': 1e8,'Qe': 1e2,'Pef': 1.0,'Pei': 0.8,
-        }
-        
-        
-        lower_bounds = self._scale_v_to_x(free_keys, dictionary_lower)
-        upper_bounds = self._scale_v_to_x(free_keys, dictionary_upper)
-
-                
-        return lower_bounds, upper_bounds
-   
+    
     def _residual_cole(self, v: dict) -> np.ndarray:
         """
         Returns the residual vector [real_res1, real_res2, ..., imag_res1, imag_res2, ...].
@@ -589,7 +624,32 @@ class ModelManual(QObject):
         weight *= 1 + 3 * np.exp(-15 * v["Pef"])  # Modified Zarc components
         
         return weight
+    
+    def _build_bounds(self, free_keys):
+        lower_bounds = []
+        upper_bounds = []
         
+        dictionary_lower = {
+            'Linf':1e-12,'Rinf': 1e-2, 
+            'Rh': 1e-2,'Fh': 1e-2,'Ph': 0.0, 
+            'Rm': 1e-2,'Fm': 1e-2, 'Pm': 0.0,
+            'Rl': 1e-2,'Fl': 1e-2,'Pl': 0.0,
+            'Re': 1e-2,'Qe': 1e-8,'Pef': 0.0, 'Pei': -3.2,
+        }
+        
+        dictionary_upper= {
+            'Linf':1e-3,'Rinf':1e8,
+            'Rh': 1e8,'Fh': 1e8,'Ph': 1.0,
+            'Rm': 1e8,'Fm': 1e8,'Pm': 1.0,
+            'Rl': 1e8,'Fl': 1e8,'Pl': 1.0,
+            'Re': 1e8,'Qe': 1e2,'Pef': 1.0,'Pei': 0.8,
+        }
+        
+        lower_bounds = self._scale_v_to_x(free_keys, dictionary_lower)
+        upper_bounds = self._scale_v_to_x(free_keys, dictionary_upper)
+
+        return lower_bounds, upper_bounds
+   
     def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=5):
         # Compute sigmas (scaled standard deviations)
 
@@ -606,9 +666,86 @@ class ModelManual(QObject):
         """Test validity criteria Fh > Fm > Fl"""
         
         return (v_dict["Fh"] >= v_dict["Fm"] and v_dict["Fm"] >= v_dict["Fl"])
+    
+    #Time Domain Related PRivate Methods
 
+    def _prepare_time_domain_frequencies(self, crit_time):
+        
+        freq= self._experiment_data["freq"]
+        
+        N = len(freq)
+        
+        # Define sampling_rate, then generate frequencies from 0 to Fs/2
+        sampling_rate = N / (1.1 * crit_time)
+        timedomain_freq = np.linspace(0, sampling_rate / 2, N)
+        timedomain_freq = timedomain_freq[1:]
+        
+        return timedomain_freq
+
+    def _extrapolate_points_for_time_domain(self, timedomain_freq):
+        freq = self._experiment_data["freq"]
+        z_real = self._experiment_data["Z_real"]  # Remove the comma to avoid tuple issues
+        z_imag = self._experiment_data["Z_imag"]  # Remove the comma
+    
+        # Interpolation functions
+        func_z_real = interp1d(freq, z_real, kind='cubic', bounds_error=False, fill_value="extrapolate")
+        func_z_imag = interp1d(freq, z_imag, kind='cubic', bounds_error=False, fill_value="extrapolate")
+    
+        # Extrapolate to the new time domain frequency points
+        z_real_extrap = func_z_real(timedomain_freq)  # Pass timedomain_freq, not z_real
+        z_imag_extrap = func_z_imag(timedomain_freq)  # Pass timedomain_freq, not z_imag
+    
+        # Create complex array
+        z_extrap = z_real_extrap + 1j * z_imag_extrap  # Use 1j instead of j
+    
+        return z_extrap 
+
+    def _fourier_trasnform(self, timedomain_freq,timedomain_z,crit_time):#Needs breaking down
+        
+                
+        N=len(timedomain_freq)
+        sampling_rate = N/ (1.1 * crit_time)
+        
+        # 4) Perform IFFT to get the unfiltered time-domain response
+        z_tilde_unfiltered = np.fft.irfft(timedomain_z, n=N)
+        
+        # Determine time-step from Fs and build time array
+        # Normalize so that the zero-frequency component is accounted for
+        t = np.linspace(0, N / sampling_rate, N)
+        dt = t[1] - t[0]
+        z_tilde_unfiltered /= dt
+        
+        # 5) Filter in the TIME domain (Butterworth)
+        b, a = sig.butter(2, 0.45, fs=1)
+        timedomain_z = sig.filtfilt(b, a, z_tilde_unfiltered)
+
+        # 6) Limit time range to 'crit_time'
+        # Find first index where t exceeds crit_time
+        w_crit = np.where(t > crit_time)[0][0]
+        timedomain_time = t[:w_crit]
+        timedomain_z = timedomain_z[:w_crit]
+
+        # 7) Compute the final step response: 1 - ∫Z/∫∞Z
+        # The integral up to 'crit_time' for normalization:
+        Vm = np.sum(timedomain_z * dt)
+        
+        # Discrete integration to form the step response
+        dV = timedomain_z * dt
+        partial_sum = 0.0
+        V_of_t = []
+        for val in dV:
+            partial_sum += val
+            V_of_t.append(partial_sum)
+        
+        V_of_t = np.array(V_of_t)
+        timedomain_volt = 1.0 - (V_of_t / Vm)
+        
+        return timedomain_time, timedomain_volt
+        
+        
+    
     # ----------------------------------------------------
-    # Private Helpers
+    # General Helpers
     # ----------------------------------------------------
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
