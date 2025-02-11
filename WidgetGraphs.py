@@ -168,7 +168,7 @@ class ParentGraph(pg.PlotWidget):
         Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
         Default: returns (Z_real, Z_imag). Subclasses override this.
         """
-        print("using old version")
+
         return Z_real, Z_imag
 
     def _refresh_plot(self, data_dict, plot_item):
@@ -368,50 +368,49 @@ class ColeColeGraph(ParentGraph):
         return Z_real, -Z_imag
     
 class TimeGraph(ParentGraph):
+
     def __init__(self):
         super().__init__()
-        
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Amplitude")
-        
-    """   
-    def _prepare_xy(self, freq, Z_real, Z_imag):
+        # Rebuild the graph to remove the static plot.
+        self._refresh_graph()
 
-        Going from freq-domain data (Z_real + j*Z_imag)
-        to a time-domain signal by inverse FFT.
-    
-        1) We assume freq is uniformly spaced: df = freq[i+1] - freq[i].
-        2) We define sampling frequency Fs = df * N, where N = len(freq).
-        3) Then the time array is t = [0, 1/Fs, 2/Fs, ..., (N-1)/Fs].
-        4) We do z_time = ifft(Z(f)), and plot the real part as the time signal.
+    def _prepare_xy(self, freq, volt, time):
+        print("called")
+        # Swap the order: x-axis is time, y-axis is voltage.
+        return time, volt
 
-        n = len(freq)
-        if n < 2:
-            return np.array([0]), np.array([0])
-        
-        # 1) Compute spacing, assume it's uniform
-        df = freq[1] - freq[0]
-        
-        # 2) Sampling freq = df*N
-        Fs = df * n
-        
-        # 3) Create a time array
-        t = np.arange(n) / Fs
-        
-        # 4) Form the complex array in frequency domain
-        Z_complex = Z_real + 1j * Z_imag
-    
-        # Warning: This example does not handle negative frequencies or zero-padding,
-        #          which are typically required for a "proper" IFFT of real-world signals.
-        #          It's just a demonstration of going from freq -> time via IFFT.
-        z_time = np.fft.ifft(Z_complex)
-        
-        # We'll plot only the real part.
-        z_time_real = np.real(z_time)
-    
-        return t, z_time_real
-        """
+    def _refresh_graph(self):
+        # Clear the plot and create only the dynamic (blue) plot.
+        self.clear()
+        self._dynamic_plot = self.plot(
+            pen='b',             # blue line
+            symbol='o',          # circle markers
+            symbolSize=7,        # marker size
+            symbolBrush=None     # blue fill (None means default blue pen)
+        )
+        # Update only the dynamic plot with manual data.
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+    def _apply_auto_scale(self):
+        # Auto-scale using the dynamic plot's (manual) data.
+        x_data, y_data = self._prepare_xy(
+            self._manual_data['freq'],
+            self._manual_data['Z_real'],
+            self._manual_data['Z_imag']
+        )
+        if x_data.size and y_data.size:
+            x_min, x_max = np.min(x_data), np.max(x_data)
+            y_min, y_max = np.min(y_data), np.max(y_data)
+            self._auto_range_in_progress = True
+            self.plotItem.getViewBox().setRange(
+                xRange=(x_min, x_max),
+                yRange=(y_min, y_max),
+                padding=0.1
+            )
+            self._auto_range_in_progress = False
 
 class WidgetGraphs(QWidget):
     """
@@ -484,7 +483,7 @@ class WidgetGraphs(QWidget):
         self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
         self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
         self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
-        self._tab_graph.update_parameters_base(freq, Z_real, Z_imag)
+#        self._tab_graph.update_parameters_base(freq, Z_real, Z_imag)
 
     def update_manual_plot(self, calc_result: CalculationResult):
         """
@@ -510,14 +509,13 @@ class WidgetGraphs(QWidget):
         self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         
+        print("called update parameters")
         # Unpack the elements of the time domain and plot them:
         timedomain_freq = calc_result.timedomain_freq  # Elements used for the time domain plot
         timedomain_volt = calc_result.timedomain_volt
         timedomain_time = calc_result.timedomain_time
         self._tab_graph.update_parameters_manual(timedomain_freq, timedomain_volt, timedomain_time)
 
-    def get_special_points(self):
-        return {}
 
 # -----------------------------------------------------------------------
 #  Quick test

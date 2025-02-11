@@ -26,8 +26,9 @@ class CalculationResult:
     special_z_imag: np.ndarray = None
     
     timedomain_freq:   np.ndarray = None   # Elements used for the time domain plot
-    timedomain_volt:   np.ndarray = None
     timedomain_time:   np.ndarray = None
+    timedomain_volt:   np.ndarray = None
+
     
     
 import numpy as np
@@ -379,8 +380,8 @@ class ModelManual(QObject):
             special_z_imag = spec_zi,
             
             timedomain_freq = tdomain_freq,
-            timedomain_volt = tdomain_volt,
-            timedomain_time = tdomain_time
+            timedomain_time = tdomain_time,
+            timedomain_volt = tdomain_volt
         )
         
 #        print("----------------------")
