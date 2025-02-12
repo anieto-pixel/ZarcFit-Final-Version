@@ -456,7 +456,8 @@ class ModelManual(QObject):
         
         # 3) Compute time domain values
         
-        tdomain_freq, tdomain_volt, tdomain_time = self.run_time_domain(v)
+        tdomain_freq, tdomain_time, tdomain_volt = self.run_time_domain(v)
+        print(tdomain_freq, tdomain_time, tdomain_volt)
         
         # 4) Create a new CalculationResult
         result = CalculationResult(
@@ -487,35 +488,29 @@ class ModelManual(QObject):
 
     #Run time domain, or calculates the exp data as time domain
     def run_time_domain(self, v: dict, crit_time=2.0, n_points=2**6):
-    
-        # 1) Frequency resolution & Nyquist frequency
-        dt = crit_time / n_points   # time step
-        df = 1.0 / crit_time        # frequency step. Why this?
-        
-        # 2) Build the uniform frequency array for the single-sided transform
-        #divides he numebr of poitns by two, rounds down, and adds one
-        #creates an array from 1 to (n_points // 2)
-        freq_indices = np.arange(1, (n_points // 2) + 1)  
-
-        #results in an array of len(freq_indices) spaced in even df increments
-        #since  df is 0.5 hz, you get alternating 0.5hz distances 
-        freqs_uniform = freq_indices * df  # shape (n_points//2,)
-        
-        #range of frequencies the data is from
         freq = self._experiment_data["freq"]
+#        z_real = self._experiment_data["Z_real"]
+#        z_imag = self._experiment_data["Z_imag"]
+        
         f_min, f_max = freq[0], freq[-1]
+        
+        freq_even = np.linspace(f_min, f_max, len(freq ) )
+        z_even = self._model_circuit.run_rock(v, freq_even)
+    
+        I0=5 #assume 5Ampers, for no particular reason
+        w= 2*np.pi*freq
+        i_step_fft = I0 / (1j * w)
+      
+        v_fft = i_step_fft * z_even  # single-sided frequency domain
+        v_time_complex = np.fft.ifft(v_fft, n=len(freq))
+        v_time = v_time_complex.real
+        
+        dt = 1.0 / (2.0 * f_max)
+        t_axis = np.arange(len(freq)) * dt
 
-        def clamp_freq(f):return np.clip(f, f_min, f_max)
-        print( freqs_uniform)
+        print(v_time)
 
-        z_total = self._model_circuit.run_rock(v, freqs_uniform)
-
-        # 5) Use real IFFT. `irfft` expects single-sided data of length (N//2 + 1).
-        volt_time = np.fft.irfft(z_total, n=n_points)
-
-         # 6) Build the time array
-        t = np.arange(n_points) * dt
-        return freqs_uniform, t, volt_time
+        return freq_even, t_axis, v_time
 
 #        return timedomain_freq, timedomain_time, timedomain_volt       
 
@@ -524,22 +519,28 @@ class ModelManual(QObject):
         Single-sided transform that excludes f=0
         """
         
-        # 1) Time/frequency spacing
-        dt = crit_time / n_points
-        df = 1.0 / crit_time
-        # We'll skip f=0 in the data, but we must still build an array of length (n_points//2+1) for irfft.
-
-        # 2) freq_indices from 1..(n_points//2)
-        freq_indices = np.arange(1, (n_points // 2) + 1)
-        freqs_uniform = freq_indices * df
+        freq = self._experiment_data["freq"]
+        z_real = self._experiment_data["Z_real"]
+        z_imag = self._experiment_data["Z_imag"]
+        z_total= z_real + 1j*z_imag
         
-        # 3) Interpolate measured data
-        z_interp= self._interpolate_points_for_time_domain(freqs_uniform)
+        f_min, f_max = freq[0], freq[-1]
 
-        t, volt_time = self._fourier_trasnform( n_points, z_interp, dt, df )
+        freq_even = np.linspace(f_min, f_max, len(freq ) )
+        z_even = np.interp(freq_even, freq, z_total)
+        
+        I0=5 #assume 5Ampers, for no particular reason
+        w= 2*np.pi*freq
+        i_step_fft = I0 / (1j * w)
+      
+        v_fft = i_step_fft * z_even  # single-sided frequency domain
+        v_time_complex = np.fft.ifft(v_fft, n=len(freq))
+        v_time = v_time_complex.real
+        
+        dt = 1.0 / (2.0 * f_max)
+        t_axis = np.arange(len(freq)) * dt
 
-        #return freqs_uniform, t, volt_time
-        return [1, 10, 100, 1000, 10000], [1, 10, 100, 1000, 10000],[1, 10, 100, 1000, 10000]
+        return freq_even, t_axis, v_time
         
 
     #Get atributes or values from the model 
