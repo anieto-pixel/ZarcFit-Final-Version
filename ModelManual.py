@@ -210,42 +210,7 @@ class ModelCircuitParent(object):
         result = 1 / denominator
         return result
 
-# Rinf needs to be able to be negative
 class ModelCircuitSeries(ModelCircuitParent):
-
-    def run_model(self, v: dict, freq_array: np.ndarray):
-        """
-        Alternative model path for testing (not used in cost functions directly).
-        """
-        v_l = v.copy()
-        
-        if self.negative_rinf:
-            v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
-
-        z = []
-
-        for freq in freq_array:
-            zinf = self._inductor(freq, v_l["Linf"]) + v_l["Rinf"]
-
-            z_cpeh = self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"])
-            zarch = self._parallel(z_cpeh, v_l["Rh"])
-
-            z_cpem = self._cpe(freq, self.q["Qm"], v_l["Pm"], v_l["Pm"])
-            zarcm = self._parallel(z_cpem, v_l["Rm"])
-
-            z_cpel = self._cpe(freq, self.q["Ql"], v_l["Pl"], v_l["Pl"])
-            zarcl = self._parallel(z_cpel, v_l["Rl"])
-
-            z_cpee = self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"])
-            zarce = self._parallel(z_cpee, v_l["Re"])
-
-            # Evaluate final formula
-            z_total = zinf + zarch + zarcm + zarcl + zarce
-
-            z.append(z_total)
-
-        return np.array(z)
     
     def run_rock(self, v: dict, freq_array: np.ndarray):
         v_l = v.copy()
@@ -266,54 +231,31 @@ class ModelCircuitSeries(ModelCircuitParent):
             z_cpel = self._cpe(freq, self.q["Ql"], v_l["Pl"], v_l["Pl"])
             zarcl = self._parallel(z_cpel, v_l["Rl"])
 
-            # Evaluate final formula
             z_total = zarch + zarcm + zarcl 
-
             z.append(z_total)
 
         return np.array(z)
+    
+    def run_model(self, v: dict, freq_array: np.ndarray):
+        z = self.run_rock(v, freq_array)
+        v_l = v.copy()
+
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+        self._calculate_secondary_variables(v_l)
+
+        zinf = [self._inductor(freq, v_l["Linf"]) + v_l["Rinf"] for freq in freq_array]
+        z_cpee = [self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for freq in freq_array]
+        zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
+        
+        return np.array([zinf[i] + z[i] + zarce[i] for i in range(len(freq_array))])
     
 
 class ModelCircuitParallel(ModelCircuitParent):
     
-    def run_model(self, v: dict, freq_array: np.ndarray):
-        
-        """
-        The main model used in cost functions.
-        """
-        v_l = v.copy()
-
-        if self.negative_rinf:
-            v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
-
-        v2 = self.v_second
-        
-        z = []
-
-        for f in freq_array:
-            zinf = self._inductor(f, v_l["Linf"])
-
-            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
-            z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
-            z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
-
-            z_lines = self._parallel(z_line_m, z_line_l)
-            z_rock = self._parallel(z_lines, v2["R0"])
-            zparallel = self._parallel(z_line_h, z_rock)
-
-            z_cpee = self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"])
-            zarce = self._parallel(z_cpee, v_l["Re"])
-
-            z_total = zinf + zparallel + zarce
-            z.append(z_total)
-
-        return np.array(z)
-    
-    
     def run_rock(self, v: dict, freq_array: np.ndarray):
         v_l = v.copy()
-
+        
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
         self._calculate_secondary_variables(v_l)
@@ -323,7 +265,6 @@ class ModelCircuitParallel(ModelCircuitParent):
         z = []
 
         for f in freq_array:
-
             z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
             z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
             z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
@@ -332,10 +273,23 @@ class ModelCircuitParallel(ModelCircuitParent):
             z_rock = self._parallel(z_lines, v2["R0"])
             zparallel = self._parallel(z_line_h, z_rock)
 
-            z_total = zparallel 
-            z.append(z_total)
+            z.append(zparallel)
 
         return np.array(z)
+    
+    def run_model(self, v: dict, freq_array: np.ndarray):
+        z = self.run_rock(v, freq_array)
+        v_l = v.copy()
+
+        if self.negative_rinf:
+            v_l['Rinf'] = -v_l['Rinf']
+        self._calculate_secondary_variables(v_l)
+
+        zinf = [self._inductor(f, v_l["Linf"]) for f in freq_array]
+        z_cpee = [self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for f in freq_array]
+        zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
+        
+        return np.array([zinf[i] + z[i] + zarce[i] for i in range(len(freq_array))])
     
 
 ############################################################################3
@@ -502,7 +456,45 @@ class ModelManual(QObject):
         return result
 
     #Run time domain, or calculates the exp data as time domain
-    def run_time_domain(self, v: dict, crit_time=2.0, n_points=2**6):
+    def run_time_domain(self, v: dict, N=2**8, T=4, crit_time=2):
+        
+        # 1) Define the frequency range and sampling rate
+        sampling_rate = N / (1.1 * T)  # Sampling frequency
+        timedomain_freq = np.linspace(0, sampling_rate / 2, N // 2 + 1)[1:]  # Avoid zero frequency
+    
+        # 2) Compute frequency-domain impedance from the model
+        z = self._model_circuit.run_rock(v, timedomain_freq)  
+    
+        # 3) Perform IFFT to obtain the time-domain response
+        # Ensure IFFT input size matches expected behavior (N/2 + 1 bins)
+        z_full = np.zeros(N, dtype=complex)
+        z_full[:len(z)] = z  # Place impedance values
+        z_full[len(z):] = np.conj(z[::-1])  # Mirror the complex conjugate for symmetry
+    
+        z_tilde_unfiltered = np.fft.irfft(z_full, n=N)
+    
+        # 4) Define time axis based on sampling rate
+        t = np.linspace(0, N / sampling_rate, N, endpoint=False)  
+        dt = t[1] - t[0]  
+    
+        # 5) Apply Butterworth filter (fixing sampling frequency)
+        b, a = sig.butter(2, 0.3, fs=sampling_rate)  # Use 0.3 cutoff to avoid distortions
+        timedomain_z = sig.filtfilt(b, a, z_tilde_unfiltered)
+    
+        # 6) Limit the response to 'crit_time'
+        w_crit = np.where(t >= crit_time)[0][0]
+        timedomain_time = t[:w_crit]
+        timedomain_z = timedomain_z[:w_crit]
+    
+        # 7) Compute the step response: 1 - ∫Z/∫∞Z
+        Vm = np.trapz(timedomain_z, dx=dt)  # Use trapezoidal integration
+        V_of_t = np.cumsum(timedomain_z) * dt  # Discrete integration
+    
+        timedomain_volt = 1.0 - (V_of_t / Vm)
+    
+        return timedomain_freq, timedomain_time, timedomain_volt
+              
+        """
         freq = self._experiment_data["freq"]
 #        z_real = self._experiment_data["Z_real"]
 #        z_imag = self._experiment_data["Z_imag"]
@@ -526,7 +518,8 @@ class ModelManual(QObject):
 
         return freq_even, t_axis, v_time
 
-#        return timedomain_freq, timedomain_time, timedomain_volt       
+#        return timedomain_freq, timedomain_time, timedomain_volt   
+"""    
 
     def transform_to_time_domain(self, crit_time=2.0, n_points=1024):
         """
