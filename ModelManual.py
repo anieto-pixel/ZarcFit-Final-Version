@@ -337,7 +337,7 @@ class ModelManual(QObject):
         self._experiment_data= file_data
         
     #Setter methods. Set atributes
-    def set_disabled_variables(self, key, disabled):
+    def set_disabled_variables(self, key: str, disabled: bool):
         """takes the key of a variable, 
         disables/enables it for the fit"""
         
@@ -386,7 +386,7 @@ class ModelManual(QObject):
             )
           
     # Methods to call from the user to request fits
-    def fit_model_cole(self, v_initial_guess):
+    def fit_model_cole(self, v_initial_guess: dict):
         #MM should pass sigma here, probably?
         """
         Fit the model using the 'Cole' cost function.
@@ -395,7 +395,7 @@ class ModelManual(QObject):
         print("cole")
         return self._fit_model(self._residual_cole, v_initial_guess, prior_weight=9000000)
     
-    def fit_model_bode(self, v_initial_guess):
+    def fit_model_bode(self, v_initial_guess: dict):
         #MM should pass sigma here, probably?
         """
         Fit the model using the 'Bode' cost function.
@@ -404,7 +404,7 @@ class ModelManual(QObject):
         return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=500)
         
     #Runs the model "manually" from outside
-    def run_model_manual(self,v):
+    def run_model_manual(self,v:dict):
         """
         Main entry point to run the model with the given slider/fit parameters `v`.
         1) Computes main impedance arrays over self._experiment_data['freq'].
@@ -565,7 +565,7 @@ class ModelManual(QObject):
     # ----------------------------------------------------
 
     # Fit Related Private Methods
-    def _fit_model(self, residual_func, v_given, prior_weight=0):#this method needs breaking down, it is scary
+    def _fit_model(self, residual_func, v_given: dict, prior_weight=0):#this method needs breaking down, it is scary
         """
         Fit the model using a residual function plus (optionally) a Gaussian prior
         that penalizes deviation from the initial guess in scaled space.
@@ -695,7 +695,7 @@ class ModelManual(QObject):
         
         return np.concatenate([res_abs*w, res_phase*w])
 
-    def _weight_function(self, v):
+    def _weight_function(self, v: dict):
         """
         Assigns dynamic weights to errors based on certain parameters.
         - Parameters like 'Rh', 'Rm', 'Rl' are crucial and should be weighted.
@@ -709,14 +709,18 @@ class ModelManual(QObject):
         
         return weight
     
-    def _build_bounds(self, free_keys):
+    def _build_bounds(self, free_keys: list):
 
         lower_bounds = self._scale_v_to_x(free_keys, self.lower_bounds)
         upper_bounds = self._scale_v_to_x(free_keys, self.upper_bounds)
 
         return lower_bounds, upper_bounds
    
-    def _compute_gaussian_prior(self, x_guessing, x0, lower_bounds, upper_bounds, prior_weight, gaussian_fraction=5):
+    def _compute_gaussian_prior(self, x_guessing: np.ndarray, 
+                                x0: np.ndarray, lower_bounds: np.ndarray, 
+                                upper_bounds: np.ndarray, prior_weight: float, 
+                                gaussian_fraction: int = 5
+                                ) -> np.ndarray:
         # Compute sigmas (scaled standard deviations)
 
         sigmas = np.array([
@@ -787,7 +791,7 @@ class ModelManual(QObject):
         
         return np.array([f1, f2, f3], dtype=float)
 
-    def _scale_v_to_x(self,keys, v):
+    def _scale_v_to_x(self,keys: list , v):
         "Receives a list of keys and a dictionary. Returns a scaled list"
         
         x = []
@@ -802,7 +806,7 @@ class ModelManual(QObject):
                 x.append(np.log10(v[k]))
         return x
     
-    def _descale_x_to_v(self, keys, x):
+    def _descale_x_to_v(self, keys: list, x):
         "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
         v = {}
         for i, k in enumerate(keys):
