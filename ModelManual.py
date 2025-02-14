@@ -363,6 +363,9 @@ class ModelManual(QObject):
             "Z_imag": np.zeros(5),
         }
 
+        self.lower_bounds={}
+        self.upper_bounds={}
+
         self.disabled_variables = set()
         self.gaussian_prior = False        
         self._model_circuit=ModelCircuitParallel()
@@ -396,6 +399,20 @@ class ModelManual(QObject):
     def set_gaussian_prior(self, state: bool):
             
         self.gaussian_prior = state
+        
+    def set_bounds(self, slider_configurations):
+        
+        print("set bounds")
+        
+        keys = slider_configurations.keys()
+        for k in keys:
+            if "Power" in str(slider_configurations[k][0]):
+                self.lower_bounds[k]=10**slider_configurations[k][1]
+                self.upper_bounds[k]=10**slider_configurations[k][2]
+            else:
+                self.lower_bounds[k]=slider_configurations[k][1]
+                self.lower_bounds[k]=slider_configurations[k][2]
+        
         
     def switch_circuit_model(self, state: bool):
             
@@ -457,7 +474,7 @@ class ModelManual(QObject):
         # 3) Compute time domain values
         
         tdomain_freq, tdomain_time, tdomain_volt = self.run_time_domain(v)
-        print(tdomain_freq, tdomain_time, tdomain_volt)
+        #print(tdomain_freq, tdomain_time, tdomain_volt)
         
         # 4) Create a new CalculationResult
         result = CalculationResult(
@@ -497,10 +514,9 @@ class ModelManual(QObject):
         freq_even = np.linspace(f_min, f_max, len(freq ) )
         z_even = self._model_circuit.run_rock(v, freq_even)
     
-        I0=5 #assume 5Ampers, for no particular reason
-        w= 2*np.pi*freq
+        I0=1 #assume 5Ampers, for no particular reason
+        w= 2*np.pi*freq_even
         i_step_fft = I0 / (1j * w)
-      
         v_fft = i_step_fft * z_even  # single-sided frequency domain
         v_time_complex = np.fft.ifft(v_fft, n=len(freq))
         v_time = v_time_complex.real
@@ -508,7 +524,7 @@ class ModelManual(QObject):
         dt = 1.0 / (2.0 * f_max)
         t_axis = np.arange(len(freq)) * dt
 
-        print(v_time)
+        #print(v_time)
 
         return freq_even, t_axis, v_time
 
@@ -529,8 +545,8 @@ class ModelManual(QObject):
         freq_even = np.linspace(f_min, f_max, len(freq ) )
         z_even = np.interp(freq_even, freq, z_total)
         
-        I0=5 #assume 5Ampers, for no particular reason
-        w= 2*np.pi*freq
+        I0=1 #assume 5Ampers, for no particular reason
+        w= 2*np.pi*freq_even
         i_step_fft = I0 / (1j * w)
       
         v_fft = i_step_fft * z_even  # single-sided frequency domain
@@ -542,7 +558,6 @@ class ModelManual(QObject):
 
         return freq_even, t_axis, v_time
         
-
     #Get atributes or values from the model 
     def get_latest_secondaries(self):
         """
@@ -570,7 +585,6 @@ class ModelManual(QObject):
         # 1) Determine free vs. locked parameters
         all_keys = list(v_given.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
-    
         # 2) Build the initial guess vector (scaled) and bounds (scaled)
         x0 = self._scale_v_to_x(free_keys, v_given)
         lower_bounds, upper_bounds = self._build_bounds(free_keys)
@@ -589,15 +603,12 @@ class ModelManual(QObject):
             }
             full_v_dict = {**locked_v_dict, **free_v_dict}
             
-            
             # c) Run Core model residual function
             try:
                 model_residual = residual_func(full_v_dict)
-    
             except ValueError:
                 # MM Consider smooth penalty instead of this
                 return np.ones(10_000) * 1e6
-            
 
             # d) Optionally add Gaussian prior
             if self.gaussian_prior:
@@ -663,10 +674,7 @@ class ModelManual(QObject):
         # Residual vectors. original
         real_res = z_real - exp_real
         imag_res = z_imag - exp_imag
-
-        
         w = self._weight_function(v)
-        
         return np.concatenate([real_res*w, imag_res*w]) #consider treating as 2 separate weights?
 
     def _residual_bode(self, v: dict) -> np.ndarray:

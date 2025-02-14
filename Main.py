@@ -57,12 +57,13 @@ class MainWidget(QWidget):
         self.widget_buttons = WidgetButtonsRow()
         
         self.widget_at_bottom = WidgetTextBar(
-            self.config.parallel_model_secondary_variables.keys()
+            self.config.secondary_variables_to_display
         )
 
         """Initialize Models"""
         # Model for manual and automatic computations
         self.model_manual = ModelManual()
+        self.model_manual.set_bounds(self.config.slider_configurations)
         
         """Initialize Data atributes"""
         # Data placeholders for file & model outputs
