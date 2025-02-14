@@ -8,7 +8,7 @@ Created on Wed Feb 12 14:03:54 2025
 import numpy as np
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtWidgets
-
+import scipy.signal as sig
 from scipy.signal import hilbert
 
 # ---------------------- 2) Compute Exponential Charging Curve ----------------------
@@ -65,7 +65,8 @@ def parallel(z1, z2):
         raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
     return 1.0 / ((1.0 / z1) + (1.0 / z2))
 
-
+#IDEA 1 OFF, USE LOG SPACING INSTEAD
+#freq_even = np.logspace(-2, np.log10(500), int(N/2)) 
 freq_even = np.linspace(10**-2, 500, int(N/2))
 
 z_real_func = []
@@ -82,18 +83,54 @@ for freq in freq_even:
 # --------------------------------------------
 print(len(zarc_list_func))
 
-v_maybe=np.fft.irfft(zarc_list_func) #half a plot
+#IDEA 2 OFF. MODIFICATION: Normalize IFFT properly
+#v_maybe = np.fft.irfft(zarc_list_func, n=N)
+#v_maybe /= dt  # Normalize by time step
+v_maybe=np.fft.irfft(zarc_list_func.copy()) #half a plot
 
+#IDEA3 ON FILTER
+b, a = sig.butter(2, 0.45, fs=1)
+v_maybe = sig.filtfilt(b, a, v_maybe)
+
+#IDEA4 OFF MODIFICATION: Generate Correct Time Axis
+#t_actual = np.linspace(0, T, len(v_maybe))
 print(len(v_maybe)) 
-t_mock = np.linspace(0, 4 , len(v_maybe))
-
-# --------------------------------------------
 t_actual = np.arange(len(v_maybe)) * dt
 
+#MODIFICATION: Compute cumulative integral to get the step response
+#Vm = np.sum(v_maybe * dt)  # Compute max voltage for normalization
+#dV = v_maybe * dt  # Discrete integration
+#v_step_response = np.cumsum(dV)  # Cumulative sum for integral
 
-
+# Normalize step response
+#v_step_response = 1 - v_step_response / Vm  
 
 # --------------------------------------------
+
+
+jv_maybe = np.fft.irfft(zarc_list_func, n=N)
+jv_maybe /= dt  # Normalize by time step
+
+b, a = sig.butter(2, 0.45, fs=1)
+jv_maybe = sig.filtfilt(b, a, jv_maybe)
+
+print(len(jv_maybe))
+
+jt_actual = np.linspace(0, T, len(jv_maybe))
+
+Vm = np.sum(jv_maybe * dt)  # Compute max voltage for normalization
+dV = jv_maybe * dt  # Discrete integration
+v_step_response = np.cumsum(dV)  # Cumulative sum for integral
+
+# Normalize step response
+v_step_response = 1 - v_step_response / Vm  
+
+integration_indices = np.where((jt_actual >= 0.45) & (jt_actual <= 1.1))[0]
+jt_integrated = jt_actual[integration_indices]
+v_integrated = v_step_response[integration_indices]
+integrated_area = np.trapz(v_integrated, jt_integrated)
+
+print(f"Integrated Chargeability (0.45s - 1.1s): {integrated_area:.4f}")
 
 
 # --------------------------------------------
@@ -141,7 +178,8 @@ p4 = win.addPlot(row=1, col=1, title="Straigth Inverse Transform")
 p4.setLabel('left', "Inverse Transform")
 p4.setLabel('bottom', "Mock Time Axis")
 p4.showGrid(x=True, y=True)
-p4.plot(t_mock, v_maybe, pen='b', symbol='o', symbolBrush='b')
+p4.plot(t_actual, v_maybe, pen='b', symbol='o', symbolBrush='g')
+#p4.plot(t_actual, v_step_response, pen='b', symbol='o', symbolBrush='g')
 
 # ----------------- Third Row: More Example Plots -----------------
 
@@ -150,7 +188,8 @@ p5 = win.addPlot(row=2, col=0, title="Example Placeholder Plot 3")
 p5.setLabel('left', "Inverse transform")
 p5.setLabel('bottom', "Actual t Axis")
 p5.showGrid(x=True, y=True)
-p5.plot(t_actual, v_maybe, pen='b', symbol='o', symbolBrush='g')
+p5.plot(jt_actual, v_step_response, pen='b', symbol='o', symbolBrush='g')
+p5.plot(jt_integrated, v_integrated, pen=pg.mkPen('r', width=2))
 
 
 # Example Plot 4 (Now in row=2)

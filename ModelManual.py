@@ -402,8 +402,6 @@ class ModelManual(QObject):
         
     def set_bounds(self, slider_configurations):
         
-        print("set bounds")
-        
         keys = slider_configurations.keys()
         for k in keys:
             if "Power" in str(slider_configurations[k][0]):
@@ -411,8 +409,8 @@ class ModelManual(QObject):
                 self.upper_bounds[k]=10**slider_configurations[k][2]
             else:
                 self.lower_bounds[k]=slider_configurations[k][1]
-                self.lower_bounds[k]=slider_configurations[k][2]
-        
+                self.upper_bounds[k]=slider_configurations[k][2]    
+                
         
     def switch_circuit_model(self, state: bool):
             
@@ -719,27 +717,9 @@ class ModelManual(QObject):
         return weight
     
     def _build_bounds(self, free_keys):
-        lower_bounds = []
-        upper_bounds = []
-        
-        dictionary_lower = {
-            'Linf':1e-12,'Rinf': 1e-2, 
-            'Rh': 1e-2,'Fh': 1e-2,'Ph': 0.0, 
-            'Rm': 1e-2,'Fm': 1e-2, 'Pm': 0.0,
-            'Rl': 1e-2,'Fl': 1e-2,'Pl': 0.0,
-            'Re': 1e-2,'Qe': 1e-8,'Pef': 0.0, 'Pei': -3.2,
-        }
-        
-        dictionary_upper= {
-            'Linf':1e-3,'Rinf':1e8,
-            'Rh': 1e8,'Fh': 1e8,'Ph': 1.0,
-            'Rm': 1e8,'Fm': 1e8,'Pm': 1.0,
-            'Rl': 1e8,'Fl': 1e8,'Pl': 1.0,
-            'Re': 1e8,'Qe': 1e2,'Pef': 1.0,'Pei': 0.8,
-        }
-        
-        lower_bounds = self._scale_v_to_x(free_keys, dictionary_lower)
-        upper_bounds = self._scale_v_to_x(free_keys, dictionary_upper)
+
+        lower_bounds = self._scale_v_to_x(free_keys, self.lower_bounds)
+        upper_bounds = self._scale_v_to_x(free_keys, self.upper_bounds)
 
         return lower_bounds, upper_bounds
    
