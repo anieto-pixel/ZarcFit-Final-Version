@@ -404,7 +404,7 @@ class ModelManual(QObject):
         return self._fit_model(self._residual_bode, v_initial_guess, prior_weight=500)
         
     #Runs the model "manually" from outside
-    def run_model_manual(self,v:dict):
+    def run_model_manual(self, v:dict):
         """
         Main entry point to run the model with the given slider/fit parameters `v`.
         1) Computes main impedance arrays over self._experiment_data['freq'].
@@ -732,7 +732,7 @@ class ModelManual(QObject):
         
         return prior_residual
     
-    def _valid_guess(self, v_dict):
+    def _valid_guess(self, v_dict: dict):
         """Test validity criteria Fh > Fm > Fl"""
         
         return (v_dict["Fh"] >= v_dict["Fm"] and v_dict["Fm"] >= v_dict["Fl"])
@@ -791,7 +791,7 @@ class ModelManual(QObject):
         
         return np.array([f1, f2, f3], dtype=float)
 
-    def _scale_v_to_x(self,keys: list , v):
+    def _scale_v_to_x(self,keys: list , v: dict):
         "Receives a list of keys and a dictionary. Returns a scaled list"
         
         x = []
@@ -806,7 +806,7 @@ class ModelManual(QObject):
                 x.append(np.log10(v[k]))
         return x
     
-    def _descale_x_to_v(self, keys: list, x):
+    def _descale_x_to_v(self, keys: list, x: dict):
         "Receives a list of keys and a list fo values. Returns a de-scaled dictionary"
         v = {}
         for i, k in enumerate(keys):
