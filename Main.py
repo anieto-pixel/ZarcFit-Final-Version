@@ -16,17 +16,22 @@ from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout
 )
 
-# Updated Imports with Renamed Classes
-from ConfigImporter import ConfigImporter
-from CustomListSliders import ListSliderRange
-from CustomSliders import DoubleSliderWithTicks, EPowerSliderWithTicks
-from Calculator import CalculationResult, Calculator
-from WidgetButtonsRow import WidgetButtonsRow
-from WidgetGraphs import WidgetGraphs
-from WidgetInputFile import WidgetInputFile
-from WidgetOutputFile import WidgetOutputFile
-from WidgetSliders import WidgetSliders
-from WidgetTextBar import WidgetTextBar
+
+# Ensure AuxiliaryClasses is included in sys.path. Import Aux Classes
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
+
+from AuxiliaryClasses.ConfigImporter import ConfigImporter
+from AuxiliaryClasses.CustomListSliders import ListSliderRange
+from AuxiliaryClasses.CustomSliders import DoubleSliderWithTicks, EPowerSliderWithTicks
+from AuxiliaryClasses.Calculator import CalculationResult, Calculator
+from AuxiliaryClasses.WidgetButtonsRow import WidgetButtonsRow
+from AuxiliaryClasses.WidgetGraphs import WidgetGraphs
+from AuxiliaryClasses.WidgetInputFile import WidgetInputFile
+from AuxiliaryClasses.WidgetOutputFile import WidgetOutputFile
+from AuxiliaryClasses.WidgetSliders import WidgetSliders
+from AuxiliaryClasses.WidgetTextBar import WidgetTextBar
+
+
 
 
 class MainWidget(QWidget):
