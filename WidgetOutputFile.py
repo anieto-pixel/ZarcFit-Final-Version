@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal
 
+
 class ErrorWindow:
     """
     Provides a static method to display critical error messages in a dialog box.
@@ -20,43 +21,45 @@ class ErrorWindow:
         msg.setText(message)
         msg.exec_()
 
+
 class FileWriter:
     """
-    Handles writing rows of data to CSV files in a safe manner.
+    Handles writing rows of data to CSV files safely.
     """
+
     @staticmethod
     def write_to_file(file_path, rows, header=None):
         """
         Appends rows to 'file_path' as CSV lines.
-        If 'header' is given, writes that first (in append mode).
         
-        :param file_path: path to the CSV file
-        :param rows: a single row or a list of rows (iterables) to write
-        :param header: (ignored in this version, but kept for backward compatibility)
+        If 'header' is provided, it is ignored in this version (for backward compatibility).
+        
+        :param file_path: Path to the CSV file.
+        :param rows: A single row or a list of rows (iterables) to write.
+        :param header: (Ignored) Header row.
         """
         if not file_path:
             ErrorWindow.show_error_message("No file selected for writing.")
             return
 
         try:
-            with open(file_path, "a", newline='') as f:
+            with open(file_path, "a", newline="") as f:
                 writer = csv.writer(f)
 
-                # If 'header' is present, we are ignoring it
-                # but you could remove or adapt this if truly unnecessary:
-                if header is not None and False:  # 'False' ensures it's never used
+                # 'header' is currently ignored (kept for backward compatibility)
+                if header is not None and False:
                     writer.writerow(header)
 
-                # If 'rows' is a single row, wrap it in a list
+                # If rows is a single row, wrap it in a list
                 if isinstance(rows[0], (int, float, str)):
                     writer.writerow(rows)
                 else:
                     for row in rows:
                         writer.writerow(row)
-
         except Exception as e:
             ErrorWindow.show_error_message(f"Could not write to file: {e}")
-                       
+
+
 class FileSelector:
     """
     Handles file creation, selection, and validation.
@@ -82,8 +85,8 @@ class FileSelector:
 
             if not os.path.exists(file_path):
                 try:
-                    with open(file_path, 'w', newline='') as f:
-                        pass  # create empty file
+                    with open(file_path, "w", newline="") as f:
+                        pass  # Create empty file.
                     set_file_callback(file_path)
                 except IOError as e:
                     ErrorWindow.show_error_message(f"Failed to create file: {str(e)}")
@@ -95,8 +98,9 @@ class FileSelector:
     @staticmethod
     def open_file_dialog(search_parameters, validate_callback, set_file_callback, set_message_callback):
         """
-        Opens a dialog to select an existing file. If 'validate_callback' passes,
-        calls 'set_file_callback' to update the application state. Otherwise shows an error.
+        Opens a dialog to select an existing file.
+        If 'validate_callback' passes, calls 'set_file_callback' to update the application state.
+        Otherwise, shows an error.
         """
         file_path, _ = QFileDialog.getOpenFileName(
             None,
@@ -116,27 +120,34 @@ class FileSelector:
 
     @staticmethod
     def validate(file_path, desired_type):
+        """
+        Validates that the file path ends with the desired type.
+        """
         if not file_path.lower().endswith(desired_type):
             raise ValueError(f"The selected file must end with '{desired_type}'")
         return True
 
+
 class WidgetOutputFile(QWidget):
     """
     A widget for creating or selecting a .csv output file and writing data to it.
-    Now write_to_file(...) expects a dictionary and builds a single row from it.
+    The write_to_file() method expects a dictionary and builds a single row from it.
     """
 
     output_file_selected = pyqtSignal(str)
 
-    def __init__(self, variables_to_print=[]):
+    def __init__(self, variables_to_print=None):
         super().__init__()
 
-        self.variables_to_print = variables_to_print  # list of keys to look for
+        if variables_to_print is None:
+            variables_to_print = []
+
+        self.variables_to_print = variables_to_print  # List of keys to look for.
         self._desired_type = ".csv"
         self._search_parameters = "CSV Files (*.csv);;All Files (*)"
         self._output_file = None
 
-        # Create UI elements
+        # Create UI elements.
         self._newfile_button = QPushButton("New File")
         self._newfile_button.clicked.connect(self._handle_create_new_file)
 
@@ -146,10 +157,12 @@ class WidgetOutputFile(QWidget):
         self._file_label = QLabel("No output file selected")
         self._file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-        # Build layout
         self._initialize_ui()
 
     def _initialize_ui(self):
+        """
+        Builds the widget layout.
+        """
         layout = QHBoxLayout()
         self._newfile_button.setFixedSize(100, 30)
         layout.addWidget(self._newfile_button)
@@ -160,6 +173,9 @@ class WidgetOutputFile(QWidget):
         self.setLayout(layout)
 
     def _handle_create_new_file(self):
+        """
+        Handler for creating a new file.
+        """
         FileSelector.create_new_file(
             self._desired_type,
             self._set_output_file,
@@ -167,6 +183,9 @@ class WidgetOutputFile(QWidget):
         )
 
     def _handle_open_file_dialog(self):
+        """
+        Handler for opening an existing file.
+        """
         FileSelector.open_file_dialog(
             self._search_parameters,
             lambda path: FileSelector.validate(path, self._desired_type),
@@ -176,24 +195,24 @@ class WidgetOutputFile(QWidget):
 
     def _set_output_file(self, file_path):
         """
-        Called whenever user picks or creates a file.
-        We store file_path and immediately print the variables in one row.
+        Called when the user picks or creates a file.
+        Stores the file path and updates the UI.
         """
         self._output_file = file_path
         self._file_label.setText(os.path.basename(file_path))
-
         self.output_file_selected.emit(self._output_file)
 
-        # Print the single row of variables if available
+        # Immediately write variables if available.
         if self.variables_to_print:
             self.print_variables_list()
 
     def _set_file_message(self, message):
+        """
+        Updates the label with a given message.
+        """
         self._file_label.setText(message)
 
-    # -----------------------------------------------------------------------
-    #  Public methods
-    # -----------------------------------------------------------------------
+    # Public methods.
     def get_output_file(self):
         return self._output_file
 
@@ -202,8 +221,7 @@ class WidgetOutputFile(QWidget):
 
     def print_variables_list(self):
         """
-        Writes 'variables_to_print' in a single row to the CSV file.
-        Called whenever a new file is created or selected.
+        Writes 'variables_to_print' as a single row to the CSV file.
         """
         if not self._output_file:
             ErrorWindow.show_error_message(
@@ -214,18 +232,13 @@ class WidgetOutputFile(QWidget):
         if self.variables_to_print:
             FileWriter.write_to_file(
                 file_path=self._output_file,
-                rows=self.variables_to_print  # single row
+                rows=self.variables_to_print  # Write as a single row.
             )
 
     def write_to_file(self, dictionary):
         """
-        Expects a dictionary. 
-        We build a single row by checking each key in 'variables_to_print' (in order):
-          - If the key is in 'content', we append the value
-          - Otherwise, we append an empty string
-
-        Then we pass that row to FileWriter.write_to_file(...) 
-        to be appended as one line in the CSV.
+        Expects a dictionary and builds a row by checking each key in
+        'variables_to_print'. Missing keys are replaced with empty strings.
         """
         if not self._output_file:
             ErrorWindow.show_error_message(
@@ -241,43 +254,36 @@ class WidgetOutputFile(QWidget):
 
         row = []
         for key in self.variables_to_print:
-            # If key is present, use its value; else an empty string
-            value = dictionary.get(key, "")
-            row.append(value)
+            row.append(dictionary.get(key, ""))
 
-        # Now pass this single row to FileWriter
         FileWriter.write_to_file(
             file_path=self._output_file,
             rows=row,
-            header=None  # ignoring header now
+            header=None  # Header is ignored.
         )
 
-
     def find_row_in_file(self, head):
-        
+        """
+        Searches the CSV file for a row whose first column matches 'head'
+        and returns it as a dictionary.
+        """
         try:
             with open(self._output_file, "r", encoding="utf-8") as f:
                 lines = f.readlines()
 
             for line in reversed(lines):
-                # Strip and split to handle trailing newlines
                 columns = line.strip().split(",")
-                # Check the first column against 'head'
                 if columns and columns[0] == head:
-                    
                     return dict(zip(self.variables_to_print, columns))
 
-            # If we get here, 'head' wasn't found in the first column
             return None
-
         except Exception as e:
             ErrorWindow.show_error_message(f"Error reading file: {e}")
             return None
-        
-        
+
 
 # -----------------------------------------------------------------------
-#  TEST (Manually adapted)
+# Test (Manually Adapted)
 # -----------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
@@ -286,10 +292,7 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
 
-    # In a real app, you'd do something like:
-    # config_importer = ConfigImporter("config.ini")
-    # vars_to_print = config_importer.variables_to_print
-    # But here, we'll hardcode a simple list of variables:
+    # Hardcoded list of variables to print.
     vars_to_print = ["A", "B", "C", "D", "E"]
 
     widget = WidgetOutputFile(variables_to_print=vars_to_print)
@@ -299,7 +302,7 @@ if __name__ == "__main__":
     layout = QVBoxLayout(container)
     layout.addWidget(widget)
 
-    # A button to test writing a dictionary
+    # Button to test writing a dictionary.
     write_test_button = QPushButton("Write Test Dictionary")
     layout.addWidget(write_test_button)
     container.setLayout(layout)
@@ -307,23 +310,19 @@ if __name__ == "__main__":
 
     def on_write_test_button():
         """
-        We'll simulate a dictionary that:
-         - includes some variables from vars_to_print (A, C),
-         - excludes others (B, D, E),
-         - and possibly has extra keys not in vars_to_print (e.g. 'Z').
+        Simulate a dictionary that includes some variables from vars_to_print
+        and possibly extra keys not in vars_to_print.
         """
         data_dict = {
             "A": 100,
             "C": 300,
-            "Z": 999  # not in vars_to_print
+            "Z": 999  # 'Z' is not in vars_to_print.
         }
-        # This will produce a row: [100, "", 300, "", ""] for A, B, C, D, E
         widget.write_to_file(data_dict)
 
     write_test_button.clicked.connect(on_write_test_button)
 
-    # Attempt writing with no file to see the error after 1s
-    # This dictionary only has "A" => the row would be [42, "", "", "", ""]
+    # Test writing with no file after 1 second.
     QTimer.singleShot(1000, lambda: widget.write_to_file({"A": 42}))
 
     sys.exit(app.exec_())

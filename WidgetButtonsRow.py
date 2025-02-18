@@ -1,47 +1,66 @@
-"""
-Created on Mon Dec  9 09:28:03 2024
-
-A vertical column of buttons for quick actions.
-Renamed from 'ButtonsWidgetRow' to 'WidgetButtonsRow' for consistency.
-"""
-from PyQt5.QtWidgets import QGraphicsColorizeEffect
-from PyQt5.QtCore import QTimer, Qt, pyqtSignal
-from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QMessageBox, 
-    )
-from PyQt5.QtGui import QColor, QPalette
 import sys
+import weakref
+from typing import Optional
+from PyQt5.QtWidgets import (
+    QWidget, QPushButton, QVBoxLayout, QMessageBox, QGraphicsColorizeEffect
+)
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QColor
+
+
+class DualLabelButton(QPushButton):
+    """
+    A QPushButton subclass that provides two distinct labels for its off and on states.
+
+    Attributes:
+        off_label (str): The label to display when the button is not checked.
+        on_label (str): The label to display when the button is checked.
+    """
+
+    def __init__(self, off_label: str, on_label: str, parent: Optional[QWidget] = None) -> None:
+        """
+        Initialize the DualLabelButton with off and on labels.
+        """
+        super().__init__(off_label, parent)
+        self.off_label = off_label
+        self.on_label = on_label
+        self.setCheckable(True)
 
 
 class WidgetButtonsRow(QWidget):
     """
-    A simple widget providing a vertical layout of buttons (F1, F2, F3, etc.).
+    A widget that provides a vertical layout of multiple buttons for quick actions.
+
+    This widget organizes both regular and checkable buttons in a vertical layout.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """
+        Initialize the WidgetButtonsRow with predefined buttons.
+        """
         super().__init__()
 
-        # Create buttons
-        self.f1_button = QPushButton("F1. Fit Cole")
-        self.f2_button = QPushButton("F2 Fit Bode")
-        self.f3_button = QPushButton("F3 AllFreqs")
-        self.f4_button = QPushButton("F4 Save plot")
-        self.f5_button = QPushButton("F5 <file")
-        self.f6_button = QPushButton("F6 file>")
-        self.f7_button = QPushButton("F7 Recover")
-        self.f8_button = QPushButton("F8 Default")
-        
-        # Checkable buttons
-        self.f9_button = QPushButton("F9 +Rinf", checkable=True)
-        self.f10_button = QPushButton("F10 Parallel", checkable=True)
+        # Create regular (non-checkable) buttons.
+        self.f1_button: QPushButton = QPushButton("F1. Fit Cole")
+        self.f2_button: QPushButton = QPushButton("F2 Fit Bode")
+        self.f3_button: QPushButton = QPushButton("F3 AllFreqs")
+        self.f4_button: QPushButton = QPushButton("F4 Save plot")
+        self.f5_button: QPushButton = QPushButton("F5 <file")
+        self.f6_button: QPushButton = QPushButton("F6 file>")
+        self.f7_button: QPushButton = QPushButton("F7 Recover")
+        self.f8_button: QPushButton = QPushButton("F8 Default")
 
-        self.f11_button = QPushButton("F11 Tail Right", checkable=True)
-        self.f12_button = QPushButton("F12 Gauss Prior", checkable=True)
+        # Create checkable buttons using DualLabelButton.
+        self.f9_button: DualLabelButton = DualLabelButton("F9 +Rinf", "F9 -Rinf")
+        self.f10_button: DualLabelButton = DualLabelButton("F10 Parallel", "F10 Series")
+        self.f11_button: DualLabelButton = DualLabelButton("F11 Tail Right", "F11 Tail Left")
+        self.f12_button: DualLabelButton = DualLabelButton("F12 Constrains", "F12 Constrains On")
 
-        self.fup_button = QPushButton("PageUp")
-        self.fdown_button = QPushButton("PageDown")
+        # Create additional regular buttons.
+        self.fup_button: QPushButton = QPushButton("PageUp")
+        self.fdown_button: QPushButton = QPushButton("PageDown")
 
-        # Group all buttons into a list for easy iteration
+        # Group all buttons into a list for easy iteration.
         self._buttons_list = [
             self.f1_button, self.f2_button, self.f3_button,
             self.f4_button, self.f5_button, self.f6_button,
@@ -53,120 +72,100 @@ class WidgetButtonsRow(QWidget):
         self._setup_layout()
         self._setup_connections()
 
-    def _setup_layout(self):
+    def _setup_layout(self) -> None:
+        """
+        Set up the vertical layout for all buttons.
+        """
         layout = QVBoxLayout()
         layout.setSpacing(0)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+        # Add each button from the list to the layout.
         for button in self._buttons_list:
             layout.addWidget(button)
-
         self.setLayout(layout)
         self.setMaximumWidth(150)
         self.setMinimumSize(130, 30 * len(self._buttons_list))
 
-    def _setup_connections(self):
-        # Connect non-toggable to a generic click handler
+    def _setup_connections(self) -> None:
+        """
+        Connect each button's signal to its appropriate slot.
+        """
+        # For each button, connect clicked signals for regular buttons and
+        # toggled signals for checkable buttons.
         for btn in self._buttons_list:
             if not btn.isCheckable():
                 btn.clicked.connect(self._on_regular_button_clicked)
             else:
                 btn.toggled.connect(self._on_checkable_toggled)
 
-    def _on_regular_button_clicked(self):
+    def _on_regular_button_clicked(self) -> None:
         """
-        Generic slot for all buttons except f9, f10 (those are checkable).
-        Briefly flashes green if 'task is successful'.
-        Shows an error message if not.
+        Handle clicks for non-checkable buttons.
+
+        Briefly flashes the button green if the operation is successful;
+        otherwise, displays an error message.
         """
         button = self.sender()
-        # --- put your "check if order is correct" logic here ---
-        order_is_correct = True  # Replace with real check
+        if not isinstance(button, QPushButton):
+            return
+
+        # Replace the following with the actual logic to verify the operation.
+        order_is_correct = True
 
         if order_is_correct:
-            self._flash_button_green(button, duration=1500)  # <-- Longer duration
+            self._flash_button_green(button, duration=1500)
         else:
             QMessageBox.warning(self, "Error", "Order not correctly executed!")
 
-    def _on_checkable_toggled(self, state):
+    def _on_checkable_toggled(self, state: bool) -> None:
         """
-        Handles checkable buttons behavior:
-          - Changes text based on on/off
-          - Red background when on, none when off
+        Handle toggling of checkable buttons.
+
+        Updates the button's text and style based on its state.
+
+        Args:
+            state (bool): The new state of the button (True for checked, False for unchecked).
         """
         button = self.sender()
+        if not isinstance(button, QPushButton):
+            return
 
-        # Example logic per button; if you want different text for each,
-        # branch according to which button was toggled:
-        if button is self.f9_button:
-            if state:
-                button.setText("F9 -Rinf")
-                button.setStyleSheet("QPushButton { background-color: red; }")
-            else:
-                button.setText("F9 +Rinf")
-                button.setStyleSheet("QPushButton { background-color: none; }")
+        if state:
+            # Set the button text to its "on" label and apply a red background.
+            button.setText(button.on_label)  # type: ignore[attr-defined]
+            button.setStyleSheet("QPushButton { background-color: red; }")
+        else:
+            # Revert the button text to its "off" label and remove the background.
+            button.setText(button.off_label)  # type: ignore[attr-defined]
+            button.setStyleSheet("QPushButton { background-color: none; }")
 
-        elif button is self.f10_button:
-            if state:
-                button.setText("F10 Series")
-                button.setStyleSheet("QPushButton { background-color: red; }")
-            else:
-                button.setText("F10 Parallel")
-                button.setStyleSheet("QPushButton { background-color: none; }")
-                
-        elif button is self.f11_button:
-            if state:
-                button.setText("F11 Right")
-                button.setStyleSheet("QPushButton { background-color: red; }")
-            else:
-                button.setText("F11 Left")
-                button.setStyleSheet("QPushButton { background-color: none; }")
-                
-        elif button is self.f12_button:
-            if state:
-                button.setText("F12 Gauss On")
-                button.setStyleSheet("QPushButton { background-color: red; }")
-            else:
-                button.setText("F12 Gauss Off")
-                button.setStyleSheet("QPushButton { background-color: none; }")
+    def _flash_button_green(self, button: QPushButton, duration: int = 1500) -> None:
+        """
+        Briefly flash the button green for a specified duration.
 
-        # If you have many checkable buttons, you can adapt the above
-        # to a dictionary-based approach to map 'button' to the appropriate
-        # on/off text instead of a hard-coded if/elif chain.
-
-    def _flash_button_green(self, button, duration=1500):
-        """Briefly flashes the button green for `duration` ms."""
+        Args:
+            button (QPushButton): The button to flash.
+            duration (int): Duration in milliseconds for the flash effect.
+        """
         effect = QGraphicsColorizeEffect()
-        effect.setColor(QColor(0, 150, 0, 255))  # darker green
+        effect.setColor(QColor(0, 150, 0, 255))
         effect.setStrength(1.0)
         button.setGraphicsEffect(effect)
-        
-        # Remove the effect after 'duration' ms
-        QTimer.singleShot(duration, lambda: button.setGraphicsEffect(None))
 
-# -----------------------------------------------------------------------
-#  Quick Test
-# -----------------------------------------------------------------------
+        # Use a weak reference to the button to prevent issues if the button is deleted.
+        weak_button = weakref.ref(button)
+        QTimer.singleShot(
+            duration, lambda: weak_button() and weak_button().setGraphicsEffect(None)
+        )
+
+
 if __name__ == "__main__":
-    def test_buttons_widget_row():
-        """
-        Demonstrates the WidgetButtonsRow in a standalone window,
-        printing size details for the 'Save plot' button and monitoring F9 toggles.
-        """
-        app = QApplication(sys.argv)
+    # Quick test for the WidgetButtonsRow.
+    from PyQt5.QtWidgets import QApplication
 
-        widget = WidgetButtonsRow()
+    app = QApplication(sys.argv)
+    widget = WidgetButtonsRow()
+    widget.setWindowTitle("Test WidgetButtonsRow")
+    widget.show()
+    sys.exit(app.exec_())
 
-        # Print size details of the 'F1' button
-        min_size = widget.f1_button.minimumSize()
-        print(f"Minimum size: {min_size.width()}px x {min_size.height()}px")
-
-        # ✅ Print F9's state whenever it is toggled
-        widget.f9_button.toggled.connect(lambda state: print(f"F9 button toggled: {state}"))
-
-        widget.setWindowTitle("Test WidgetButtonsRow")
-        widget.show()
-
-        sys.exit(app.exec_())
-
-    test_buttons_widget_row()

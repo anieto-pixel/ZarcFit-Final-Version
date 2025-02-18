@@ -6,7 +6,8 @@ Graphs for impedance data visualization:
   - PhaseGraph
   - BodeGraph
   - ColeColeGraph
-  - WidgetGraphs (displays 3 graphs side by side)
+  - TimeGraph
+  - WidgetGraphs (displays multiple graphs)
 """
 
 import sys
@@ -14,9 +15,29 @@ import copy
 import numpy as np
 import pyqtgraph as pg
 
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import (
+    QApplication, QPushButton, QWidget, QTabWidget, QHBoxLayout,
+    QVBoxLayout, QFrame, QSizePolicy
+)
 from PyQt5.QtCore import Qt
-from ModelManual import CalculationResult
+
+# Example import for the type-hinted method below:
+# from ModelManual import CalculationResult
+# In your real code, ensure CalculationResult is defined or properly imported.
+class CalculationResult:
+    """Dummy placeholder so this snippet runs independently."""
+    def __init__(self):
+        self.main_freq = np.array([1, 10, 100])
+        self.main_z_real = np.array([100, 80, 60])
+        self.main_z_imag = np.array([-50, -40, -30])
+
+        self.special_freq = np.array([10, 50, 90])
+        self.special_z_real = np.array([70, 65, 55])
+        self.special_z_imag = np.array([-40, -35, -28])
+
+        self.timedomain_freq = np.array([1, 10, 100])
+        self.timedomain_time = np.linspace(0, 1, 100)
+        self.timedomain_volt = np.sin(2 * np.pi * 10 * self.timedomain_time)
 
 
 class ParentGraph(pg.PlotWidget):
@@ -26,7 +47,6 @@ class ParentGraph(pg.PlotWidget):
       - Plotting or filtering frequency ranges
       - Overridden methods to transform freq, Z_real, Z_imag into X, Y
     """
-    
 
     def __init__(self):
         super().__init__()
@@ -42,10 +62,10 @@ class ParentGraph(pg.PlotWidget):
             'Z_real': np.array([90, 70, 50, 30, 10]),
             'Z_imag': np.array([-45, -35, -25, -15, -5]),
         }
-        
-        # Keep a copy of the original data so we can re-expand
-#        self._original_base_data = copy.deepcopy(self._base_data)
-#        self._original_manual_data = copy.deepcopy(self._manual_data)
+
+        # Keep full copies to allow re-expansion after filtering
+        self._original_base_data = copy.deepcopy(self._base_data)
+        self._original_manual_data = copy.deepcopy(self._manual_data)
 
         self.setTitle("Parent Graph")
         self.showGrid(x=True, y=True)
@@ -53,57 +73,51 @@ class ParentGraph(pg.PlotWidget):
         # Plot objects for static (base) and dynamic (manual) lines
         self._static_plot = None
         self._dynamic_plot = None
-        
-        # It is small and embedded in the top left corner.
+
+        # A small auto-scale button in the top-left corner
         self.auto_scale_button = QPushButton("", self)
         self.auto_scale_button.setCheckable(True)
-        self.auto_scale_button.setGeometry(10, 10, 10,10)
+        self.auto_scale_button.setGeometry(10, 10, 10, 10)
         self.auto_scale_button.toggled.connect(self._handle_auto_scale_toggle)
         self.auto_scale_button.setStyleSheet("""
             QPushButton { background-color: lightgray; }
             QPushButton:checked { background-color: rgb(102, 178, 255); }
         """)
-                
+
         # Flag to avoid recursive auto-ranging calls
-        #MM ?
         self._auto_range_in_progress = False
-        
-        # Connect view changes to our handler so that we can re-auto range
-        # if the button is toggled on.
+
+        # Connect view changes to a handler so we can re-apply auto-range if needed
         self.plotItem.getViewBox().sigRangeChanged.connect(self._on_view_range_changed)
 
         # Initial display
         self._refresh_graph()
         self.auto_scale_button.setChecked(True)
 
-     
-    ###################
-    # Public Methods
-    ######################
-        
+        # For optional special markers
+        self._special_items = []
+
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points within [f_min, f_max].
         Always filter from the original datasets so we can re-expand later.
         """
-        
         base_mask = (
-            (self._original_base_data['freq'] >= f_min) &
-            (self._original_base_data['freq'] <= f_max)
+            (self._original_base_data['freq'] >= f_min)
+            & (self._original_base_data['freq'] <= f_max)
         )
         self._base_data = {
-            'freq'  : self._original_base_data['freq'][base_mask],
+            'freq': self._original_base_data['freq'][base_mask],
             'Z_real': self._original_base_data['Z_real'][base_mask],
             'Z_imag': self._original_base_data['Z_imag'][base_mask],
         }
 
-        # Filter from the original manual data
         manual_mask = (
-            (self._original_manual_data['freq'] >= f_min) &
-            (self._original_manual_data['freq'] <= f_max)
+            (self._original_manual_data['freq'] >= f_min)
+            & (self._original_manual_data['freq'] <= f_max)
         )
         self._manual_data = {
-            'freq'  : self._original_manual_data['freq'][manual_mask],
+            'freq': self._original_manual_data['freq'][manual_mask],
             'Z_real': self._original_manual_data['Z_real'][manual_mask],
             'Z_imag': self._original_manual_data['Z_imag'][manual_mask],
         }
@@ -116,13 +130,15 @@ class ParentGraph(pg.PlotWidget):
         Also update the originals so filtering includes the new full dataset.
         """
         self.auto_scale_button.setChecked(False)
-        
+
         self._base_data = {
-            'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag
+            'freq': freq,
+            'Z_real': Z_real,
+            'Z_imag': Z_imag
         }
         self._original_base_data = copy.deepcopy(self._base_data)
+
         self._refresh_graph()
-        
         self.auto_scale_button.setChecked(True)
 
     def update_parameters_manual(self, freq, Z_real, Z_imag):
@@ -131,45 +147,40 @@ class ParentGraph(pg.PlotWidget):
         Also update the originals so filtering includes the new full dataset.
         """
         self._manual_data = {
-            'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag
+            'freq': freq,
+            'Z_real': Z_real,
+            'Z_imag': Z_imag
         }
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
-        
-        
+
     def update_special_points(self, freq_array, z_real_array, z_imag_array):
-        # Clear old special items if needed
+        """
+        Adds or updates special marker points on the graph.
+        """
         for item in getattr(self, '_special_items', []):
             self.removeItem(item)
         self._special_items = []
-    
-        for i, color in enumerate(['r', 'g', 'c']):  # or pick whatever colors
-            f = freq_array[i]
-            zr = z_real_array[i]
-            zi = z_imag_array[i]
-            x, y = self._prepare_xy(np.array([f]), np.array([zr]), np.array([zi]))
-    
+
+        for i, color in enumerate(['r', 'g', 'c']):
+            x, y = self._prepare_xy(
+                np.array([freq_array[i]]),
+                np.array([z_real_array[i]]),
+                np.array([z_imag_array[i]])
+            )
             plot_item = self.plot(
-                x, y,
-                pen=None,
-                symbol='x',
-                symbolSize=12,
-                symbolBrush=color,
-                symbolPen=color
+                x, y, pen=None,
+                symbol='x', symbolSize=12,
+                symbolBrush=color, symbolPen=color
             )
             self._special_items.append(plot_item)
-        
-    #####################
-    # Private methods
-    #################
-    
-    def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Transforms impedance data (freq, Z_real, Z_imag) into the (x, y) needed for plotting.
-        Default: returns (Z_real, Z_imag). Subclasses override this.
-        """
 
-        return Z_real, Z_imag
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """
+        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
+        Default is (Z_real, Z_imag). Subclasses override this if needed.
+        """
+        return z_real, z_imag
 
     def _refresh_plot(self, data_dict, plot_item):
         """
@@ -185,95 +196,60 @@ class ParentGraph(pg.PlotWidget):
             plot_item.setData(x, y)
 
     def _refresh_graph(self):
-        """Clears and re-displays both the static and dynamic plots."""
-        self.clear()
-        #----------------------------------
         """
         Clears and re-displays both the static and dynamic plots.
-        Explicitly removes old plot items to avoid duplicate-addition warnings.
-        Use in case self.clear() starts to throw errors
-
-        # Remove previous static plot if it exists
-        if self._static_plot is not None:
-            try:
-                self.removeItem(self._static_plot)
-            except Exception as e:
-              print("Error removing static plot:", e)
-            self._static_plot = None
-        
-      # Remove previous dynamic plot if it exists
-        if self._dynamic_plot is not None:
-          try:
-              self.removeItem(self._dynamic_plot)
-          except Exception as e:
-              print("Error removing dynamic plot:", e)
-          self._dynamic_plot = None
-          
-          #self.clear() should work but throws the ocassional error
-          """
-        #-------------------------------
+        """
+        self.clear()
 
         # Static plot
         self._static_plot = self.plot(
-            pen='g',             # green line connecting points
-            symbol='o',          # circle marker
-            symbolSize=5,        # smaller points
-            symbolBrush='g'      # green fill for markers
+            pen='g',           # green line
+            symbol='o',
+            symbolSize=5,
+            symbolBrush='g'
         )
         self._refresh_plot(self._base_data, self._static_plot)
 
         # Dynamic plot
         self._dynamic_plot = self.plot(
-            pen='b',             # blue line connecting points
-            symbol='o',          # circle marker
-            symbolSize=7,        # smaller points
-            symbolBrush=None     # blue fill
+            pen='b',
+            symbol='o',
+            symbolSize=7,
+            symbolBrush=None
         )
-        # Exclude the dynamic plot from auto-ranging:
-
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
-
-
-
-    ###########################
-    # Auto-Scaling Functionality
-    ###########################
     def _handle_auto_scale_toggle(self, checked):
         """
         Called when the auto-scale button is toggled.
         If enabled, immediately re-auto-range the view.
         """
         if checked:
-            self._apply_auto_scale()  # ----- WISH 2: Apply auto-scale only using the green plot data -----
+            self._apply_auto_scale()
 
     def _on_view_range_changed(self, view_box, view_range):
         """
         Called when the view's range changes.
-        If auto-scale is enabled and the change did not originate from an auto-range call,
-        then re-apply auto-range.
+        If auto-scale is enabled and this change did not originate
+        from our own auto-range call, re-apply auto-range.
         """
         if self.auto_scale_button.isChecked() and not self._auto_range_in_progress:
-            self._apply_auto_scale()  # ----- WISH 2: Apply auto-scale only using the green plot data -----
+            self._apply_auto_scale()
 
-                 
     def _apply_auto_scale(self):
         """
         Auto-scales the view based solely on the static (green) plot data.
-        This version uses _prepare_xy to compute the correct plotting coordinates.
         """
-        # Get the plotted (transformed) coordinates for the green plot.
         x_data, y_data = self._prepare_xy(
             self._base_data['freq'],
             self._base_data['Z_real'],
             self._base_data['Z_imag']
         )
-        # Ensure there is data to process.
         if x_data.size and y_data.size:
             x_min, x_max = np.min(x_data), np.max(x_data)
             y_min, y_max = np.min(y_data), np.max(y_data)
+
             self._auto_range_in_progress = True
-            # Use the ViewBox's setRange method without the animate parameter.
             self.plotItem.getViewBox().setRange(
                 xRange=(x_min, x_max),
                 yRange=(y_min, y_max),
@@ -281,44 +257,34 @@ class ParentGraph(pg.PlotWidget):
             )
             self._auto_range_in_progress = False
 
+
 class PhaseGraph(ParentGraph):
     """
-    Plots log10(|phase|) vs. frequency, 
-    instead of the raw phase in degrees.
+    Plots log10(|phase|) vs. frequency (phase in degrees).
     """
 
     def __init__(self):
         super().__init__()
         self.setTitle("Phase (Log Scale of Degrees)")
-        self.setLabel('bottom', "log10(Freq[Hz])")#log
+        self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
-        
-        #fix axis
-        y_low=-2
-        y_top=2
-        x_low=-1.5
-        x_top=6
-        # Fix y-axis 
-        self.setYRange(y_low, y_top, padding=0.08)
-        # Fix x-axis 
-        self.setXRange(x_low, x_top, padding=0.05)
+
+        # Fix axes for demonstration
+        self.setYRange(-2, 2, padding=0.08)
+        self.setXRange(-1.5, 6, padding=0.05)
         self.getViewBox().invertX(True)
 
-    def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Convert to phase in degrees, then take log10(|phase|).
-        """
-        freq_log=np.log10(freq)
-        
-        phase_deg = np.degrees(np.arctan2(Z_imag, Z_real))
-        # log10 of the absolute value, with a small offset to avoid log(0)
+    def _prepare_xy(self, freq, z_real, z_imag):
+        freq_log = np.log10(freq)
+        phase_deg = np.degrees(np.arctan2(z_imag, z_real))
+        # Avoid log of zero by adding a small offset
         phase_log = np.log10(np.abs(phase_deg) + 1e-10)
-        
         return freq_log, phase_log
+
 
 class BodeGraph(ParentGraph):
     """
-    Plots the magnitude of impedance (in dB) vs. frequency (Bode plot).
+    Plots the magnitude of impedance in log scale vs. frequency.
     """
 
     def __init__(self):
@@ -326,115 +292,199 @@ class BodeGraph(ParentGraph):
         self.setTitle("Bode Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
-        
-        #fix axis
-        y_low=3
-        y_top=7
-        x_low=-1.5
-        x_top=6
-        # Fix y-axis
-        self.setYRange(y_low, y_top, padding=0.08)
-        # Fix x-axis
-        self.setXRange(x_low, x_top, padding=0.05)
+
+        self.setYRange(3, 7, padding=0.08)
+        self.setXRange(-1.5, 6, padding=0.05)
         self.getViewBox().invertX(True)
 
-    def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Convert impedance to magnitude (dB) = 20 * log10(|Z|).
-        """
-        freq_log=np.log10(freq)
-        
-        mag = np.sqrt(Z_real**2 + Z_imag**2)
+    def _prepare_xy(self, freq, z_real, z_imag):
+        freq_log = np.log10(freq)
+        mag = np.sqrt(z_real**2 + z_imag**2)
+        # Using log10(magnitude). If you really want dB, use 20*log10(mag).
         mag_db = np.log10(mag)
         return freq_log, mag_db
 
+
 class ColeColeGraph(ParentGraph):
     """
-    Plots Cole-Cole (Nyquist) diagram: real(Z) vs. -imag(Z).
+    Plots a Nyquist diagram: real(Z) vs. -imag(Z).
     """
+
     def __init__(self):
         super().__init__()
-        
         self.getPlotItem().setAspectLocked(True, 1)
-        
+
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
         self.setLabel('left', "-Z'' [Ohms]")
 
-    def _prepare_xy(self, freq, Z_real, Z_imag):
-        """
-        Typical Nyquist representation: X = Re(Z), Y = -Im(Z).
-        """
-        return Z_real, -Z_imag
-    
+    def _prepare_xy(self, freq, z_real, z_imag):
+        return z_real, -z_imag
+
+
 class TimeGraph(ParentGraph):
+    """
+    Simple time-domain plot: time vs. voltage.
+    """
 
     def __init__(self):
         super().__init__()
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Voltage")
-        # Rebuild the graph to remove the static plot.
+
+        # Rebuild the graph to remove default data in the constructor
         self._refresh_graph()
 
     def _prepare_xy(self, freq, time, volt):
-        # Swap the order: x-axis is time, y-axis is voltage.
+        """
+        TODO: Implement proper data processing for the time-domain graph.
+        Currently returning dummy data (time, volt) for demo purposes.
+        """
+        # Create a text item with the placeholder message.
+        placeholder = pg.TextItem("Placeholder: Not Implemented", anchor=(0.5, 0.5))
+        
+        # Position the text in the middle of the data range.
+        mid_x = (time[0] + time[-1]) / 2 if len(time) else 0.5
+        mid_y = (min(volt) + max(volt)) / 2 if len(volt) else 0.5
+        placeholder.setPos(mid_x, mid_y)
+        
+        # Add the text item to the graph.
+        self.addItem(placeholder)
+        
+        
         return time, volt
 
 
 class WidgetGraphs(QWidget):
     """
-    A widget that displays three graphs side by side:
-      - A large Cole-Cole graph
-      - Two smaller graphs (Bode and Phase) stacked vertically
-      - A Time-Domain graph in a separate tab
+    A widget that displays multiple graphs in a split/tabbed layout:
+      - A tabbed area with:
+          * Cole-Cole (Nyquist) graph
+          * Time-Domain graph
+      - To the right, a vertical stack of:
+          * Bode graph
+          * Phase graph
     """
 
     def __init__(self):
-        
         super().__init__()
         self._init_graphs()
         self._init_ui()
 
-    # ------------------------------------------
-    # Graph Update Methods
-    # ------------------------------------------
+    def _init_graphs(self):
+        """
+        Initializes internal graph widgets.
+        """
+        self._big_graph = ColeColeGraph()
+        self._small_graph_1 = BodeGraph()
+        self._small_graph_2 = PhaseGraph()
+        self._tab_graph = TimeGraph()
 
-    def update_front_graphs(self, freq, Z_real, Z_imag):
-        """Updates the base (static) data for all graphs."""
-        
-        self._big_graph.update_parameters_base(freq, Z_real, Z_imag)
-        self._small_graph_1.update_parameters_base(freq, Z_real, Z_imag)
-        self._small_graph_2.update_parameters_base(freq, Z_real, Z_imag)
-        
+    def _init_ui(self):
+        """
+        Initializes and sets up the UI layout.
+        """
+        # Create the tab widget
+        self._tab_widget = QTabWidget()
+        self._tab_widget.addTab(self._big_graph, "Cole Graph")
+        self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
+        self._tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._tab_widget.setStyleSheet("QTabWidget::pane { border: none; }")
+
+        # Determine tab bar height for alignment
+        tab_bar_height = self._tab_widget.tabBar().sizeHint().height()
+
+        # Create the left panel (tabbed area)
+        left_panel = self._create_left_panel()
+
+        # Create the right panel (two smaller graphs)
+        right_panel = self._create_right_panel(tab_bar_height)
+
+        # Put everything in a horizontal layout
+        main_layout = QHBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(10)
+        main_layout.addWidget(left_panel)
+        main_layout.addWidget(right_panel)
+
+        self.setLayout(main_layout)
+
+    def _create_left_panel(self):
+        """
+        Creates the left panel containing the QTabWidget inside a QFrame.
+        """
+        frame = self._create_frame()
+        layout = self._create_vbox_layout(frame, margins=(0, 0, 0, 0))
+        layout.addWidget(self._tab_widget)
+        return frame
+
+    def _create_right_panel(self, tab_bar_height):
+        """
+        Creates the right panel containing the two smaller graphs.
+        """
+        frame = self._create_frame()
+        layout = self._create_vbox_layout(frame, margins=(0, tab_bar_height, 0, 0))
+        layout.addWidget(self._small_graph_1)
+        layout.addWidget(self._small_graph_2)
+        return frame
+
+    @staticmethod
+    def _create_frame():
+        """
+        Creates and returns a styled QFrame.
+        """
+        frame = QFrame()
+        frame.setFrameShape(QFrame.StyledPanel)
+        frame.setFrameShadow(QFrame.Raised)
+        return frame
+
+    @staticmethod
+    def _create_vbox_layout(parent, margins=(0, 0, 0, 0)):
+        """
+        Creates and returns a QVBoxLayout with the specified margins.
+        """
+        layout = QVBoxLayout(parent)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(0)
+        return layout
+
+    def update_front_graphs(self, freq, z_real, z_imag):
+        """
+        Updates the base (static) data for the Cole, Bode, Phase graphs.
+        """
+        self._big_graph.update_parameters_base(freq, z_real, z_imag)
+        self._small_graph_1.update_parameters_base(freq, z_real, z_imag)
+        self._small_graph_2.update_parameters_base(freq, z_real, z_imag)
+
     def update_timedomain_graph(self, freq, time, voltage):
-        """Updates the base (static) data for all graphs."""
-        
+        """
+        Updates the base (static) data for the time-domain graph.
+        """
         self._tab_graph.update_parameters_base(freq, time, voltage)
 
     def update_manual_plot(self, calc_result: CalculationResult):
-        """Updates the manual (dynamic) data for all graphs."""
-        
-        # Unpack main arrays
+        """
+        Updates all graphs with the 'manual' (dynamic) data from a CalculationResult.
+        """
         freq_main = calc_result.main_freq
         z_real_main = calc_result.main_z_real
         z_imag_main = calc_result.main_z_imag
 
-        # Update manual parameters for all graphs
+        # Update manual parameters for Cole/Bode/Phase
         self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
 
-        # Unpack and update special points
+        # Add special markers
         freq_sp = calc_result.special_freq
         z_real_sp = calc_result.special_z_real
         z_imag_sp = calc_result.special_z_imag
-
         self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
 
-        # Update time-domain graph
+        # Update time-domain graph with manual data
         self._tab_graph.update_parameters_manual(
             calc_result.timedomain_freq,
             calc_result.timedomain_time,
@@ -442,289 +492,94 @@ class WidgetGraphs(QWidget):
         )
 
     def apply_filter_frequency_range(self, f_min, f_max):
-        """Filters out data outside [f_min, f_max] for all graphs."""
-        
+        """
+        Filters out data outside [f_min, f_max] for all graphs.
+        """
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
-        self._tab_graph.filter_frequency_range(f_min, f_max)
-
-    # ------------------------------------------
-    # Private Methods for UI Creation
-    # ------------------------------------------
-    
-    def _init_graphs(self):
-        """Initializes graph widgets."""
-        
-        self._big_graph = ColeColeGraph()
-        self._small_graph_1 = BodeGraph()
-        self._small_graph_2 = PhaseGraph()
-        self._tab_graph = TimeGraph()
-    
-    # Private Methods for UI Creation
-    def _init_ui(self):
-        """Initializes and sets up the UI layout."""
-        
-        # Create the tab widget
-        self._tab_widget = QTabWidget()
-        self._tab_widget.addTab(self._big_graph, "Cole Graph")
-        self._tab_widget.addTab(self._tab_graph, "T.Domain Graph")
-        self._tab_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self._tab_widget.setStyleSheet("QTabWidget::pane { border: none; }")  # Remove default border
-
-        # Determine tab bar height for alignment
-        tab_bar_height = self._tab_widget.tabBar().sizeHint().height()
-
-        # Create layout components using helper methods
-        left_panel = self._create_left_panel()
-        right_panel = self._create_right_panel(tab_bar_height)
-
-        # MAIN LAYOUT: Places left and right panels side by side
-        main_layout = QHBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(10)
-        main_layout.addWidget(left_panel)
-        main_layout.addWidget(right_panel)
-        
-        self.setLayout(main_layout)
-
-    def _create_left_panel(self):
-        """Creates the left panel containing the QTabWidget inside a QFrame."""
-        frame = self._create_frame()
-        layout = self._create_vbox_layout(frame, margins=(0, 0, 0, 0))
-        layout.addWidget(self._tab_widget)
-        return frame
-
-    def _create_right_panel(self, tab_bar_height):
-        """Creates the right panel containing the two smaller graphs."""
-        frame = self._create_frame()
-        layout = self._create_vbox_layout(frame, margins=(0, tab_bar_height, 0, 0))
-        layout.addWidget(self._small_graph_1)
-        layout.addWidget(self._small_graph_2)
-        return frame
-
-    def _create_frame(self):
-        """Creates and returns a styled QFrame."""
-        frame = QFrame()
-        frame.setFrameShape(QFrame.StyledPanel)
-        frame.setFrameShadow(QFrame.Raised)
-        return frame
-
-    def _create_vbox_layout(self, parent, margins=(0, 0, 0, 0)):
-        """Creates and returns a QVBoxLayout with the specified margins."""
-        layout = QVBoxLayout(parent)
-        layout.setContentsMargins(*margins)
-        layout.setSpacing(0)
-        return layout
-
+       #TODO
+       #self._tab_graph.filter_frequency_range(f_min, f_max)
 
 # -----------------------------------------------------------------------
-#  Quick test
+#  Quick Test
 # -----------------------------------------------------------------------
+
 import sys
 import numpy as np
-import pyqtgraph as pg
-
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QLabel, QSlider, QPushButton
+    QApplication, QWidget, QHBoxLayout, QVBoxLayout,
+    QSlider, QLabel, QSizePolicy
 )
 from PyQt5.QtCore import Qt
 
-# Import your adapted graph widget and CalculationResult
-# from your_file import WidgetGraphs, CalculationResult
 
-def test_widget_graphs():
+def generate_base_data(num_points=50):
+    freq = np.logspace(0, 5, num_points)
+    z_real = 50 + 10 * np.sqrt(freq)
+    z_imag = -5 * np.log10(freq + 1)
+    time = np.linspace(0, 1, 200)
+    volt = 0.5 * np.sin(2 * np.pi * 5 * time)
+    return freq, z_real, z_imag, time, volt
+
+
+def generate_manual_data(base_data, param1, param2, param3):
+    freq, z_real, z_imag, time, volt = base_data
+    factor = 1 + param1 / 100
+    offset_z = param2 / 10
+    offset_v = param3 / 100
+    return freq, factor * (z_real + offset_z), factor * (z_imag + offset_z), time, factor * volt + offset_v
+
+
+class TestWidget(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Manual Test: Blue line only moves")
+        self.graphs = WidgetGraphs()
+
+        # Create sliders and labels using parameter info
+        params = [("param1", 20), ("param2", 10), ("param3", 5)]
+        self.sliders, self.labels = {}, {}
+        slider_layout = QVBoxLayout()
+        for name, init in params:
+            self.labels[name] = QLabel(f"{name}: {init}")
+            slider = QSlider(Qt.Horizontal)
+            slider.setRange(0, 100)
+            slider.setValue(init)
+            slider.valueChanged.connect(self._update_blue_line)
+            self.sliders[name] = slider
+            slider_layout.addWidget(self.labels[name])
+            slider_layout.addWidget(slider)
+
+        # Main layout: graphs on left, sliders on right
+        main_layout = QHBoxLayout()
+        main_layout.addWidget(self.graphs, stretch=1)
+        main_layout.addLayout(slider_layout)
+        self.setLayout(main_layout)
+
+        # Set up the base (green) data once
+        self.base_data = generate_base_data()
+        freq, z_real, z_imag, time, volt = self.base_data
+        self.graphs.update_front_graphs(freq, z_real, z_imag)
+        self.graphs.update_timedomain_graph(freq, time, volt)
+
+        self._update_blue_line()
+
+    def _update_blue_line(self):
+        p1 = self.sliders["param1"].value()
+        p2 = self.sliders["param2"].value()
+        p3 = self.sliders["param3"].value()
+        for name, val in zip(["param1", "param2", "param3"], (p1, p2, p3)):
+            self.labels[name].setText(f"{name}: {val}")
+
+        freq, z_real, z_imag, time, volt = generate_manual_data(self.base_data, p1, p2, p3)
+        for graph in (self.graphs._big_graph, self.graphs._small_graph_1, self.graphs._small_graph_2):
+            graph.update_parameters_manual(freq, z_real, z_imag)
+        self.graphs._tab_graph.update_parameters_manual(freq, time, volt)
+
+
+if __name__ == '__main__':
     app = QApplication(sys.argv)
-
-    # 1) Create a main widget to hold the graphs + sliders + test buttons
-    main_widget = QWidget()
-    main_layout = QVBoxLayout(main_widget)
-
-    # 2) The composite widget with ColeCole, Bode, Phase
-    graph_widget = WidgetGraphs()
-    main_layout.addWidget(graph_widget)
-
-    # ---------------------------------------------------------------------
-    # Base (green) data: "static" reference
-    # ---------------------------------------------------------------------
-    base_freq = np.array([1, 10, 100, 1000, 10000])
-    base_real = np.array([100, 80, 60, 40, 20])
-    base_imag = np.array([-50, -40, -30, -20, -10])
-
-    # Initialize the 'base' lines with green
-    graph_widget.update_graphs(base_freq, base_real, base_imag)
-
-    # ---------------------------------------------------------------------
-    # Manual (blue) data + 3 special points
-    # ---------------------------------------------------------------------
-    manual_freq = np.array([1, 10, 100, 1000, 10000])
-    manual_real = np.array([90, 70, 50, 30, 10])
-    manual_imag = np.array([-45, -35, -25, -15, -5])
-
-    # Three special frequency points
-    sp_freq = np.array([5, 50, 500]) 
-    sp_real = np.array([88, 48, 12]) 
-    sp_imag = np.array([-44, -28, -10])
-
-    # Build a CalculationResult for the "manual" portion
-    # (Note: For the 3 special points, we only have 3 data, 
-    #  so they’ll be shown as separate colored markers.)
-    initial_calc_result = CalculationResult(
-        main_freq = manual_freq,
-        main_z_real = manual_real,
-        main_z_imag = manual_imag,
-        special_freq = sp_freq,
-        special_z_real = sp_real,
-        special_z_imag = sp_imag
-    )
-
-    # Pass it to the graph widget’s update_manual_plot (blue + special points)
-    graph_widget.update_manual_plot(initial_calc_result)
-
-    # ---------------------------------------------------------------------
-    # Create sliders to scale the base & manual data in real-time
-    # ---------------------------------------------------------------------
-    sliders_layout = QGridLayout()
-    main_layout.addLayout(sliders_layout)
-
-    # 5 sliders: freq scale (for *both* base & manual), 
-    #            green real, green imag, blue real, blue imag
-    freq_slider_label = QLabel("Freq Scale (black):")
-    freq_slider = QSlider(Qt.Horizontal)
-    freq_slider.setRange(1, 300)
-    freq_slider.setValue(100)
-    sliders_layout.addWidget(freq_slider_label, 0, 0)
-    sliders_layout.addWidget(freq_slider, 0, 1)
-
-    green_real_label = QLabel("Green Z_real:")
-    green_real_slider = QSlider(Qt.Horizontal)
-    green_real_slider.setRange(1, 300)
-    green_real_slider.setValue(100)
-    sliders_layout.addWidget(green_real_label, 1, 0)
-    sliders_layout.addWidget(green_real_slider, 1, 1)
-
-    green_imag_label = QLabel("Green Z_imag:")
-    green_imag_slider = QSlider(Qt.Horizontal)
-    green_imag_slider.setRange(1, 300)
-    green_imag_slider.setValue(100)
-    sliders_layout.addWidget(green_imag_label, 2, 0)
-    sliders_layout.addWidget(green_imag_slider, 2, 1)
-
-    blue_real_label = QLabel("Blue Z_real:")
-    blue_real_slider = QSlider(Qt.Horizontal)
-    blue_real_slider.setRange(1, 300)
-    blue_real_slider.setValue(100)
-    sliders_layout.addWidget(blue_real_label, 3, 0)
-    sliders_layout.addWidget(blue_real_slider, 3, 1)
-
-    blue_imag_label = QLabel("Blue Z_imag:")
-    blue_imag_slider = QSlider(Qt.Horizontal)
-    blue_imag_slider.setRange(1, 300)
-    blue_imag_slider.setValue(100)
-    sliders_layout.addWidget(blue_imag_label, 4, 0)
-    sliders_layout.addWidget(blue_imag_slider, 4, 1)
-
-    def on_any_slider_changed():
-        """
-        When any slider moves, rescale base & manual data
-        and re-plot them. Then build a new CalculationResult
-        for the manual portion (including the special points).
-        """
-        freq_scale = freq_slider.value() / 100.0
-
-        green_r_scale = green_real_slider.value() / 100.0
-        green_i_scale = green_imag_slider.value() / 100.0
-
-        blue_r_scale = blue_real_slider.value() / 100.0
-        blue_i_scale = blue_imag_slider.value() / 100.0
-
-        # Scale base (green) data
-        base_freq_scaled = base_freq * freq_scale
-        base_real_scaled = base_real * green_r_scale
-        base_imag_scaled = base_imag * green_i_scale
-
-        # Scale manual (blue) data
-        manual_freq_scaled = manual_freq * freq_scale
-        manual_real_scaled = manual_real * blue_r_scale
-        manual_imag_scaled = manual_imag * blue_i_scale
-
-        # Scale special points
-        sp_freq_scaled = sp_freq * freq_scale
-        sp_real_scaled = sp_real * blue_r_scale
-        sp_imag_scaled = sp_imag * blue_i_scale
-
-        # Update the 'base' line in green
-        graph_widget.update_graphs(
-            base_freq_scaled,
-            base_real_scaled,
-            base_imag_scaled
-        )
-
-        # Construct a new CalculationResult for the manual portion
-        calc_res = CalculationResult(
-            main_freq     = manual_freq_scaled,
-            main_z_real   = manual_real_scaled,
-            main_z_imag   = manual_imag_scaled,
-            special_freq  = sp_freq_scaled,
-            special_z_real= sp_real_scaled,
-            special_z_imag= sp_imag_scaled
-        )
-        # Pass it to update_manual_plot
-        graph_widget.update_manual_plot(calc_res)
-
-    # Connect all sliders
-    freq_slider.valueChanged.connect(on_any_slider_changed)
-    green_real_slider.valueChanged.connect(on_any_slider_changed)
-    green_imag_slider.valueChanged.connect(on_any_slider_changed)
-    blue_real_slider.valueChanged.connect(on_any_slider_changed)
-    blue_imag_slider.valueChanged.connect(on_any_slider_changed)
-
-    # ---------------------------------------------------------------------
-    # 3) Optional: Add test buttons to filter frequency range
-    # ---------------------------------------------------------------------
-    button_layout = QHBoxLayout()
-    main_layout.addLayout(button_layout)
-
-    btn_filter_10_100 = QPushButton("Filter 10..100 Hz")
-    button_layout.addWidget(btn_filter_10_100)
-
-    def filter_10_100():
-        graph_widget.apply_filter_frequency_range(10, 100)
-    btn_filter_10_100.clicked.connect(filter_10_100)
-
-    btn_show_all = QPushButton("Show All Freq")
-    button_layout.addWidget(btn_show_all)
-
-    def show_all():
-        """
-        Reset the original data to undo prior filtering and re-plot.
-        """
-        graph_widget.update_graphs(base_freq, base_real, base_imag)
-
-        # Also reset manual part
-        calc_res = CalculationResult(
-            main_freq     = manual_freq,
-            main_z_real   = manual_real,
-            main_z_imag   = manual_imag,
-            special_freq  = sp_freq,
-            special_z_real= sp_real,
-            special_z_imag= sp_imag
-        )
-        graph_widget.update_manual_plot(calc_res)
-
-    btn_show_all.clicked.connect(show_all)
-
-    # ---------------------------------------------------------------------
-    # Final Setup
-    # ---------------------------------------------------------------------
-    main_widget.setLayout(main_layout)
-    main_widget.resize(900, 700)
-    main_widget.setWindowTitle("WidgetGraphs - Test of CalculationResult + Special Points")
-    main_widget.show()
-
+    tester = TestWidget()
+    tester.show()
     sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    test_widget_graphs()

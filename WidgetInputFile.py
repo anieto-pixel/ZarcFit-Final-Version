@@ -175,7 +175,7 @@ class WidgetInputFile(QWidget):
                 )
                 self.previous_button.setEnabled(False)
                 self.next_button.setEnabled(False)
-            self._slider.setList(self._files)
+            self._slider.set_list(self._files)
 
     def _update_file_display(self):
         """
