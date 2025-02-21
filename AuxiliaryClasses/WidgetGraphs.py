@@ -118,7 +118,7 @@ class ParentGraph(pg.PlotWidget):
             self.removeItem(item)
         self._special_items = []
 
-        for i, color in enumerate(['r', 'g', 'c']):
+        for i, color in enumerate(['r', 'g', 'b']):
             x, y = self._prepare_xy(
                 np.array([freq_array[i]]),
                 np.array([z_real_array[i]]),
@@ -225,7 +225,7 @@ class ParentGraph(pg.PlotWidget):
 
         # Dynamic plot (manual data)
         self._dynamic_plot = self.plot(
-            pen='b',
+            pen='c',
             symbol='o',
             symbolSize=7,
             symbolBrush=None

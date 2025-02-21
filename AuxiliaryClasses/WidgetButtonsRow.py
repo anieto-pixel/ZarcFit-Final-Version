@@ -45,16 +45,16 @@ class WidgetButtonsRow(QWidget):
         self.f2_button: QPushButton = QPushButton("F2 Fit Bode")
         self.f3_button: QPushButton = QPushButton("F3 AllFreqs")
         self.f4_button: QPushButton = QPushButton("F4 Save plot")
-        self.f5_button: QPushButton = QPushButton("F5 <file")
-        self.f6_button: QPushButton = QPushButton("F6 file>")
+        self.f5_button: QPushButton = QPushButton("F5 File Back")
+        self.f6_button: QPushButton = QPushButton("F6 File Forth")
         self.f7_button: QPushButton = QPushButton("F7 Recover")
-        self.f8_button: QPushButton = QPushButton("F8 Default")
+        self.f8_button: QPushButton = QPushButton("F8 Sliders Default")
 
         # Create checkable buttons using DualLabelButton.
         self.f9_button: DualLabelButton = DualLabelButton("F9 +Rinf", "F9 -Rinf")
         self.f10_button: DualLabelButton = DualLabelButton("F10 Parallel", "F10 Series")
-        self.f11_button: DualLabelButton = DualLabelButton("F11 Tail Right", "F11 Tail Left")
-        self.f12_button: DualLabelButton = DualLabelButton("F12 Constrains", "F12 Constrains On")
+        self.f11_button: DualLabelButton = DualLabelButton("F11 Tail Left", "F11 Tail Right")
+        self.f12_button: DualLabelButton = DualLabelButton("F12 Damping", "F12 Constrains On")
 
         # Create additional regular buttons.
         self.fup_button: QPushButton = QPushButton("PageUp")

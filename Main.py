@@ -336,7 +336,7 @@ class MainWidget(QWidget):
         Resets sliders to their default values and refreshes frequency settings.
         """
         self.widget_sliders.set_default_values()
-        self._handle_set_allfreqs()
+        #self._handle_set_allfreqs()
 
     def _handle_rinf_negative(self, state):
         """Handles toggling for Rinf being negative."""

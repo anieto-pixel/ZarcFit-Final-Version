@@ -567,7 +567,6 @@ class Calculator(QObject):
         where sigma is an effective standard deviation derived from the parameter bounds.
         """
         # Uncomment the next line to disable the penalty for debugging purposes.
-        prior_weight = 0
         
         # Compute effective standard deviation for each parameter.
         sigmas = (upper_bounds - lower_bounds) * gaussian_fraction
@@ -580,6 +579,7 @@ class Calculator(QObject):
         Test validity criteria: Fh >= Fm >= Fl.
         Returns zero if valid, or positive deviations if invalid.
         """
+        #return  np.array([0,0])
         return np.array([
             max(0.0, params["Fm"] - params["Fh"]),
             max(0.0, params["Fl"] - params["Fm"])
