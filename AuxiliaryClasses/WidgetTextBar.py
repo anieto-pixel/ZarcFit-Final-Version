@@ -97,10 +97,10 @@ class WidgetTextBar(QWidget):
                     f"<b><font color='{color}'>{key}:</font></b> {value:.3g}"
                 )
                 self.value_labels[key].setText(formatted_string)
-            else:
-                print(
-                    f"WidgetTextBar Warning: Key '{key}' not found in value_labels."
-                )
+            else:pass
+                #print(
+                #    f"WidgetTextBar Warning: Key '{key}' will not be displayed. Add it in config.ini"
+                #)
 
 
 #########################

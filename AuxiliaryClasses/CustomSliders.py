@@ -83,7 +83,7 @@ class CustomSliders(QWidget):
         metrics = self.fontMetrics()
         return metrics.horizontalAdvance("-0099e+00") + 10  # Add padding
 
-    def _update_slider_style(self, colour):
+    def _update_slider_style(self, colour: str):
         style = textwrap.dedent(f"""
             QSlider::handle:vertical {{
                 background: {colour};
@@ -169,7 +169,7 @@ class CustomSliders(QWidget):
         """
         self._slider.setValue(int(value))
 
-    def toggle_red_frame(self, state):
+    def toggle_red_frame(self, state: bool):
         """
         Set a thick red frame around the label of the slider if not already set,
         and remove it if it is set.

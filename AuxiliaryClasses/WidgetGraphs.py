@@ -14,6 +14,8 @@ import sys
 import copy
 import numpy as np
 import pyqtgraph as pg
+from pyqtgraph import FillBetweenItem
+from PyQt5.QtWidgets import QLineEdit
 
 from PyQt5.QtWidgets import (
     QApplication, QPushButton, QWidget, QTabWidget, QHBoxLayout,
@@ -35,10 +37,9 @@ class CalculationResult:
         self.special_z_real = np.array([70, 65, 55])
         self.special_z_imag = np.array([-40, -35, -28])
 
-        self.timedomain_freq = np.array([1, 10, 100])
+        self.timedomain_freq = np.array([0.01, 4.5, 1.1])
         self.timedomain_time = np.linspace(0, 1, 100)
         self.timedomain_volt = np.sin(2 * np.pi * 10 * self.timedomain_time)
-
 
 class ParentGraph(pg.PlotWidget):
     """
@@ -50,53 +51,18 @@ class ParentGraph(pg.PlotWidget):
 
     def __init__(self):
         super().__init__()
+        self._init_data()
+        self._init_ui()
+        self._init_signals()
+        self._special_items = [] #Special points marker
+        
+        self.fill_region = None
 
-        # Default data for base and manual plots
-        self._base_data = {
-            'freq': np.array([1, 10, 100, 1000, 10000]),
-            'Z_real': np.array([100, 80, 60, 40, 20]),
-            'Z_imag': np.array([-50, -40, -30, -20, -10]),
-        }
-        self._manual_data = {
-            'freq': np.array([1, 10, 100, 1000, 10000]),
-            'Z_real': np.array([90, 70, 50, 30, 10]),
-            'Z_imag': np.array([-45, -35, -25, -15, -5]),
-        }
-
-        # Keep full copies to allow re-expansion after filtering
-        self._original_base_data = copy.deepcopy(self._base_data)
-        self._original_manual_data = copy.deepcopy(self._manual_data)
-
-        self.setTitle("Parent Graph")
-        self.showGrid(x=True, y=True)
-
-        # Plot objects for static (base) and dynamic (manual) lines
-        self._static_plot = None
-        self._dynamic_plot = None
-
-        # A small auto-scale button in the top-left corner
-        self.auto_scale_button = QPushButton("", self)
-        self.auto_scale_button.setCheckable(True)
-        self.auto_scale_button.setGeometry(10, 10, 10, 10)
-        self.auto_scale_button.toggled.connect(self._handle_auto_scale_toggle)
-        self.auto_scale_button.setStyleSheet("""
-            QPushButton { background-color: lightgray; }
-            QPushButton:checked { background-color: rgb(102, 178, 255); }
-        """)
-
-        # Flag to avoid recursive auto-ranging calls
-        self._auto_range_in_progress = False
-
-        # Connect view changes to a handler so we can re-apply auto-range if needed
-        self.plotItem.getViewBox().sigRangeChanged.connect(self._on_view_range_changed)
-
-        # Initial display
+        # Initial display and auto-scale setup
         self._refresh_graph()
         self.auto_scale_button.setChecked(True)
 
-        # For optional special markers
-        self._special_items = []
-
+    #----Public Methods----------
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points within [f_min, f_max].
@@ -127,30 +93,20 @@ class ParentGraph(pg.PlotWidget):
     def update_parameters_base(self, freq, Z_real, Z_imag):
         """
         Sets new 'base' data and re-displays both plots.
-        Also update the originals so filtering includes the new full dataset.
+        Also updates the originals so filtering includes the new full dataset.
         """
         self.auto_scale_button.setChecked(False)
-
-        self._base_data = {
-            'freq': freq,
-            'Z_real': Z_real,
-            'Z_imag': Z_imag
-        }
+        self._base_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self._original_base_data = copy.deepcopy(self._base_data)
-
         self._refresh_graph()
         self.auto_scale_button.setChecked(True)
 
     def update_parameters_manual(self, freq, Z_real, Z_imag):
         """
         Sets new 'manual' (dynamic) data and refreshes only the dynamic plot.
-        Also update the originals so filtering includes the new full dataset.
+        Also updates the originals so filtering includes the new full dataset.
         """
-        self._manual_data = {
-            'freq': freq,
-            'Z_real': Z_real,
-            'Z_imag': Z_imag
-        }
+        self._manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
@@ -175,50 +131,47 @@ class ParentGraph(pg.PlotWidget):
             )
             self._special_items.append(plot_item)
 
-    def _prepare_xy(self, freq, z_real, z_imag):
-        """
-        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
-        Default is (Z_real, Z_imag). Subclasses override this if needed.
-        """
-        return z_real, z_imag
+    #----Private Methods----------
+    def _init_data(self):
+        """Initialize default datasets and related flags."""
+        # Default data for base and manual plots
+        self._base_data = {
+            'freq': np.array([1, 10, 100, 1000, 10000]),
+            'Z_real': np.array([100, 80, 60, 40, 20]),
+            'Z_imag': np.array([-50, -40, -30, -20, -10]),
+        }
+        self._manual_data = {
+            'freq': np.array([1, 10, 100, 1000, 10000]),
+            'Z_real': np.array([90, 70, 50, 30, 10]),
+            'Z_imag': np.array([-45, -35, -25, -15, -5]),
+        }
+        # Keep full copies to allow re-expansion after filtering
+        self._original_base_data = copy.deepcopy(self._base_data)
+        self._original_manual_data = copy.deepcopy(self._manual_data)
+        # Flag to avoid recursive auto-ranging calls
+        self._auto_range_in_progress = False
 
-    def _refresh_plot(self, data_dict, plot_item):
-        """
-        Updates a single plot (static or dynamic) with new data.
-        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
-        """
-        x, y = self._prepare_xy(
-            data_dict['freq'],
-            data_dict['Z_real'],
-            data_dict['Z_imag']
-        )
-        if plot_item:
-            plot_item.setData(x, y)
+    def _init_ui(self):
+        """Setup the UI elements."""
+        self.setTitle("Parent Graph")
+        self.showGrid(x=True, y=True)
+        self._create_auto_scale_button()
 
-    def _refresh_graph(self):
-        """
-        Clears and re-displays both the static and dynamic plots.
-        """
-        self.clear()
+    def _create_auto_scale_button(self):
+        """Create and configure the auto-scale button."""
+        self.auto_scale_button = QPushButton("", self)
+        self.auto_scale_button.setCheckable(True)
+        self.auto_scale_button.setGeometry(10, 10, 10, 10)
+        self.auto_scale_button.toggled.connect(self._handle_auto_scale_toggle)
+        self.auto_scale_button.setStyleSheet("""
+            QPushButton { background-color: lightgray; }
+            QPushButton:checked { background-color: rgb(102, 178, 255); }
+        """)
 
-        # Static plot
-        self._static_plot = self.plot(
-            pen='g',           # green line
-            symbol='o',
-            symbolSize=5,
-            symbolBrush='g'
-        )
-        self._refresh_plot(self._base_data, self._static_plot)
-
-        # Dynamic plot
-        self._dynamic_plot = self.plot(
-            pen='b',
-            symbol='o',
-            symbolSize=7,
-            symbolBrush=None
-        )
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
-
+    def _init_signals(self):
+        """Connect signals to their handlers."""
+        self.plotItem.getViewBox().sigRangeChanged.connect(self._on_view_range_changed)
+        
     def _handle_auto_scale_toggle(self, checked):
         """
         Called when the auto-scale button is toggled.
@@ -238,7 +191,7 @@ class ParentGraph(pg.PlotWidget):
 
     def _apply_auto_scale(self):
         """
-        Auto-scales the view based solely on the static (green) plot data.
+        Auto-scales the view based solely on the static (base) plot data.
         """
         x_data, y_data = self._prepare_xy(
             self._base_data['freq'],
@@ -257,6 +210,49 @@ class ParentGraph(pg.PlotWidget):
             )
             self._auto_range_in_progress = False
 
+    def _refresh_graph(self):
+        """Clears and re-displays both the static and dynamic plots."""
+        self.clear()
+
+        # Static plot (base data)
+        self._static_plot = self.plot(
+            pen='g',  # green line
+            symbol='o',
+            symbolSize=5,
+            symbolBrush='g'
+        )
+        self._refresh_plot(self._base_data, self._static_plot)
+
+        # Dynamic plot (manual data)
+        self._dynamic_plot = self.plot(
+            pen='b',
+            symbol='o',
+            symbolSize=7,
+            symbolBrush=None
+        )
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+    def _refresh_plot(self, data_dict, plot_item):
+        """
+        Updates a single plot (static or dynamic) with new data.
+        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
+        """
+        
+        x, y = self._prepare_xy(
+            data_dict['freq'],
+            data_dict['Z_real'],
+            data_dict['Z_imag']
+        )
+        if plot_item:
+            plot_item.setData(x, y)
+
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """
+        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
+        Default is (Z_real, Z_imag). Subclasses override this if needed.
+        """
+        return z_real, z_imag
+
 
 class PhaseGraph(ParentGraph):
     """
@@ -265,6 +261,7 @@ class PhaseGraph(ParentGraph):
 
     def __init__(self):
         super().__init__()
+        
         self.setTitle("Phase (Log Scale of Degrees)")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
@@ -325,36 +322,111 @@ class ColeColeGraph(ParentGraph):
 class TimeGraph(ParentGraph):
     """
     Simple time-domain plot: time vs. voltage.
+    Interprets Z_real as time and Z_imag as voltage.
+    The Mx, Mt, M0 labels remain pinned in the top-left of the plot view
+    (they do NOT move when panning or zooming).
     """
 
     def __init__(self):
+        # 1) Child attributes must be set BEFORE super().__init__(), so
+        #    if the parent calls _refresh_graph() early, these exist already.
+        self.mx = None
+        self.mt = None
+        self.m0 = None
+
+        # Create the TextItems but DO NOT place them in data coords yet.
+        self.mx_text = pg.TextItem(color='w', anchor=(0, 0))
+        self.mt_text = pg.TextItem(color='w', anchor=(0, 0))
+        self.m0_text = pg.TextItem(color='w', anchor=(0, 0))
+
+        # 2) Now construct the parent PlotWidget
         super().__init__()
+
+        # 3) Basic plot configuration
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Voltage")
 
-        # Rebuild the graph to remove default data in the constructor
+        # 4) Make each label a child of the *ViewBox* in device coords.
+        #    This ensures they stay in the same screen location, regardless of data transformations.
+        self.mx_text.setParentItem(self.plotItem.vb)
+        self.mt_text.setParentItem(self.plotItem.vb)
+        self.m0_text.setParentItem(self.plotItem.vb)
+
+        # Position them in the top-left corner (in pixels).
+        # - setPos(10,10) means 10px from the left, 10px down from the top of the ViewBox.
+        self.mx_text.setPos(300, 10)
+        self.mt_text.setPos(300, 30)   # stack below Mx
+        self.m0_text.setPos(300, 50)   # stack below Mt
+
+        # Build the initial plot
         self._refresh_graph()
 
-    def _prepare_xy(self, freq, time, volt):
-        """
-        TODO: Implement proper data processing for the time-domain graph.
-        Currently returning dummy data (time, volt) for demo purposes.
-        """
-        # Create a text item with the placeholder message.
-        placeholder = pg.TextItem("Placeholder: Not Implemented", anchor=(0.5, 0.5))
-        
-        # Position the text in the middle of the data range.
-        mid_x = (time[0] + time[-1]) / 2 if len(time) else 0.5
-        mid_y = (min(volt) + max(volt)) / 2 if len(volt) else 0.5
-        placeholder.setPos(mid_x, mid_y)
-        
-        # Add the text item to the graph.
-        self.addItem(placeholder)
-        
-        
-        return time, volt
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """Interpret Z_real as time, Z_imag as voltage."""
+        return z_real, z_imag
 
+    def update_parameters_base(self, freq, z_real, z_imag):
+        super().update_parameters_base(freq, z_real, z_imag)
+        self._refresh_graph()
+
+    def update_parameters_manual(self, freq, z_real, z_imag):
+        super().update_parameters_manual(freq, z_real, z_imag)
+        self._refresh_graph()
+
+    def _refresh_graph(self):
+        """
+        Draw the green (base) + blue (manual) lines via the parent,
+        then compute Mx/Mt/M0 and update the text items' content.
+        The text items are pinned to the top-left in device coords,
+        so we do NOT change their .setPos() here.
+        """
+        # 1) Let the parent draw
+        super()._refresh_graph()
+
+        # 2) Grab the manual data (blue curve)
+        t = self._manual_data['Z_real']
+        v = self._manual_data['Z_imag']
+        if t.size == 0 or v.size == 0:
+            return
+
+        # 3) Fill region for [0.45..1.1]
+        t_start, t_end = 0.45, 1.1
+        mask = (t >= t_start) & (t <= t_end)
+        if np.any(mask):
+            self.plot(
+                t[mask], v[mask],
+                pen=pg.mkPen('b', width=0),
+                fillLevel=0,
+                brush=pg.mkBrush(0, 0, 255, 80)  # semi-transparent blue
+            )
+
+        # 4) Compute M-values if there's data
+        self.mx = 1000 * self._integrate_chargeability(t, v, 0.45, 1.1)
+        self.mt = 1000 * self._integrate_chargeability(t, v, 0, 2)
+        self.m0 = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
+
+        # 5) Update text content (but NOT positions).
+        self.mx_text.setText(f"Mx = {self.mx:.1f}")
+        self.mt_text.setText(f"Mt = {self.mt:.1f}")
+        self.m0_text.setText(f"M0 = {self.m0:.3f}")
+
+        # 6) Auto-range the plot to show everything
+        self.plotItem.getViewBox().autoRange()
+
+    def _integrate_chargeability(self, t, v, tmin, tmax):
+        mask = (t >= tmin) & (t <= tmax)
+        if not np.any(mask):
+            return 0.0
+        return np.trapz(y=v[mask], x=t[mask])
+
+    def get_special_values(self):
+        values_dictionary={}
+        values_dictionary['mx']=self.mx
+        values_dictionary['mt']=self.mt
+        values_dictionary['m0']=self.m0
+        
+        return values_dictionary
 
 class WidgetGraphs(QWidget):
     """
@@ -498,8 +570,16 @@ class WidgetGraphs(QWidget):
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
-       #TODO
-       #self._tab_graph.filter_frequency_range(f_min, f_max)
+        
+        #print("filter freq range")
+        #self._tab_graph.filter_frequency_range(f_min, f_max)
+        
+    def get_graphs_parameters(self):
+        
+        graphs_parameters= self._tab_graph.get_special_values()
+        
+        return graphs_parameters
+    
 
 # -----------------------------------------------------------------------
 #  Quick Test

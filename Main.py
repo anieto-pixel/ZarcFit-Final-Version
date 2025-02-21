@@ -15,8 +15,6 @@ from PyQt5.QtWidgets import (
     QApplication, QLabel, QMainWindow, QShortcut, QSizePolicy, QSplitter,
     QWidget, QHBoxLayout, QVBoxLayout
 )
-
-
 # Ensure AuxiliaryClasses is included in sys.path. Import Aux Classes
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
 
@@ -30,8 +28,6 @@ from AuxiliaryClasses.WidgetInputFile import WidgetInputFile
 from AuxiliaryClasses.WidgetOutputFile import WidgetOutputFile
 from AuxiliaryClasses.WidgetSliders import WidgetSliders
 from AuxiliaryClasses.WidgetTextBar import WidgetTextBar
-
-
 
 
 class MainWidget(QWidget):
@@ -146,8 +142,8 @@ class MainWidget(QWidget):
         self.widget_at_bottom = WidgetTextBar(self.config.secondary_variables_to_display)
 
         # Initialize Models
-        self.model_manual = Calculator()
-        self.model_manual.set_bounds(self.config.slider_configurations)
+        self.calculator = Calculator()
+        self.calculator.set_bounds(self.config.slider_configurations)
 
     def _create_file_options_widget(self) -> QWidget:
         """
@@ -169,31 +165,31 @@ class MainWidget(QWidget):
 
     # ---------------- SIGNAL CONNECTIONS ----------------
     def _connect_listeners(self):
-        """Connects signals for file I/O, sliders, and model updates."""
+        """Connects signals from other widgets to their matching handle methods."""
         # File-related signals
-        self.widget_input_file.file_data_updated.connect(self._update_file_data)
+        self.widget_input_file.file_data_updated.connect(self._handle_update_file_data)
         self.widget_output_file.output_file_selected.connect(self.config.set_output_file)
 
         # Slider signals
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
         self.widget_sliders.all_sliders_reseted.connect(self._reset_v_sliders)
-        self.widget_sliders.slider_was_disabled.connect(self.model_manual.set_disabled_variables)
+        self.widget_sliders.slider_was_disabled.connect(self.calculator.set_disabled_variables)
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
-        self.model_manual.model_manual_result.connect(self.widget_graphs.update_manual_plot)
-        self.model_manual.model_manual_values.connect(self.widget_sliders.set_all_variables)
+        self.calculator.model_manual_result.connect(self.widget_graphs.update_manual_plot)
+        self.calculator.model_manual_values.connect(self.widget_sliders.set_all_variables)
 
     def _initialize_hotkeys_and_buttons(self):
         """Initializes keyboard shortcuts and connects button actions."""
         shortcut_f1 = QShortcut(QKeySequence(Qt.Key_F1), self)
         shortcut_f1.activated.connect(self.widget_buttons.f1_button.click)
         self.widget_buttons.f1_button.clicked.connect(
-            lambda: self.model_manual.fit_model_cole(self.v_sliders)
+            lambda: self.calculator.fit_model_cole(self.v_sliders)
         )
 
         shortcut_f2 = QShortcut(QKeySequence(Qt.Key_F2), self)
         shortcut_f2.activated.connect(self.widget_buttons.f2_button.click)
         self.widget_buttons.f2_button.clicked.connect(
-            lambda: self.model_manual.fit_model_bode(self.v_sliders)
+            lambda: self.calculator.fit_model_bode(self.v_sliders)
         )
 
         shortcut_f3 = QShortcut(QKeySequence(Qt.Key_F3), self)
@@ -226,7 +222,7 @@ class MainWidget(QWidget):
 
         shortcut_f10 = QShortcut(QKeySequence(Qt.Key_F10), self)
         shortcut_f10.activated.connect(self.widget_buttons.f10_button.click)
-        self.widget_buttons.f10_button.toggled.connect(self.model_manual.switch_circuit_model)
+        self.widget_buttons.f10_button.toggled.connect(self.calculator.switch_circuit_model)
 
         shortcut_f11 = QShortcut(QKeySequence(Qt.Key_F11), self)
         shortcut_f11.activated.connect(self.widget_buttons.f11_button.click)
@@ -234,7 +230,7 @@ class MainWidget(QWidget):
 
         shortcut_f12 = QShortcut(QKeySequence(Qt.Key_F12), self)
         shortcut_f12.activated.connect(self.widget_buttons.f12_button.click)
-        self.widget_buttons.f12_button.clicked.connect(self.model_manual.set_gaussian_prior)
+        self.widget_buttons.f12_button.clicked.connect(self.calculator.set_gaussian_prior)
 
         shortcut_page_down = QShortcut(QKeySequence(Qt.Key_PageDown), self)
         shortcut_page_down.activated.connect(self.widget_buttons.fdown_button.click)
@@ -245,22 +241,24 @@ class MainWidget(QWidget):
         self.widget_buttons.fup_button.clicked.connect(self.freq_slider.up_min)
 
     # ------------------- HANDLERS -------------------
-    def _update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
+    def _handle_update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
         """
-        Called when WidgetInputFile emits new file data.
-        Updates graphs, model, frequency slider, and configuration.
+        Updates graphs, model, frequency slider, and configuration with new file data.
         """
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_front_graphs(freq, Z_real, Z_imag)
-        freqs_uniform, t, volt_time = self.model_manual.transform_to_time_domain()
-        self.widget_graphs.update_timedomain_graph(freqs_uniform, t, volt_time)
-        self.model_manual.initialize_expdata(self.file_data)
+        
+        freqs_uniform, t, volt = self.calculator.transform_to_time_domain()
+        self.widget_graphs.update_timedomain_graph(freqs_uniform, t, volt)
+        
+        self.calculator.initialize_expdata(self.file_data)
         self.freq_slider.set_list(freq)
         self._update_sliders_data()
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
     def _handle_recover_file_values(self):
-        """Recovers file values from output and updates sliders."""
+        """Recovers file values from output. Updates sliders position."""
+        
         head = self.widget_input_file.get_current_file_name()
         dictionary = self.widget_output_file.find_row_in_file(head)
         if dictionary is None:
@@ -279,29 +277,30 @@ class MainWidget(QWidget):
         self.update_timer.start(5)  # Adjust the timeout as needed
 
     def _update_sliders_data(self):
-        """Processes all pending slider updates and refreshes the UI."""
+        """Processes all pending slider updates. Updates affected widgets and refreshes the UI."""
+        
         for key, value in self.pending_updates.items():
             self.v_sliders[key] = value
         self.pending_updates.clear()
 
-        self.model_manual.run_model_manual(self.v_sliders)
-        v_second = self.model_manual.get_latest_secondaries()
+        self.calculator.run_model_manual(self.v_sliders)
+        v_second = self.calculator.get_latest_secondaries()
         self.widget_at_bottom._update_text(v_second)
 
     def _reset_v_sliders(self, dictionary):
         """
-        Resets slider values if the incoming dictionary keys match the current slider keys.
+        Resets slider values to the values in the incoming dictionary.
         """
         if set(dictionary.keys()) != set(self.v_sliders.keys()):
             raise ValueError(
-                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
+                "Main._reset_v_sliders:Incoming dictionary keys do not match the slider keys in WidgetSliders."
             )
         self.v_sliders = dictionary
         self._update_sliders_data()
 
     def _handle_frequency_update(self, bottom_i, top_i, f_max, f_min):
         """
-        Handles frequency filtering based on slider positions.
+        Handles frequency filtering based on freq_slider positions.
         """
         freq_filtered = self.file_data['freq'][bottom_i: top_i + 1]
         z_real_filtered = self.file_data["Z_real"][bottom_i: top_i + 1]
@@ -313,7 +312,7 @@ class MainWidget(QWidget):
             "Z_imag": z_imag_filtered,
         }
 
-        self.model_manual.initialize_expdata(new_data)
+        self.calculator.initialize_expdata(new_data)
         self.widget_graphs.apply_filter_frequency_range(f_min, f_max)
 
     def _handle_set_allfreqs(self):
@@ -323,7 +322,7 @@ class MainWidget(QWidget):
         and updates front graphs.
         """
         self.freq_slider.default()
-        self.model_manual.initialize_expdata(self.file_data)
+        self.calculator.initialize_expdata(self.file_data)
         self.widget_graphs.update_front_graphs(
             self.file_data['freq'],
             self.file_data['Z_real'],
@@ -341,7 +340,7 @@ class MainWidget(QWidget):
 
     def _handle_rinf_negative(self, state):
         """Handles toggling for Rinf being negative."""
-        self.model_manual.set_rinf_negative(state)
+        self.calculator.set_rinf_negative(state)
         self.widget_sliders.get_slider('Rinf').toggle_red_frame(state)
 
     def _handle_toggle_pei(self, state):
@@ -369,8 +368,9 @@ class MainWidget(QWidget):
         file = {'file': self.widget_input_file.get_current_file_name()}
 
         main_dictionary = self.v_sliders | date | file
-        model_dictionary = self.model_manual.get_model_parameters()
-        self.widget_output_file.write_to_file(main_dictionary | model_dictionary)
+        model_dictionary = self.calculator.get_model_parameters()
+        graphs_dictionary = self.widget_graphs.get_graphs_parameters()
+        self.widget_output_file.write_to_file(main_dictionary | model_dictionary | graphs_dictionary)
 
 
 if __name__ == "__main__":

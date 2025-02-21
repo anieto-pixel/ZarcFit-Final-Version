@@ -457,6 +457,9 @@ class Calculator(QObject):
         This version minimizes overhead by precomputing the locked parameters
         and inlining the conversion of free parameters.
         """
+        if self.gaussian_prior and not self._valid_guess(initial_params):
+            print("The initial guess is invalid. This may prevent the fit")
+        
         
         all_keys = list(initial_params.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
@@ -464,28 +467,41 @@ class Calculator(QObject):
         locked_params = {k: initial_params[k] for k in self.disabled_variables if k in initial_params}
         x0 = self._scale_params(free_keys, initial_params)
         lower_bounds, upper_bounds = self._build_bounds(free_keys)
-    
-        def _residual_wrapper(x_free: np.ndarray) -> np.ndarray:
-            # Recover free parameters
-            free_params = self._descale_params(free_keys, x_free)
-            full_params = {**locked_params, **free_params}
-    
-            # Safely compute the model residual
+
+        def _residual_wrapper(x_guessing: np.ndarray) -> np.ndarray:
+            # Inline descaling of free parameters.
+            free_params = self._descale_params(free_keys, x_guessing)
+            full_params = locked_params.copy()
+            full_params.update(free_params)
+            
             try:
                 model_residual = residual_func(full_params)
             except ValueError:
-                # Return a large penalty if the model fails
                 return np.ones(10000) * 1e6
-    
-            # If Gaussian prior is enabled, add penalties
-            if self.gaussian_prior:
-                prior_residual = self._compute_gaussian_prior(
-                    x_free, x0, lower_bounds, upper_bounds, prior_weight
-                )
-                deviation_residual = self._compute_invalid_guess_penalty(full_params, prior_weight)
-                model_residual = np.concatenate([model_residual, prior_residual, deviation_residual])
             
-            return model_residual
+            if self.gaussian_prior:
+                #TODO. Better smoothing of this
+                penalty=1
+                if not self._valid_guess(full_params):
+                    print("bad news")
+                    
+                    penalty_scale = 1e4 * prior_weight  # arbitrary scaling
+                    penalty = np.ones(2 * len(self._experiment_data["freq"])) * penalty_scale
+                    penalty = np.concatenate([penalty, np.ones(len(free_keys)) * penalty_scale])
+                    #print(f"penalty: {penalty}") #legacy option
+                    return penalty               #legacy option
+                
+                prior_residual = self._compute_gaussian_prior(
+                    x_guessing, x0, lower_bounds, upper_bounds, prior_weight
+                )
+            else:
+                prior_residual = np.array([], dtype=float)
+                
+            return np.concatenate([model_residual, prior_residual]) #legacy option
+
+
+
+
 
         result = opt.least_squares(
             _residual_wrapper,
@@ -546,44 +562,26 @@ class Calculator(QObject):
         upper_bounds = self._scale_params(free_keys, self.upper_bounds)
         return lower_bounds, upper_bounds
 
-    def _compute_invalid_guess_penalty(self, params: dict, prior_weight: float) -> np.ndarray:
-        """
-        Returns the penalty array if the guess is invalid, otherwise zeros.
-        """
-        deviation = self._invalid_guess(params)
-        # Scale by some factor and prior_weight (tweak as needed)
-        return deviation * 1e4 * prior_weight
-
     def _compute_gaussian_prior(
         self, x_guessing: np.ndarray, x0: np.ndarray,
         lower_bounds: np.ndarray, upper_bounds: np.ndarray,
         prior_weight: float, gaussian_fraction: int = 5
     ) -> np.ndarray:
+        
+        #print("compute gaussian prior")
         """
-        Calculate the Gaussian prior penalty for each parameter.
-        
-        The penalty is computed as:
-            penalty = prior_weight * ((x_guessing - x0) / sigma)
-        where sigma is an effective standard deviation derived from the parameter bounds.
+        Compute the Gaussian prior penalty based on scaled standard deviations.
         """
-        # Uncomment the next line to disable the penalty for debugging purposes.
-        prior_weight = 0
-        
-        # Compute effective standard deviation for each parameter.
-        sigmas = (upper_bounds - lower_bounds) * gaussian_fraction
-        
-        # Return the scaled normalized deviation.
+        sigmas = np.array(
+            [(ub - lb) * gaussian_fraction for lb, ub in zip(lower_bounds, upper_bounds)],
+            dtype=float
+        )
         return prior_weight * ((x_guessing - x0) / sigmas)
 
-    def _invalid_guess(self, params: dict) -> list:
-        """
-        Test validity criteria: Fh >= Fm >= Fl.
-        Returns zero if valid, or positive deviations if invalid.
-        """
-        return np.array([
-            max(0.0, params["Fm"] - params["Fh"]),
-            max(0.0, params["Fl"] - params["Fm"])
-        ])
+    def _valid_guess(self, params: dict) -> float:
+        """Test validity criteria: Fh >= Fm >= Fl."""
+        #if params["Fh"] >= params["Fm"] and params["Fm"] >= params["Fl"]:
+        return 0
 
     #--------------v/t methods---------------
     def _interpolate_points_for_time_domain(self, freqs_even: np.ndarray) -> np.ndarray:

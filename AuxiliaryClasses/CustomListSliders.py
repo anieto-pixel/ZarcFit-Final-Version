@@ -98,7 +98,7 @@ class ListSlider(QtWidgets.QSlider):
             self.setValue(index)
             self.update()
 
-    def set_list(self, values_list):
+    def set_list(self, values_list: list[float]):
         """
         Update the slider with a new list of valid values.
 
@@ -223,7 +223,7 @@ class ListSliderRange(QtWidgets.QSlider):
             self._high = high
             self.update()
 
-    def set_list_value(self, value):
+    def set_list_value(self, value: float):
         """
         Set one of the handles based on the given value.
 
