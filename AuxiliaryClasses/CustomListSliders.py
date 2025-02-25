@@ -18,7 +18,6 @@ from PyQt5.QtWidgets import QApplication, QSlider, QVBoxLayout, QWidget
 class ListSlider(QtWidgets.QSlider):
     """
     A single-handle slider that maps a list of discrete values.
-    
     The slider's internal integer range corresponds directly to the indices
     of the provided values_list.
     """
@@ -26,29 +25,43 @@ class ListSlider(QtWidgets.QSlider):
     def __init__(self, values_list=None, *args, **kwargs):
         """
         Initialize the slider.
-
-        Args:
-            values_list (list, optional): List of discrete values.
-                Defaults to [0.0] if not provided.
+        Args:values_list (list, optional): List of discrete values.
         """
         super().__init__(*args, **kwargs)
         if values_list is None:
             values_list = [0.0]
         self.values_list = values_list
 
-        # Set horizontal orientation.
+        self._initialize_orientation()
+        self._configure_range()
+        self._configure_ticks()
+        self._apply_custom_style()
+
+    def _initialize_orientation(self):
+        """Set the slider orientation to horizontal."""
         self.setOrientation(Qt.Horizontal)
-        # The integer range corresponds to the indices of values_list.
+
+    def _configure_range(self):
+        """
+        Configure the slider's range to match the indices of values_list,
+        and set its initial value.
+        """
         self.setMinimum(0)
         self.setMaximum(len(self.values_list) - 1)
         self.setValue(self.minimum())
 
-        # Configure tick marks below the slider.
-        self.setTickPosition(QSlider.TicksBelow)
-        # Set tick interval proportional to the list length.
-        self.setTickInterval(max(1, int(len(self.values_list) / 10)))
+    def _configure_ticks(self):
+        """
+        Configure tick marks for the slider.
+        The tick position is set below the slider and the interval is proportional
+        to the number of discrete values.
+        """
+        self.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        interval = max(1, int(len(self.values_list) / 10))
+        self.setTickInterval(interval)
 
-        # Apply a custom style to improve visual appearance.
+    def _apply_custom_style(self):
+        """Apply a custom style to improve the slider's visual appearance."""
         self.setStyleSheet("""
             QSlider::groove:horizontal {
                 border: 1px solid #bbb;
@@ -140,7 +153,6 @@ class ListSlider(QtWidgets.QSlider):
 class ListSliderRange(QtWidgets.QSlider):
     """
     A dual-handle slider for log10 ranges.
-
     QSlider remains integer-based; here the integers represent indices for the
     discrete log10-scaled values in values_list.
     """
@@ -148,38 +160,56 @@ class ListSliderRange(QtWidgets.QSlider):
     # The signal emits: (low_index, high_index, low_value, high_value)
 
     def __init__(self, values_list=None, *args):
-        """
-        Initialize the range slider.
-
-        Args:
-            values_list (list, optional): List of discrete float values.
-                Defaults to [0.0] if not provided.
-        """
+        """Initialize the range slider."""
+        
         super().__init__(*args)
+        self._setup_slider_configuration(values_list)
+        self._init_mouse_variables()
+
+    def _setup_slider_configuration(self, values_list):
+        """
+        Setup the slider configuration: set the discrete value list, orientation,
+        tick marks, range, handle positions, and dimensions.
+        """
         if values_list is None:
             values_list = [0.0]
         self.values_list = values_list
 
-        # Set vertical orientation.
         self.setOrientation(Qt.Vertical)
         self.setTickPosition(QtWidgets.QSlider.TicksBelow)
-
-        # Configure slider range based on number of discrete values.
         self.setMinimum(0)
         self.setMaximum(len(self.values_list) - 1)
-
-        # Initialize handle positions at the extreme ends.
         self._low = self.minimum()
         self._high = self.maximum()
+        self.setMinimumWidth(100)
+        self.number_of_ticks = 20
 
-        # Variables for mouse interaction.
+    def _init_mouse_variables(self):
+        """
+        Initialize variables needed for mouse interaction.
+        """
         self.pressed_control = QtWidgets.QStyle.SC_None
         self.hover_control = QtWidgets.QStyle.SC_None
         self.click_offset = 0
         self.active_slider = -1
 
-        self.setMinimumWidth(100)
-        self.number_of_ticks = 20
+    def up(self):
+        """
+        Move the slider one step upward (to a higher index).
+        """
+        current = self.value()
+        new_val = current + 1
+        if new_val <= self.maximum():
+            self.setValue(new_val)
+
+    def down(self):
+        """
+        Move the slider one step downward (to a lower index).
+        """
+        current = self.value()
+        new_val = current - 1
+        if new_val >= self.minimum():
+            self.setValue(new_val)
 
     def low(self):
         """Return the index of the lower handle."""

@@ -267,7 +267,6 @@ class PhaseGraph(ParentGraph):
     """
     Plots log10(|phase|) vs. frequency (phase in degrees).
     """
-
     def __init__(self):
         super().__init__()
         
@@ -292,7 +291,6 @@ class BodeGraph(ParentGraph):
     """
     Plots the magnitude of impedance in log scale vs. frequency.
     """
-
     def __init__(self):
         super().__init__()
         self.setTitle("Impedance Magnitude Graph")
@@ -316,7 +314,6 @@ class ColeColeGraph(ParentGraph):
     Plots a Nyquist diagram: real(Z) vs. -imag(Z),
     with an optional third (secondary) line.
     """
-
     def __init__(self):
         
         # Initialize secondary manual data and placeholder for plot
@@ -334,7 +331,6 @@ class ColeColeGraph(ParentGraph):
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
         self.setLabel('left', "-Z'' [Ohms]")
-
 
     def update_parameters_secondary_manual(self, freq, Z_real, Z_imag):
         """
@@ -383,42 +379,48 @@ class TimeGraph(ParentGraph):
     The Mx, Mt, M0 labels remain pinned in the top-left of the plot view
     (they do NOT move when panning or zooming).
     """
-
+    
     def __init__(self):
-        # 1) Child attributes must be set BEFORE super().__init__(), so
-        #    if the parent calls _refresh_graph() early, these exist already.
+
+        self._init_child_attributes()
+        
+        super().__init__()
+        self._configure_plot()
+        self._setup_text_items()
+        self._refresh_graph()
+    
+    def _init_child_attributes(self):
+        """Initialize attributes specific to the time graph."""
         self.mx = None
         self.mt = None
         self.m0 = None
 
-        # Create the TextItems but DO NOT place them in data coords yet.
+        # Create TextItems; they are not added to the ViewBox until later.
         self.mx_text = pg.TextItem(color='w', anchor=(0, 0))
         self.mt_text = pg.TextItem(color='w', anchor=(0, 0))
         self.m0_text = pg.TextItem(color='w', anchor=(0, 0))
-
-        # 2) Now construct the parent PlotWidget
-        super().__init__()
-
-        # 3) Basic plot configuration
+    
+    def _configure_plot(self):
+        """Configure the plot title and axis labels."""
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Voltage")
-
-        # 4) Make each label a child of the *ViewBox* in device coords.
-        #    This ensures they stay in the same screen location, regardless of data transformations.
-        self.mx_text.setParentItem(self.plotItem.vb)
-        self.mt_text.setParentItem(self.plotItem.vb)
-        self.m0_text.setParentItem(self.plotItem.vb)
-
-        # Position them in the top-left corner (in pixels).
-        # - setPos(10,10) means 10px from the left, 10px down from the top of the ViewBox.
+    
+    def _setup_text_items(self):
+        """
+        Make each label a child of the ViewBox in device coordinates so that they stay
+        in the same screen location regardless of panning or zooming.
+        """
+        vb = self.plotItem.vb
+        self.mx_text.setParentItem(vb)
+        self.mt_text.setParentItem(vb)
+        self.m0_text.setParentItem(vb)
+        
+        # Position the text items in the top-left corner (device coordinates)
         self.mx_text.setPos(300, 10)
-        self.mt_text.setPos(300, 30)   # stack below Mx
-        self.m0_text.setPos(300, 50)   # stack below Mt
-
-        # Build the initial plot
-        self._refresh_graph()
-
+        self.mt_text.setPos(300, 30)  # Stack below Mx
+        self.m0_text.setPos(300, 50)  # Stack below Mt
+    
     def _prepare_xy(self, freq, z_real, z_imag):
         """Interpret Z_real as time, Z_imag as voltage."""
         return z_real, z_imag
@@ -435,20 +437,19 @@ class TimeGraph(ParentGraph):
         """
         Draw the green (base) + blue (manual) lines via the parent,
         then compute Mx/Mt/M0 and update the text items' content.
-        The text items are pinned to the top-left in device coords,
-        so we do NOT change their .setPos() here.
+        The text items are pinned to the top-left in device coords, so we do NOT change their positions here.
         """
-        # 1) Let the parent draw
+        # 1) Let the parent draw its curves.
         super()._refresh_graph()
 
-        # 2) Grab the manual data (blue curve)
-        t = self._manual_data['Z_real']   # or 'freq' if your "time" is stored there
-        v = self._manual_data['Z_imag']   # or however you store the decaying voltage
-    
+        # 2) Get manual data (blue curve)
+        t = self._manual_data['Z_real']  # Here, Z_real is used as time.
+        v = self._manual_data['Z_imag']  # Z_imag is the voltage.
+
         if t.size == 0 or v.size == 0:
             return
-    
-        # 2) Fill region for [0.45..1.1], just for visual shading
+
+        # 3) Shade the region [0.45, 1.1]
         t_start, t_end = 0.45, 1.1
         mask = (t >= t_start) & (t <= t_end)
         if np.any(mask):
@@ -456,50 +457,47 @@ class TimeGraph(ParentGraph):
                 t[mask], v[mask],
                 pen=pg.mkPen('b', width=0),
                 fillLevel=0,
-                brush=pg.mkBrush(0, 0, 255, 80)  # semi-transparent blue
+                brush=pg.mkBrush(0, 0, 255, 80)  # Semi-transparent blue.
             )
-    
-        # 3) Compute M-values (chargeability) in mV/V, if Vp != 0
-        Vp = np.interp(0.0, t, v)  # Voltage at t=0 (primary)
+
+        # 4) Compute chargeability M-values (mV/V)
+        Vp = np.interp(0.0, t, v)  # Voltage at t=0.
         if abs(Vp) < 1e-12:
-            # If Vp is effectively zero, set M-values to 0 or handle differently
             self.mx = 0.0
             self.mt = 0.0
             self.m0 = 0.0
         else:
-            # Integrate v(t) in the specified windows, then normalize
             integral_mx = self._integrate_chargeability(t, v, 0.45, 1.1)
             integral_mt = self._integrate_chargeability(t, v, 0.0, 2.0)
             v_at_0p01   = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
-    
+
             self.mx = 1000.0 * (integral_mx / Vp)
             self.mt = 1000.0 * (integral_mt / Vp)
             self.m0 = 1000.0 * (v_at_0p01 / Vp)
-    
-        # 4) Update text content
+
+        # 5) Update text items with the computed values.
         self.mx_text.setText(f"Mx = {self.mx:.1f}")
         self.mt_text.setText(f"Mt = {self.mt:.1f}")
         self.m0_text.setText(f"M0 = {self.m0:.3f}")
-    
-        # 5) Auto-range the plot
+
+        # 6) Auto-range the plot.
         self.plotItem.getViewBox().autoRange()
-    
+
     def _integrate_chargeability(self, t, v, tmin, tmax):
         """
-        Returns the integral of v(t) from tmin to tmax, using np.trapz().
+        Compute the integral of v(t) between tmin and tmax using the trapezoidal rule.
         """
         mask = (t >= tmin) & (t <= tmax)
         if not np.any(mask):
             return 0.0
         return np.trapz(y=v[mask], x=t[mask])
     
-        def get_special_values(self):
-            values_dictionary={}
-            values_dictionary['mx']=self.mx
-            values_dictionary['mt']=self.mt
-            values_dictionary['m0']=self.m0
-            
-            return values_dictionary
+    def get_special_values(self):
+        """
+        Return a dictionary of the special values: Mx, Mt, and M0.
+        """
+        return {'mx': self.mx, 'mt': self.mt, 'm0': self.m0}
+
 
 class WidgetGraphs(QWidget):
     """
@@ -650,9 +648,6 @@ class WidgetGraphs(QWidget):
         self._big_graph.filter_frequency_range(f_min, f_max)
         self._small_graph_1.filter_frequency_range(f_min, f_max)
         self._small_graph_2.filter_frequency_range(f_min, f_max)
-        
-        #print("filter freq range")
-        #self._tab_graph.filter_frequency_range(f_min, f_max)
         
     def get_graphs_parameters(self):
         

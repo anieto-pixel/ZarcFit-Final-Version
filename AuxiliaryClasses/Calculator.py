@@ -42,16 +42,13 @@ class ModelCircuitParent(object):
     """
     Parent class for circuit models.
     """
-
     def __init__(self, negative_rinf=False, q=None, v_second=None, v_others=None):
         super().__init__()
-
         # Avoid mutable default arguments; properly assign attributes.
         if q is None:
             q = {}
         if v_second is None:
             v_second = {}
-
         # Attributes
         self.name=""
         
@@ -257,11 +254,10 @@ class ModelCircuitParallel(ModelCircuitParent):
 
 
 ###############################################################################
-# Fit_class
+# Fit_class ?
 ###############################################################################
 class Fit(QObject):
     def __init__(self) -> None:
-        
         pass
 
 ###############################################################################
@@ -392,21 +388,18 @@ class Calculator(QObject):
         #auxiliary class to handle time domain conversion
         self._model_circuit = ModelCircuitParallel()
         self.time_domain_builder=TimeDomainBuilder()
-        self.fit =Fit()
         
         self.lower_bounds = {}
         self.upper_bounds = {}
         self.disabled_variables = set()
         self.gaussian_prior = False
 
-
         self._fit_variables={'model':self._model_circuit.name }
-
 
     # ------------------------------
     # Public Methods
     # ------------------------------
-
+    # Getters and setters
     def initialize_expdata(self, file_data: dict) -> None:
         """Set the experimental data from an external dictionary."""
         self._experiment_data = file_data
@@ -465,6 +458,7 @@ class Calculator(QObject):
                 v_second=dict(old_vsec)
             )
 
+    #calls to autofit
     def fit_model_cole(self, initial_params: dict) -> dict:
         """Fit the model using the Cole cost function."""
         print("cole")
@@ -479,6 +473,7 @@ class Calculator(QObject):
         
         return self._fit_model(self._residual_bode, initial_params, prior_weight=prior_weight)
 
+    #call to run modle with sliders
     def run_model_manual(self, params: dict) -> CalculationResult:
         """
         Run the model with the given parameters.
@@ -527,6 +522,7 @@ class Calculator(QObject):
         
         return result
 
+    #Calls related to time domain
     def run_time_domain(self, params: dict):
         """
         Calculate time-domain values using a real IFFT.
@@ -743,7 +739,6 @@ class Calculator(QObject):
             else:
                 descale[k] = 10.0 ** x[i]
         return descale
-    
     
 ######################################################################################
 
