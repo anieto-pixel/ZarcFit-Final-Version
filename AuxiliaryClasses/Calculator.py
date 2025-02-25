@@ -259,13 +259,117 @@ class ModelCircuitParallel(ModelCircuitParent):
 ###############################################################################
 # Fit_class
 ###############################################################################
-
+class Fit(QObject):
+    def __init__(self) -> None:
+        
+        pass
 
 ###############################################################################
 # v/t class
 ###############################################################################
+class TimeDomainBuilder(QObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.N = 2 ** 8
+        self.T = 4
+        
+        self._integral_variables={}
+        
+    #   Public Methods
+    def get_integral_variables(self):
+        return self._integral_variables
 
+    def run_time_domain(self, params: dict, model_circuit: ModelCircuitParent):
+        """
+        Calculate time-domain values using a real IFFT.
+        """ 
+        n_freq = (self.N // 2) #+1
+        
+        dt = self.T / self.N
+        df = 1.0 / self.T
 
+        fmin   = 0
+        fmax   = n_freq / self.T
+        freq_even = np.linspace(fmin, fmax, int(n_freq + 1))
+        freq_even[0] = 0.001
+
+        z_complex = model_circuit.run_rock(params, freq_even)
+        t, volt_down=self._fourier_transform(z_complex, dt)       
+        
+        self._integration_variables(t, volt_down)
+        
+        index = np.searchsorted(t, self.T//2)
+        return freq_even[:index+1], t[:index+1], volt_down[:index+1]
+
+    def transform_to_time_domain(self,experiment_data):
+        """
+        Transform experimental data to the time domain.
+        """
+        n_freq = (self.N // 2) #+1
+        
+        dt = self.T / self.N
+        df = 1.0 / self.T
+
+        fmin   = 0
+        fmax   = n_freq / self.T
+        freq_even = np.linspace(fmin, fmax, int(n_freq + 1))
+        freq_even[0] = 0.001
+              
+        z_interp = self._interpolate_points_for_time_domain(freq_even, experiment_data)
+        t, volt_down=self._fourier_transform(z_interp, dt)   
+        
+        index = np.searchsorted(t, self.T//2)
+        return freq_even[:index+1], t[:index+1], volt_down[:index+1]  
+
+    #Private Methods
+    def _interpolate_points_for_time_domain(self, freqs_even: np.ndarray, experiment_data) -> np.ndarray:
+        """
+        Interpolate measured impedance data for the time-domain transform.
+        """
+        freq   = experiment_data["freq"]
+        z_real = experiment_data["Z_real"]
+        z_imag = experiment_data["Z_imag"]
+    
+        # Create interpolation functions that extrapolate outside the measured range.
+        interp_real = interp1d(freq, z_real, kind="cubic", fill_value="extrapolate")
+        interp_imag = interp1d(freq, z_imag, kind="cubic", fill_value="extrapolate")
+    
+        # Evaluate the interpolants at the uniformly spaced frequencies.
+        z_real_interp = interp_real(freqs_even)
+        z_imag_interp = interp_imag(freqs_even)
+        
+        return z_real_interp + 1j * z_imag_interp
+
+    def _fourier_transform(self, z_complex: np.ndarray, dt: float):
+        """
+        Build the single-sided array for IRFFT and perform a real IFFT.
+        """
+        v = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
+                                        #largest value is 0.28         
+        b, a = sig.butter(2, 0.45) 
+        z_inversefft = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
+                   #largest value is 0.28       
+        z_inversefft = sig.filtfilt(b, a, z_inversefft)   #Applies filter
+        t = np.arange(len(z_inversefft)) * dt  # constructs time based on N and dt
+ 
+        volt_up = np.concatenate(([0], np.cumsum(z_inversefft)[:-1]))
+        
+        time_to_plot_in_seconds=2
+        
+        index = np.searchsorted(t, time_to_plot_in_seconds, side="right")
+        volt_down = volt_up[index]-volt_up
+        
+        return t, volt_down
+
+    def _integration_variables(self, t, v_down):
+        
+        keys=['V(.1ms)',	'V(1ms)', 'V(10)',	'V(100)','V(200)',	'V(400)',	'V(800)',	'V(1.2s)', 'V(1.6s)']
+        seconds=[0.0001,	0.001, 0.01,	0.1, 0.2, 0.4, 0.8, 1.2, 1.6]
+        
+        for key, mili in zip (keys, seconds):
+            index = np.searchsorted(t, mili)
+            self._integral_variables[key]=v_down[index]
+            
 ###############################################################################
 # Calculator
 ###############################################################################
@@ -285,14 +389,19 @@ class Calculator(QObject):
             "Z_real": np.zeros(5),
             "Z_imag": np.zeros(5),
         }
+        #auxiliary class to handle time domain conversion
+        self._model_circuit = ModelCircuitParallel()
+        self.time_domain_builder=TimeDomainBuilder()
+        self.fit =Fit()
+        
         self.lower_bounds = {}
         self.upper_bounds = {}
         self.disabled_variables = set()
         self.gaussian_prior = False
-        self._model_circuit = ModelCircuitParallel()
+
 
         self._fit_variables={'model':self._model_circuit.name }
-        self._integral_variables={}
+
 
     # ------------------------------
     # Public Methods
@@ -331,7 +440,10 @@ class Calculator(QObject):
 
     def get_model_parameters(self) -> dict:
         """Return the combined dictionary of model parameters."""
-        return self._model_circuit.q | self._model_circuit.v_second| self._fit_variables | self._integral_variables
+        integral_variables=self.time_domain_builder.get_integral_variables()
+        fit_variables=self._model_circuit.q | self._model_circuit.v_second| self._fit_variables
+        
+        return fit_variables | integral_variables
 
     def switch_circuit_model(self, state: bool) -> None:
         """
@@ -415,48 +527,21 @@ class Calculator(QObject):
         
         return result
 
-    def run_time_domain(self, params: dict, N: int = 2 ** 8, T: int = 4):
+    def run_time_domain(self, params: dict):
         """
         Calculate time-domain values using a real IFFT.
         """ 
-        n_freq = (N // 2) #+1
-        
-        dt = T / N
-        df = 1.0 / T
+        freq, t, v = self.time_domain_builder.run_time_domain(params, self._model_circuit)
+        return  freq, t, v
 
-        fmin   = 0
-        fmax   = n_freq / T
-        freq_even = np.linspace(fmin, fmax, int(n_freq + 1))
-        freq_even[0] = 0.001
-
-        z_complex = self._model_circuit.run_rock(params, freq_even)
-        t, volt_down=self._fourier_transform(z_complex, dt)       
-        
-        self._integration_variables(t, volt_down)
-        
-        index = np.searchsorted(t, T//2)
-        return freq_even[:index+1], t[:index+1], volt_down[:index+1]
-
-    def transform_to_time_domain(self,  N: int = 2 ** 8, T: int = 4):
+    def transform_to_time_domain(self):
         """
-        Transform experimental data to the time domain.
-        """
-        n_freq = (N // 2) #+1
+        Transform Experiment data to time domain.
+        """ 
+        experiment_data=self._experiment_data
         
-        dt = T / N
-        df = 1.0 / T
-
-        fmin   = 0
-        fmax   = n_freq / T
-        freq_even = np.linspace(fmin, fmax, int(n_freq + 1))
-        freq_even[0] = 0.001
-              
-        z_interp = self._interpolate_points_for_time_domain(freq_even)
-        t, volt_down=self._fourier_transform(z_interp, dt)   
-        
-        index = np.searchsorted(t, T//2)
-        return freq_even[:index+1], t[:index+1], volt_down[:index+1]  
-
+        freq, t, v = self.time_domain_builder.transform_to_time_domain(experiment_data)
+        return  freq, t, v
 
     # ------------------------------
     # Private Methods
@@ -599,56 +684,6 @@ class Calculator(QObject):
             max(0.0, params["Fl"] - params["Fm"])
         ])
 
-    #--------------v/t methods---------------
-    def _interpolate_points_for_time_domain(self, freqs_even: np.ndarray) -> np.ndarray:
-        """
-        Interpolate measured impedance data for the time-domain transform.
-        """
-        freq   = self._experiment_data["freq"]
-        z_real = self._experiment_data["Z_real"]
-        z_imag = self._experiment_data["Z_imag"]
-    
-        # Create interpolation functions that extrapolate outside the measured range.
-        interp_real = interp1d(freq, z_real, kind="cubic", fill_value="extrapolate")
-        interp_imag = interp1d(freq, z_imag, kind="cubic", fill_value="extrapolate")
-    
-        # Evaluate the interpolants at the uniformly spaced frequencies.
-        z_real_interp = interp_real(freqs_even)
-        z_imag_interp = interp_imag(freqs_even)
-        
-        return z_real_interp + 1j * z_imag_interp
-
-    def _fourier_transform(self, z_complex: np.ndarray, dt: float):
-        """
-        Build the single-sided array for IRFFT and perform a real IFFT.
-        """
-        v = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
-                                        #largest value is 0.28         
-        b, a = sig.butter(2, 0.45) 
-        z_inversefft = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
-                   #largest value is 0.28       
-        z_inversefft = sig.filtfilt(b, a, z_inversefft)   #Applies filter
-        t = np.arange(len(z_inversefft)) * dt  # constructs time based on N and dt
- 
-        volt_up = np.concatenate(([0], np.cumsum(z_inversefft)[:-1]))
-        
-        time_to_plot_in_seconds=2
-        
-        index = np.searchsorted(t, time_to_plot_in_seconds, side="right")
-        volt_down = volt_up[index]-volt_up
-        
-        return t, volt_down
-
-    def _integration_variables(self, t, v_down):
-        
-        keys=['V(.1ms)',	'V(1ms)', 'V(10)',	'V(100)','V(200)',	'V(400)',	'V(800)',	'V(1.2s)', 'V(1.6s)']
-        seconds=[0.0001,	0.001, 0.01,	0.1, 0.2, 0.4, 0.8, 1.2, 1.6]
-        
-        for key, mili in zip (keys, seconds):
-            index = np.searchsorted(t, mili)
-            self._integral_variables[key]=v_down[index]
-            
-        
     #---------------others-------------        
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
@@ -708,3 +743,109 @@ class Calculator(QObject):
             else:
                 descale[k] = 10.0 ** x[i]
         return descale
+    
+    
+######################################################################################
+
+import unittest
+import numpy as np
+from PyQt5.QtWidgets import QApplication
+import sys
+from scipy.optimize import least_squares
+
+# Ensure a QApplication exists (required for QObject-based classes)
+if QApplication.instance() is None:
+    app = QApplication(sys.argv)
+
+# Dummy model circuit that returns ones so that the logarithms are finite.
+class DummyModelCircuit:
+    def __init__(self):
+        self.v_second = {}
+        self.q = {}
+        self.name = "DummyCircuit"
+    
+    def run_model(self, params, freq_array):
+        # Return an array of ones (complex ones) so that |z|=1.
+        z = np.ones(len(freq_array), dtype=complex)
+        return z, z
+    
+    def run_rock(self, params, freq_array):
+        return self.run_model(params, freq_array)
+    
+    def init_parameters(self):
+        # Return default parameters.
+        return False, {}, {}
+
+class TestCalculatorFitFunctions(unittest.TestCase):
+    def setUp(self):
+        # Create a Calculator instance.
+        self.calc = Calculator()
+        # Replace the circuit model with our dummy model.
+        self.calc._model_circuit = DummyModelCircuit()
+        
+        # Set experimental data to ones (avoiding zeros so log10 is defined).
+        exp_data = {
+            "freq": np.array([1, 10, 100, 1000, 10000]),
+            "Z_real": np.ones(5),
+            "Z_imag": np.ones(5)
+        }
+        self.calc.initialize_expdata(exp_data)
+        
+        # Set dummy lower and upper bounds for the fit parameters.
+        self.calc.lower_bounds = {
+            "Fh": 1, "Fm": 1, "Fl": 1, "Ph": 0.1, "Pm": 0.1, "Pl": 0.1, "Pef": 0.1,
+            "Rinf": 1, "Rh": 1, "Rm": 1, "Rl": 1, "Linf": 0.0001, "Qe": 1e-5, "Pei": 0.1, "Re": 1
+        }
+        self.calc.upper_bounds = {
+            "Fh": 1000, "Fm": 1000, "Fl": 1000, "Ph": 10, "Pm": 10, "Pl": 10, "Pef": 10,
+            "Rinf": 1000, "Rh": 1000, "Rm": 1000, "Rl": 1000, "Linf": 0.01, "Qe": 1e-2, "Pei": 10, "Re": 100
+        }
+        
+        # Define dummy initial parameters (all > 0).
+        self.dummy_params = {
+            "Fh": 100,
+            "Fm": 50,
+            "Fl": 10,
+            "Ph": 1,
+            "Pm": 1,
+            "Pl": 1,
+            "Pef": 1,
+            "Rinf": 100,
+            "Rh": 50,
+            "Rm": 30,
+            "Rl": 20,
+            "Linf": 0.001,
+            "Qe": 1e-3,
+            "Pei": 1,
+            "Re": 10
+        }
+        
+        # Ensure no disabled variables and Gaussian prior is off.
+        self.calc.disabled_variables = set()
+        self.calc.gaussian_prior = False
+
+    def test_fit_model_cole(self):
+        """Test that the Cole fitting function runs and returns a dict with expected keys."""
+        result = self.calc.fit_model_cole(self.dummy_params)
+        self.assertIsInstance(result, dict)
+        for key in self.dummy_params.keys():
+            self.assertIn(key, result)
+
+    def test_fit_model_bode(self):
+        """Test that the Bode fitting function runs and returns a dict with expected keys."""
+        result = self.calc.fit_model_bode(self.dummy_params)
+        self.assertIsInstance(result, dict)
+        for key in self.dummy_params.keys():
+            self.assertIn(key, result)
+
+    def test_get_model_parameters(self):
+        """Test that get_model_parameters returns a combined dictionary including fit variables."""
+        _ = self.calc.run_model_manual(self.dummy_params)
+        params = self.calc.get_model_parameters()
+        self.assertIsInstance(params, dict)
+        self.assertIn("model", params)
+        self.assertIn("mismatch", params)
+
+if __name__ == '__main__':
+    unittest.main()
+
