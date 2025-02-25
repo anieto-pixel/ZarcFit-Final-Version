@@ -30,10 +30,8 @@ class DualLabelButton(QPushButton):
 class WidgetButtonsRow(QWidget):
     """
     A widget that provides a vertical layout of multiple buttons for quick actions.
-
     This widget organizes both regular and checkable buttons in a vertical layout.
     """
-
     def __init__(self) -> None:
         """
         Initialize the WidgetButtonsRow with predefined buttons.

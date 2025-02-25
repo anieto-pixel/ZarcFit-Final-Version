@@ -175,6 +175,7 @@ class MainWidget(QWidget):
         self.widget_sliders.all_sliders_reseted.connect(self._reset_v_sliders)
         self.widget_sliders.slider_was_disabled.connect(self.calculator.set_disabled_variables)
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
+        # Calculator signals
         self.calculator.model_manual_result.connect(self.widget_graphs.update_manual_plot)
         self.calculator.model_manual_values.connect(self.widget_sliders.set_all_variables)
 
@@ -335,8 +336,7 @@ class MainWidget(QWidget):
         """
         Resets sliders to their default values and refreshes frequency settings.
         """
-        self.widget_sliders.set_default_values()
-        #self._handle_set_allfreqs()
+        self.widget_sliders.set_default_values() #self._handle_set_allfreqs()
 
     def _handle_rinf_negative(self, state):
         """Handles toggling for Rinf being negative."""

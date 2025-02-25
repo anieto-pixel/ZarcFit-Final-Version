@@ -9,74 +9,72 @@ import sys
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QMainWindow, QSlider, QWidget, QVBoxLayout
 
-
 class WidgetTextBar(QWidget):
     """A widget that displays key/value pairs with colored labels."""
 
     def __init__(self, keys_1=None):
         """
         Initialize the WidgetTextBar.
-
-        Parameters:
-            keys_1 (list): A list of keys used to create the labels.
+        Parameters: keys_1 (list): A list of keys with the values to be displayed labels.
         """
         super().__init__()
-        if keys_1 is None:
-            keys_1 = []
-        self.value_labels = {}   # Maps keys to QLabel instances.
-        self.key_colors = {}     # Maps keys to HTML colors for label text.
+        self.value_labels = {}  # Maps keys to QLabel instances.
+        self.key_colors = {}    # Maps keys to HTML colors for label text.
 
-        # Create a horizontal layout for the widget.
+        keys_1 = keys_1 or []  # Ensure it's a list
+
+        # Sort and order the keys by type/colour
+        ordered_keys = self._sort_keys_by_suffix(keys_1)
+
+        # Initialize labels and layout
+        self._build_ui(ordered_keys)
+
+    def _sort_keys_by_suffix(self, keys):
+        """
+        Sorts and categorizes keys based on their suffix.
+
+        Returns:
+            list: Ordered list of keys for display.
+        """
+        categorized_keys = {"h": [], "m": [], "l": [], "other": []}
+
+        for key in keys:
+            suffix = key[-1] if key[-1] in categorized_keys else "other"
+            categorized_keys[suffix].append(key)
+
+        # Sort within each category and return merged ordered keys
+        return (
+            sorted(categorized_keys["h"]) +
+            sorted(categorized_keys["m"]) +
+            sorted(categorized_keys["l"]) +
+            sorted(categorized_keys["other"])
+        )
+
+    def _assign_color_by_suffix(self, key):
+        """
+        Assigns colors based on the key suffix.
+
+        Returns:
+            str: Corresponding HTML color name.
+        """
+        return {"h": "red", "m": "green", "l": "blue"}.get(key[-1], "black")
+
+    def _build_ui(self, ordered_keys):
+        """
+        Creates labels with the correct order and formatting.
+        """
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(0, 0, 0, 0)
         h_layout.setSpacing(20)
 
-        # 1) Separate keys by suffix, then sort within each group.
-        keys_h = []
-        keys_m = []
-        keys_l = []
-        keys_other = []
-
-        # If you want to include keys_2 in the same logic, uncomment below:
-        # combined_keys = keys_1 + keys_2
-        combined_keys = keys_1
-
-        for k in combined_keys:
-            if k.endswith("h"):
-                keys_h.append(k)
-            elif k.endswith("m"):
-                keys_m.append(k)
-            elif k.endswith("l"):
-                keys_l.append(k)
-            else:
-                keys_other.append(k)
-
-        keys_h.sort()
-        keys_m.sort()
-        keys_l.sort()
-        keys_other.sort()
-
-        # Merge keys in the desired display order.
-        ordered_keys = keys_h + keys_m + keys_l + keys_other
-
-        # 2) Create labels in that order with corresponding colors.
         for key in ordered_keys:
-            if key.endswith("h"):
-                color = "red"
-            elif key.endswith("m"):
-                color = "green"
-            elif key.endswith("l"):
-                color = "blue"
-            else:
-                color = "black"
-
+            color = self._assign_color_by_suffix(key)
             self.key_colors[key] = color
 
-            # Create a QLabel with colored key text and a default numeric value.
             initial_text = f"<b><font color='{color}'>{key}:</font></b> 0.000000"
             value_label = QLabel(initial_text)
             value_label.setAlignment(Qt.AlignLeft)
-            value_label.setFixedWidth(130 + len(key))  # Adjust width as needed.
+            value_label.setFixedWidth(130 + len(key))
 
             h_layout.addWidget(value_label)
             self.value_labels[key] = value_label
@@ -91,17 +89,14 @@ class WidgetTextBar(QWidget):
         The key text remains colored, while the value text is displayed in black.
         """
         for key, value in dictionary.items():
-            if key in self.value_labels:
-                color = self.key_colors.get(key, "black")
-                formatted_string = (
-                    f"<b><font color='{color}'>{key}:</font></b> {value:.3g}"
-                )
-                self.value_labels[key].setText(formatted_string)
+            label = self.value_labels.get(key)
+            if label:
+                color = self.key_colors[key]
+                label.setText(f"<b><font color='{color}'>{key}:</font></b> {value:.3g}")
             else:
-                print(
-                    f"WidgetTextBar Warning: Key '{key}' will not be displayed. Add it in config.ini"
-                )
-
+                print(f"WidgetTextBar Warning: Key '{key}' is not configured. Add it in config.ini")
+                
+                
 
 #########################
 # Manual Testing

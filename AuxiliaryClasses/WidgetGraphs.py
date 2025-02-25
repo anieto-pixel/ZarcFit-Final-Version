@@ -16,6 +16,7 @@ import numpy as np
 import pyqtgraph as pg
 from pyqtgraph import FillBetweenItem
 from PyQt5.QtWidgets import QLineEdit
+from pyqtgraph import mkPen
 
 from PyQt5.QtWidgets import (
     QApplication, QPushButton, QWidget, QTabWidget, QHBoxLayout,
@@ -32,10 +33,16 @@ class CalculationResult:
         self.main_freq = np.array([1, 10, 100])
         self.main_z_real = np.array([100, 80, 60])
         self.main_z_imag = np.array([-50, -40, -30])
+            
+        self.rock_z_real: np.ndarray = ([100, 80, 60])
+        self.rock_z_imag: np.ndarray = ([-48, -32, -28])
 
         self.special_freq = np.array([10, 50, 90])
         self.special_z_real = np.array([70, 65, 55])
         self.special_z_imag = np.array([-40, -35, -28])
+        
+        self.special_resistance_frequency: np.ndarray = [0.1]
+        self.special_resistance: np.ndarray = [90]
 
         self.timedomain_freq = np.array([0.01, 4.5, 1.1])
         self.timedomain_time = np.linspace(0, 1, 100)
@@ -118,7 +125,7 @@ class ParentGraph(pg.PlotWidget):
             self.removeItem(item)
         self._special_items = []
 
-        for i, color in enumerate(['r', 'g', 'b']):
+        for i, color in enumerate(['r', 'g', 'b', 'w']):
             x, y = self._prepare_xy(
                 np.array([freq_array[i]]),
                 np.array([z_real_array[i]]),
@@ -157,6 +164,51 @@ class ParentGraph(pg.PlotWidget):
         self.showGrid(x=True, y=True)
         self._create_auto_scale_button()
 
+    # methods related to ploting
+    def _refresh_graph(self):
+        """Clears and re-displays both the static and dynamic plots."""
+        self.clear()
+
+        # Static plot (base data)
+        self._static_plot = self.plot(
+            pen='g',  # green line
+            symbol='o',
+            symbolSize=5,
+            symbolBrush='g'
+        )
+        self._refresh_plot(self._base_data, self._static_plot)
+
+        # Dynamic plot (manual data)
+        self._dynamic_plot = self.plot(
+            pen='c',
+            symbol='o',
+            symbolSize=7,
+            symbolBrush=None
+        )
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+    def _refresh_plot(self, data_dict, plot_item):
+        """
+        Updates a single plot (static or dynamic) with new data.
+        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
+        """
+        
+        x, y = self._prepare_xy(
+            data_dict['freq'],
+            data_dict['Z_real'],
+            data_dict['Z_imag']
+        )
+        if plot_item:
+            plot_item.setData(x, y)
+
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """
+        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
+        Default is (Z_real, Z_imag). Subclasses override this if needed.
+        """
+        return z_real, z_imag
+    
+    # methods related to escale button
     def _create_auto_scale_button(self):
         """Create and configure the auto-scale button."""
         self.auto_scale_button = QPushButton("", self)
@@ -210,49 +262,6 @@ class ParentGraph(pg.PlotWidget):
             )
             self._auto_range_in_progress = False
 
-    def _refresh_graph(self):
-        """Clears and re-displays both the static and dynamic plots."""
-        self.clear()
-
-        # Static plot (base data)
-        self._static_plot = self.plot(
-            pen='g',  # green line
-            symbol='o',
-            symbolSize=5,
-            symbolBrush='g'
-        )
-        self._refresh_plot(self._base_data, self._static_plot)
-
-        # Dynamic plot (manual data)
-        self._dynamic_plot = self.plot(
-            pen='c',
-            symbol='o',
-            symbolSize=7,
-            symbolBrush=None
-        )
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
-
-    def _refresh_plot(self, data_dict, plot_item):
-        """
-        Updates a single plot (static or dynamic) with new data.
-        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
-        """
-        
-        x, y = self._prepare_xy(
-            data_dict['freq'],
-            data_dict['Z_real'],
-            data_dict['Z_imag']
-        )
-        if plot_item:
-            plot_item.setData(x, y)
-
-    def _prepare_xy(self, freq, z_real, z_imag):
-        """
-        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
-        Default is (Z_real, Z_imag). Subclasses override this if needed.
-        """
-        return z_real, z_imag
-
 
 class PhaseGraph(ParentGraph):
     """
@@ -286,7 +295,7 @@ class BodeGraph(ParentGraph):
 
     def __init__(self):
         super().__init__()
-        self.setTitle("Bode Graph")
+        self.setTitle("Impedance Magnitude Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
 
@@ -304,18 +313,66 @@ class BodeGraph(ParentGraph):
 
 class ColeColeGraph(ParentGraph):
     """
-    Plots a Nyquist diagram: real(Z) vs. -imag(Z).
+    Plots a Nyquist diagram: real(Z) vs. -imag(Z),
+    with an optional third (secondary) line.
     """
 
     def __init__(self):
+        
+        # Initialize secondary manual data and placeholder for plot
+        self._secondary_manual_data = {
+            'freq': np.array([]),
+            'Z_real': np.array([]),
+            'Z_imag': np.array([]),
+        }
+        self._secondary_plot = None
+        
         super().__init__()
+        
+        # Adjust Cole-Cole specific properties
         self.getPlotItem().setAspectLocked(True, 1)
-
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
         self.setLabel('left', "-Z'' [Ohms]")
 
+
+    def update_parameters_secondary_manual(self, freq, Z_real, Z_imag):
+        """
+        Assign new data to the 'third line' (secondary manual data),
+        then refresh only that plot.
+        """
+        self._secondary_manual_data = {
+            'freq': freq,
+            'Z_real': Z_real,
+            'Z_imag': Z_imag
+        }
+        # If the plot exists, update it; otherwise it will be updated in _refresh_graph
+        if self._secondary_plot is not None:
+            self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
+
+    def _refresh_graph(self):
+        """
+        Override the parent method to add a third line after the usual
+        base/manual lines have been set up.
+        """
+        # First, call the parent to plot the base and manual data lines.
+        super()._refresh_graph()
+
+        # Now create (or recreate) the third line plot.
+        # Example: red line with circle symbols.
+        self._secondary_plot = self.plot(
+            pen=mkPen(color='#F4C2C2', style=Qt.DashLine),  # Pale pink
+            symbol='o',
+            symbolSize=6,
+            symbolBrush=None
+        )
+        # Immediately refresh with whatever data is in _secondary_manual_data
+        self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
+
     def _prepare_xy(self, freq, z_real, z_imag):
+        """
+        Transform data for Cole-Cole plotting: real(Z) vs. -imag(Z).
+        """
         return z_real, -z_imag
 
 
@@ -385,12 +442,13 @@ class TimeGraph(ParentGraph):
         super()._refresh_graph()
 
         # 2) Grab the manual data (blue curve)
-        t = self._manual_data['Z_real']
-        v = self._manual_data['Z_imag']
+        t = self._manual_data['Z_real']   # or 'freq' if your "time" is stored there
+        v = self._manual_data['Z_imag']   # or however you store the decaying voltage
+    
         if t.size == 0 or v.size == 0:
             return
-
-        # 3) Fill region for [0.45..1.1]
+    
+        # 2) Fill region for [0.45..1.1], just for visual shading
         t_start, t_end = 0.45, 1.1
         mask = (t >= t_start) & (t <= t_end)
         if np.any(mask):
@@ -400,33 +458,48 @@ class TimeGraph(ParentGraph):
                 fillLevel=0,
                 brush=pg.mkBrush(0, 0, 255, 80)  # semi-transparent blue
             )
-
-        # 4) Compute M-values if there's data
-        self.mx = 1000 * self._integrate_chargeability(t, v, 0.45, 1.1)
-        self.mt = 1000 * self._integrate_chargeability(t, v, 0, 2)
-        self.m0 = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
-
-        # 5) Update text content (but NOT positions).
+    
+        # 3) Compute M-values (chargeability) in mV/V, if Vp != 0
+        Vp = np.interp(0.0, t, v)  # Voltage at t=0 (primary)
+        if abs(Vp) < 1e-12:
+            # If Vp is effectively zero, set M-values to 0 or handle differently
+            self.mx = 0.0
+            self.mt = 0.0
+            self.m0 = 0.0
+        else:
+            # Integrate v(t) in the specified windows, then normalize
+            integral_mx = self._integrate_chargeability(t, v, 0.45, 1.1)
+            integral_mt = self._integrate_chargeability(t, v, 0.0, 2.0)
+            v_at_0p01   = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
+    
+            self.mx = 1000.0 * (integral_mx / Vp)
+            self.mt = 1000.0 * (integral_mt / Vp)
+            self.m0 = 1000.0 * (v_at_0p01 / Vp)
+    
+        # 4) Update text content
         self.mx_text.setText(f"Mx = {self.mx:.1f}")
         self.mt_text.setText(f"Mt = {self.mt:.1f}")
         self.m0_text.setText(f"M0 = {self.m0:.3f}")
-
-        # 6) Auto-range the plot to show everything
+    
+        # 5) Auto-range the plot
         self.plotItem.getViewBox().autoRange()
-
+    
     def _integrate_chargeability(self, t, v, tmin, tmax):
+        """
+        Returns the integral of v(t) from tmin to tmax, using np.trapz().
+        """
         mask = (t >= tmin) & (t <= tmax)
         if not np.any(mask):
             return 0.0
         return np.trapz(y=v[mask], x=t[mask])
-
-    def get_special_values(self):
-        values_dictionary={}
-        values_dictionary['mx']=self.mx
-        values_dictionary['mt']=self.mt
-        values_dictionary['m0']=self.m0
-        
-        return values_dictionary
+    
+        def get_special_values(self):
+            values_dictionary={}
+            values_dictionary['mx']=self.mx
+            values_dictionary['mt']=self.mt
+            values_dictionary['m0']=self.m0
+            
+            return values_dictionary
 
 class WidgetGraphs(QWidget):
     """
@@ -542,16 +615,23 @@ class WidgetGraphs(QWidget):
         freq_main = calc_result.main_freq
         z_real_main = calc_result.main_z_real
         z_imag_main = calc_result.main_z_imag
+        
+        z_rock_real = calc_result.rock_z_real
+        z_rock_imag = calc_result.rock_z_imag
 
         # Update manual parameters for Cole/Bode/Phase
         self._big_graph.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_1.update_parameters_manual(freq_main, z_real_main, z_imag_main)
         self._small_graph_2.update_parameters_manual(freq_main, z_real_main, z_imag_main)
+        
+        # Update secondary manual parameters for Cole
+        self._big_graph.update_parameters_secondary_manual(freq_main, z_rock_real, z_rock_imag)
 
         # Add special markers
         freq_sp = calc_result.special_freq
         z_real_sp = calc_result.special_z_real
         z_imag_sp = calc_result.special_z_imag
+        
         self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
         self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
@@ -589,77 +669,135 @@ import sys
 import numpy as np
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout,
-    QSlider, QLabel, QSizePolicy
+    QSlider, QLabel
 )
 from PyQt5.QtCore import Qt
 
-
-def generate_base_data(num_points=50):
-    freq = np.logspace(0, 5, num_points)
-    z_real = 50 + 10 * np.sqrt(freq)
-    z_imag = -5 * np.log10(freq + 1)
-    time = np.linspace(0, 1, 200)
-    volt = 0.5 * np.sin(2 * np.pi * 5 * time)
-    return freq, z_real, z_imag, time, volt
-
-
-def generate_manual_data(base_data, param1, param2, param3):
-    freq, z_real, z_imag, time, volt = base_data
-    factor = 1 + param1 / 100
-    offset_z = param2 / 10
-    offset_v = param3 / 100
-    return freq, factor * (z_real + offset_z), factor * (z_imag + offset_z), time, factor * volt + offset_v
-
-
+###############################################################################
+# TestWidget
+###############################################################################
 class TestWidget(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Manual Test: Blue line only moves")
+        self.setWindowTitle("Manual Test: Blue & Pink lines move (ColeColeGraph)")
+
+        # 1) Create the main "WidgetGraphs" container
         self.graphs = WidgetGraphs()
 
-        # Create sliders and labels using parameter info
+        # 2) Create sliders & labels for parameters
         params = [("param1", 20), ("param2", 10), ("param3", 5)]
         self.sliders, self.labels = {}, {}
         slider_layout = QVBoxLayout()
-        for name, init in params:
-            self.labels[name] = QLabel(f"{name}: {init}")
+        for name, init_val in params:
+            label = QLabel(f"{name}: {init_val}")
             slider = QSlider(Qt.Horizontal)
-            slider.setRange(0, 100)
-            slider.setValue(init)
+            slider.setRange(0, 100)  # slider from 0..100
+            slider.setValue(init_val)
             slider.valueChanged.connect(self._update_blue_line)
+
+            self.labels[name] = label
             self.sliders[name] = slider
-            slider_layout.addWidget(self.labels[name])
+
+            slider_layout.addWidget(label)
             slider_layout.addWidget(slider)
 
-        # Main layout: graphs on left, sliders on right
+        # 3) Put everything in the main layout
         main_layout = QHBoxLayout()
         main_layout.addWidget(self.graphs, stretch=1)
         main_layout.addLayout(slider_layout)
         self.setLayout(main_layout)
 
-        # Set up the base (green) data once
-        self.base_data = generate_base_data()
+        # 4) Generate & set up the base (green) data once
+        self.base_data = self._generate_base_data()
         freq, z_real, z_imag, time, volt = self.base_data
-        self.graphs.update_front_graphs(freq, z_real, z_imag)
-        self.graphs.update_timedomain_graph(freq, time, volt)
+        self.graphs.update_front_graphs(freq, z_real, z_imag)    # Cole/Bode/Phase
+        self.graphs.update_timedomain_graph(freq, time, volt)    # TimeGraph
 
+        # 5) Initial draw of the manual lines (blue & pink)
         self._update_blue_line()
 
+    @staticmethod
+    def _generate_base_data(num_points=50):
+        """
+        Creates some 'base' data for testing.
+        """
+        freq = np.logspace(0, 5, num_points)   # 1 .. 100000
+        z_real = 50 + 10 * np.sqrt(freq)       # some made-up data
+        z_imag = -5 * np.log10(freq + 1)
+        time = np.linspace(0, 1, 200)          # 0..1
+        volt = 0.5 * np.sin(2 * np.pi * 5 * time)
+        return freq, z_real, z_imag, time, volt
+
+    @staticmethod
+    def _generate_manual_data(base_data, param1, param2, param3):
+        """
+        Generates the 'manual' (blue) line data from the base data,
+        with transformations to make changes clearly visible.
+        """
+        freq, z_real, z_imag, time, volt = base_data
+
+        # Increase factor & offset so changes are obvious:
+        # param1 (0..100) => factor ~ [1..6], param2 => offset up to ~50, etc.
+        factor = 1 + param1 / 20.0
+        offset_z = param2 * 0.5
+        offset_v = param3 / 20.0
+
+        freq_out = freq
+        z_real_out = factor * (z_real + offset_z)
+        z_imag_out = factor * (z_imag + offset_z)
+        volt_out = factor * volt + offset_v
+
+        return freq_out, z_real_out, z_imag_out, time, volt_out
+
     def _update_blue_line(self):
+        """
+        1) Re-compute the 'manual' (blue) data from sliders,
+        2) Update it in all relevant graphs,
+        3) Generate & update the 'secondary' pink line in ColeColeGraph.
+        """
+        # -- Read slider values --
         p1 = self.sliders["param1"].value()
         p2 = self.sliders["param2"].value()
         p3 = self.sliders["param3"].value()
+
+        # -- Update labels --
         for name, val in zip(["param1", "param2", "param3"], (p1, p2, p3)):
             self.labels[name].setText(f"{name}: {val}")
 
-        freq, z_real, z_imag, time, volt = generate_manual_data(self.base_data, p1, p2, p3)
-        for graph in (self.graphs._big_graph, self.graphs._small_graph_1, self.graphs._small_graph_2):
-            graph.update_parameters_manual(freq, z_real, z_imag)
+        # -- 1) Update the BLUE line --
+        freq, z_real, z_imag, time, volt = self._generate_manual_data(
+            self.base_data, p1, p2, p3
+        )
+
+        # Update the 'blue line' (manual) in Cole/Bode/Phase
+        self.graphs._big_graph.update_parameters_manual(freq, z_real, z_imag)
+        self.graphs._small_graph_1.update_parameters_manual(freq, z_real, z_imag)
+        self.graphs._small_graph_2.update_parameters_manual(freq, z_real, z_imag)
+
+        # Update the 'blue line' in the TimeDomain
         self.graphs._tab_graph.update_parameters_manual(freq, time, volt)
 
+        # -- 2) Update the PINK (secondary) line in ColeColeGraph --
+        # Create a bigger shift so the pink line is clearly different:
+        freq2 = freq * (1.2 + p1 / 15.0)
+        z_real2 = z_real + 30 + 2 * p2
+        z_imag2 = z_imag - 30 - 2 * p3
 
+        # This method is only valid on ColeColeGraph
+        self.graphs._big_graph.update_parameters_secondary_manual(
+            freq2, z_real2, z_imag2
+        )
+
+###############################################################################
+#  MAIN
+###############################################################################
 if __name__ == '__main__':
+    from PyQt5.QtWidgets import QApplication
+    # Make sure we have a QApplication instance
     app = QApplication(sys.argv)
+
+    # Create and show the test widget
     tester = TestWidget()
     tester.show()
+
     sys.exit(app.exec_())

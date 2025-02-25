@@ -22,6 +22,9 @@ class CalculationResult:
     main_freq: np.ndarray = None  # The frequency array used for the main curve
     main_z_real: np.ndarray = None
     main_z_imag: np.ndarray = None
+    
+    rock_z_real: np.ndarray = None
+    rock_z_imag: np.ndarray = None
 
     special_freq: np.ndarray = None  # The 3 special frequencies
     special_z_real: np.ndarray = None
@@ -192,7 +195,7 @@ class ModelCircuitSeries(ModelCircuitParent):
         return np.array(z)
 
     def run_model(self, v: dict, freq_array: np.ndarray):
-        z = self.run_rock(v, freq_array)
+        z_rock = self.run_rock(v, freq_array)
         v_l = v.copy()
 
         if self.negative_rinf:
@@ -203,7 +206,7 @@ class ModelCircuitSeries(ModelCircuitParent):
         z_cpee = [self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for freq in freq_array]
         zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
 
-        return np.array([zinf[i] + z[i] + zarce[i] for i in range(len(freq_array))])
+        return np.array([zinf[i] + z_rock[i] + zarce[i] for i in range(len(freq_array))]), np.array(z_rock)
     
 
 class ModelCircuitParallel(ModelCircuitParent):
@@ -239,7 +242,7 @@ class ModelCircuitParallel(ModelCircuitParent):
         return np.array(z)
 
     def run_model(self, v: dict, freq_array: np.ndarray):
-        z = self.run_rock(v, freq_array)
+        z_rock = self.run_rock(v, freq_array)
         v_l = v.copy()
 
         if self.negative_rinf:
@@ -250,7 +253,7 @@ class ModelCircuitParallel(ModelCircuitParent):
         z_cpee = [self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for f in freq_array]
         zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
 
-        return np.array([zinf[i] + z[i] + zarce[i] for i in range(len(freq_array))])
+        return np.array([zinf[i] + z_rock[i] + zarce[i] for i in range(len(freq_array))]), np.array(z_rock)
 
 
 ###############################################################################
@@ -375,12 +378,16 @@ class Calculator(QObject):
         """
         
         freq_array = self._experiment_data["freq"]
-        z = self._model_circuit.run_model(params, freq_array)
+        z, rock_z = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
+        rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
         special_freq = self._get_special_freqs(params)
-        spec_z = self._model_circuit.run_model(params, special_freq)
+        spec_z, throwaway= self._model_circuit.run_model(params, special_freq)
+        
         spec_zr, spec_zi = spec_z.real, spec_z.imag
+        #single out the "special resistence' from the other mrakers
+        spec_zi[len(spec_z)-1]=0
 
         tdomain_freq, tdomain_time, tdomain_volt = self.run_time_domain(params)
 
@@ -388,13 +395,20 @@ class Calculator(QObject):
             main_freq=freq_array,
             main_z_real=z_real,
             main_z_imag=z_imag,
+            
+            rock_z_real = rock_z_real,
+            rock_z_imag = rock_z_imag,
+            
             special_freq=special_freq,
             special_z_real=spec_zr,
             special_z_imag=spec_zi,
+            
             timedomain_freq=tdomain_freq,
             timedomain_time=tdomain_time,
             timedomain_volt=tdomain_volt
         )
+        
+        
         self.model_manual_result.emit(result)
         
         self._calculator_variables(z_real,z_imag, params)
@@ -507,7 +521,7 @@ class Calculator(QObject):
     def _residual_cole(self, params: dict) -> np.ndarray:
         """Return the residual vector for the Cole model."""
         freq_array = self._experiment_data["freq"]
-        z = self._model_circuit.run_model(params, freq_array)
+        z, throwaway = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
@@ -519,7 +533,7 @@ class Calculator(QObject):
     def _residual_bode(self, params: dict) -> np.ndarray:
         """Return the residual vector for the Bode model."""
         freq_array = self._experiment_data["freq"]
-        z = self._model_circuit.run_model(params, freq_array)
+        z, throwaway = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
         z_abs = np.sqrt(z_real ** 2 + z_imag ** 2)
         z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
@@ -643,7 +657,8 @@ class Calculator(QObject):
         f1 = slider_values["Fh"]
         f2 = slider_values["Fm"]
         f3 = slider_values["Fl"]
-        return np.array([f1, f2, f3], dtype=float)
+        f4 = 0.1
+        return np.array([f1, f2, f3, f4], dtype=float)
     
     def _calculator_variables(self, z_real, z_imag, params):
         """ prints selected variables """
@@ -656,8 +671,10 @@ class Calculator(QObject):
         self._fit_variables['mismatch'] = mismatch
         
         #compute Res.1Hz
-        Res_1Hz = self._model_circuit.run_model(params, [0.1])[0]
-        Res_1Hz=abs(Res_1Hz)
+        z_1Hz = self._model_circuit.run_model(params, [0.1])[0]
+        #Res_1Hz=abs(z_1Hz)
+        Res_1Hz=abs(z_1Hz.real)
+        print("called")
         self._fit_variables['Res.1Hz'] = Res_1Hz
         
         length=len(self._experiment_data["freq"])

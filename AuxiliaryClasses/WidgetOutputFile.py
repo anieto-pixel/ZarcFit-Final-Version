@@ -26,7 +26,6 @@ class FileWriter:
     """
     Handles writing rows of data to CSV files safely.
     """
-
     @staticmethod
     def write_to_file(file_path, rows, header=None):
         """
@@ -39,7 +38,7 @@ class FileWriter:
         :param header: (Ignored) Header row.
         """
         if not file_path:
-            ErrorWindow.show_error_message("No file selected for writing.")
+            ErrorWindow.show_error_message("FileWriter.write_to_file :No file selected for writing.")
             return
 
         try:
@@ -149,28 +148,111 @@ class WidgetOutputFile(QWidget):
 
         # Create UI elements.
         self._newfile_button = QPushButton("New File")
-        self._newfile_button.clicked.connect(self._handle_create_new_file)
-
         self._select_button = QPushButton("Select .csv File")
-        self._select_button.clicked.connect(self._handle_open_file_dialog)
-
         self._file_label = QLabel("No output file selected")
-        self._file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self._initialize_ui()
+        self._connect_signals()
+ 
+    # -----------------------------------------------------------------------
+    #  Public Methods
+    # -----------------------------------------------------------------------
+    def get_output_file(self):
+        """Returns the currently selected output file path or None."""
+        return self._output_file
 
+    def setup_current_file(self, new_input_file):
+        """Sets the widget's file to 'new_input_file' and updates the UI."""
+        self._set_output_file(new_input_file)
+
+    def print_variables_list(self):
+        """
+        Writes 'variables_to_print' as a single row to the CSV file.
+        """
+        if not self._output_file:
+            ErrorWindow.show_error_message(
+                "No output file selected. Please select or create a file first."
+            )
+            return
+
+        if self.variables_to_print:
+            FileWriter.write_to_file(
+                file_path=self._output_file,
+                rows=self.variables_to_print  # Write as a single row.
+            )
+
+    def write_to_file(self, dictionary):
+        """
+        Expects a dictionary and builds a row by checking each key in
+        'variables_to_print'. Missing keys are replaced with empty strings.
+        """
+        if not self._output_file:
+            ErrorWindow.show_error_message(
+                "No output file selected. Please select or create a file first."
+            )
+            return
+
+        if not isinstance(dictionary, dict):
+            ErrorWindow.show_error_message(
+                "write_to_file requires a dictionary. Received something else."
+            )
+            return
+
+        row = [dictionary.get(key, "") for key in self.variables_to_print]
+
+        FileWriter.write_to_file(
+            file_path=self._output_file,
+            rows=row,
+            header=None  # Header param is ignored.
+        )
+
+    def find_row_in_file(self, head):
+        """
+        Searches the CSV file for a row whose first column matches 'head'
+        and returns it as a dictionary.
+        """
+        try:
+            with open(self._output_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            for line in reversed(lines):
+                columns = line.strip().split(",")
+                if columns and columns[0] == head:
+                    return dict(zip(self.variables_to_print, columns))
+
+            return None
+        except Exception as e:
+            ErrorWindow.show_error_message(f"Error reading file: {e}")
+            return None
+       
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
     def _initialize_ui(self):
         """
-        Builds the widget layout.
+        Builds and sets the layout for this widget.
         """
         layout = QHBoxLayout()
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(1)
+
+        # Button sizes and alignment
         self._newfile_button.setFixedSize(100, 30)
+        self._file_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+        # Add widgets to layout
         layout.addWidget(self._newfile_button)
         layout.addWidget(self._select_button)
         layout.addWidget(self._file_label)
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(1)
+
         self.setLayout(layout)
+        
+    def _connect_signals(self):
+        """
+        Connects signals from buttons to their handlers.
+        """
+        self._newfile_button.clicked.connect(self._handle_create_new_file)
+        self._select_button.clicked.connect(self._handle_open_file_dialog)
 
     def _handle_create_new_file(self):
         """
@@ -211,75 +293,6 @@ class WidgetOutputFile(QWidget):
         Updates the label with a given message.
         """
         self._file_label.setText(message)
-
-    # Public methods.
-    def get_output_file(self):
-        return self._output_file
-
-    def setup_current_file(self, new_input_file):
-        self._set_output_file(new_input_file)
-
-    def print_variables_list(self):
-        """
-        Writes 'variables_to_print' as a single row to the CSV file.
-        """
-        if not self._output_file:
-            ErrorWindow.show_error_message(
-                "No output file selected. Please select or create a file first."
-            )
-            return
-
-        if self.variables_to_print:
-            FileWriter.write_to_file(
-                file_path=self._output_file,
-                rows=self.variables_to_print  # Write as a single row.
-            )
-
-    def write_to_file(self, dictionary):
-        """
-        Expects a dictionary and builds a row by checking each key in
-        'variables_to_print'. Missing keys are replaced with empty strings.
-        """
-        if not self._output_file:
-            ErrorWindow.show_error_message(
-                "No output file selected. Please select or create a file first."
-            )
-            return
-
-        if not isinstance(dictionary, dict):
-            ErrorWindow.show_error_message(
-                "write_to_file requires a dictionary. Received something else."
-            )
-            return
-
-        row = []
-        for key in self.variables_to_print:
-            row.append(dictionary.get(key, ""))
-
-        FileWriter.write_to_file(
-            file_path=self._output_file,
-            rows=row,
-            header=None  # Header is ignored.
-        )
-
-    def find_row_in_file(self, head):
-        """
-        Searches the CSV file for a row whose first column matches 'head'
-        and returns it as a dictionary.
-        """
-        try:
-            with open(self._output_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-
-            for line in reversed(lines):
-                columns = line.strip().split(",")
-                if columns and columns[0] == head:
-                    return dict(zip(self.variables_to_print, columns))
-
-            return None
-        except Exception as e:
-            ErrorWindow.show_error_message(f"Error reading file: {e}")
-            return None
 
 
 # -----------------------------------------------------------------------

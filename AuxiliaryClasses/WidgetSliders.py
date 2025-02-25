@@ -19,13 +19,10 @@ class WidgetSliders(QWidget):
     Parameters
     ----------
     slider_configurations : dict
-        Dict where keys are slider names (str) and values are tuples with:
-        (slider_class, min_value, max_value, color, number_of_tick_intervals).
-
     slider_default_values : list
         List of default values in the same order as slider_configurations.keys().
     """
-
+    
     slider_value_updated = pyqtSignal(str, float)
     slider_was_disabled = pyqtSignal(str, bool)
     all_sliders_reseted = pyqtSignal(dict)
@@ -37,13 +34,13 @@ class WidgetSliders(QWidget):
         self.slider_default_values = dict(
             zip(slider_configurations.keys(), slider_default_values)
         )
-
+        
         # Create sliders and ensure each is wide enough.
         self.sliders = self._create_sliders(slider_configurations)
-
+        
         # Set sliders to default values.
         self.set_default_values()
-
+        
         # Build the UI and connect signals.
         self._setup_layout(slider_configurations)
         self._connect_signals()
@@ -51,7 +48,6 @@ class WidgetSliders(QWidget):
     # -------------------------------
     # Public Methods
     # -------------------------------
-
     def get_slider(self, key):
         """Return a slider by its key."""
         return self.sliders.get(key)
@@ -88,7 +84,7 @@ class WidgetSliders(QWidget):
         """
         if set(variables.keys()) != set(self.sliders.keys()):
             raise ValueError(
-                "Incoming dictionary keys do not match the slider keys in WidgetSliders."
+                "WidgetSlider.set_all_variables: Incoming dictionary keys do not match the slider keys in WidgetSliders."
             )
 
         values = {}
@@ -101,7 +97,6 @@ class WidgetSliders(QWidget):
     # -------------------------------
     # Private Methods
     # -------------------------------
-
     def _signal_all_sliders_reseted(self):
         """(Placeholder) Signal that all sliders have been reset."""
         pass
@@ -114,7 +109,6 @@ class WidgetSliders(QWidget):
         sliders = {}
         for key, (slider_type, min_value, max_value, color, num_ticks) in slider_configurations.items():
             slider_widget = slider_type(min_value, max_value, color, num_ticks)
-            slider_widget.setMinimumWidth(slider_widget._calculate_button_width())
             sliders[key] = slider_widget
         return sliders
 
