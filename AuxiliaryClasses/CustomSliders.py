@@ -77,9 +77,12 @@ class CustomSliders(QWidget):
         """
         return self._slider.valueChanged
       
+    def artificially_toggle_slider(self):
+        self._toggle_slider(self)
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
+    # Construction and initialization
     def _build_ui(self):
         
         # Creates main slider
@@ -148,6 +151,7 @@ class CustomSliders(QWidget):
         self._update_slider_style(self.colour)
         self.setMinimumWidth(75)
 
+    #Listeners and handers
     def _toggle_slider(self):
         """
         Flip the is_disabled state and update styles / signals.
@@ -296,9 +300,11 @@ class DoubleSliderWithTicks(CustomSliders):
         """
         # Connect the slider's "raw" integer changes to our float-based signal.
         self._slider.valueChanged.connect(self._emit_corrected_value)
+        self._slider.valueChanged.connect(self._update_label)
 
         # Toggling the push-button toggles disabled style
         self._disable_button.clicked.connect(self._toggle_slider)
+
 
     def _update_label(self):
         """
@@ -361,10 +367,10 @@ class EPowerSliderWithTicks(DoubleSliderWithTicks):
         return f"1E{exponent}"
 
 
-############################
-# -----------------------------------------------------------------------
+#######################################################################
+# ---------------------------------------------------------------------
 #  Test
-# -----------------------------------------------------------------------
+# ---------------------------------------------------------------------
 #######################################################################
 import sys
 from PyQt5.QtWidgets import (

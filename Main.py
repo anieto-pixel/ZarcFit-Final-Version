@@ -6,7 +6,6 @@ import sys
 from datetime import datetime
 
 import numpy as np
-from sympy import pi
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt, QTimer

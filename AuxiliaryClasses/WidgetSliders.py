@@ -76,6 +76,13 @@ class WidgetSliders(QWidget):
             slider.set_value(default_value)
             values[key] = slider.get_value()
         self.all_sliders_reseted.emit(values)
+        
+    def set_default_activation(self):
+        pass
+        
+    def set_activation(self):
+        #get this one to work with a list or a string? cna I?
+            pass
 
     def set_all_variables(self, variables: dict):
         """

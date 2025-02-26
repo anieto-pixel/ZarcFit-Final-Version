@@ -385,21 +385,22 @@ class Calculator(QObject):
             "Z_real": np.zeros(5),
             "Z_imag": np.zeros(5),
         }
-        #auxiliary class to handle time domain conversion
+        # Auxiliary class to handle time domain conversion.
         self._model_circuit = ModelCircuitParallel()
-        self.time_domain_builder=TimeDomainBuilder()
+        self.time_domain_builder = TimeDomainBuilder()
         
+        # Boundaries and disabled variables.
         self.lower_bounds = {}
         self.upper_bounds = {}
         self.disabled_variables = set()
         self.gaussian_prior = False
 
-        self._fit_variables={'model':self._model_circuit.name }
+        # Dictionary for additional fit variables.
+        self._fit_variables = {'model': self._model_circuit.name}
 
     # ------------------------------
-    # Public Methods
+    # Public Methods (Interface Unchanged)
     # ------------------------------
-    # Getters and setters
     def initialize_expdata(self, file_data: dict) -> None:
         """Set the experimental data from an external dictionary."""
         self._experiment_data = file_data
@@ -412,13 +413,17 @@ class Calculator(QObject):
             self.disabled_variables.discard(key)
 
     def set_rinf_negative(self, state: bool) -> None:
+        """Set negative resistance flag in the circuit model."""
         self._model_circuit.negative_rinf = state
 
     def set_gaussian_prior(self, state: bool) -> None:
+        """Enable or disable the Gaussian prior for model fitting."""
         self.gaussian_prior = state
 
     def set_bounds(self, slider_configurations: dict) -> None:
-        """Set the lower and upper bounds for parameters based on slider configurations."""
+        """
+        Set the lower and upper bounds for parameters based on slider configurations.
+        """
         for key, config in slider_configurations.items():
             if "Power" in str(config[0]):
                 self.lower_bounds[key] = 10 ** config[1]
@@ -432,11 +437,15 @@ class Calculator(QObject):
         return dict(self._model_circuit.v_second)
 
     def get_model_parameters(self) -> dict:
-        """Return the combined dictionary of model parameters."""
-        integral_variables=self.time_domain_builder.get_integral_variables()
-        fit_variables=self._model_circuit.q | self._model_circuit.v_second| self._fit_variables
-        
-        return fit_variables | integral_variables
+        """
+        Return the combined dictionary of model parameters, integrating:
+          - Circuit model parameters.
+          - Time domain integral variables.
+          - Additional fit variables.
+        """
+        integral_vars = self.time_domain_builder.get_integral_variables()
+        circuit_params = self._model_circuit.q | self._model_circuit.v_second | self._fit_variables
+        return circuit_params | integral_vars
 
     def switch_circuit_model(self, state: bool) -> None:
         """
@@ -458,22 +467,16 @@ class Calculator(QObject):
                 v_second=dict(old_vsec)
             )
 
-    #calls to autofit
     def fit_model_cole(self, initial_params: dict) -> dict:
         """Fit the model using the Cole cost function."""
-        print("cole")
-        prior_weight=10**6
-        
-        return self._fit_model(self._residual_cole, initial_params, prior_weight=prior_weight)
+        prior_weight = 10 ** 6
+        return self._fit_model(self._residual_cole, initial_params, prior_weight)
 
     def fit_model_bode(self, initial_params: dict) -> dict:
         """Fit the model using the Bode cost function."""
-        print("bode")
-        prior_weight=400
-        
-        return self._fit_model(self._residual_bode, initial_params, prior_weight=prior_weight)
+        prior_weight = 400
+        return self._fit_model(self._residual_bode, initial_params, prior_weight)
 
-    #call to run modle with sliders
     def run_model_manual(self, params: dict) -> CalculationResult:
         """
         Run the model with the given parameters.
@@ -483,262 +486,225 @@ class Calculator(QObject):
         3) Compute the time-domain response.
         4) Pack all results into a CalculationResult and emit a signal.
         """
-        
         freq_array = self._experiment_data["freq"]
         z, rock_z = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
         rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
         special_freq = self._get_special_freqs(params)
-        spec_z, throwaway= self._model_circuit.run_model(params, special_freq)
-        
+        spec_z, _ = self._model_circuit.run_model(params, special_freq)
         spec_zr, spec_zi = spec_z.real, spec_z.imag
-        #single out the "special resistence' from the other mrakers
-        spec_zi[len(spec_z)-1]=0
+        # Adjust the special impedance marker.
+        spec_zi[len(spec_z) - 1] = 0
 
-        tdomain_freq, tdomain_time, tdomain_volt = self.run_time_domain(params)
+        t_freq, t_time, t_volt = self.run_time_domain(params)
 
         result = CalculationResult(
             main_freq=freq_array,
             main_z_real=z_real,
             main_z_imag=z_imag,
-            
-            rock_z_real = rock_z_real,
-            rock_z_imag = rock_z_imag,
-            
+            rock_z_real=rock_z_real,
+            rock_z_imag=rock_z_imag,
             special_freq=special_freq,
             special_z_real=spec_zr,
             special_z_imag=spec_zi,
-            
-            timedomain_freq=tdomain_freq,
-            timedomain_time=tdomain_time,
-            timedomain_volt=tdomain_volt
+            timedomain_freq=t_freq,
+            timedomain_time=t_time,
+            timedomain_volt=t_volt
         )
         
-        
         self.model_manual_result.emit(result)
-        
-        self._calculator_variables(z_real,z_imag, params)
-        
+        self._update_fit_variables(z_real, z_imag, params)
         return result
 
-    #Calls related to time domain
     def run_time_domain(self, params: dict):
         """
         Calculate time-domain values using a real IFFT.
-        """ 
-        freq, t, v = self.time_domain_builder.run_time_domain(params, self._model_circuit)
-        return  freq, t, v
+        """
+        return self.time_domain_builder.run_time_domain(params, self._model_circuit)
 
     def transform_to_time_domain(self):
         """
-        Transform Experiment data to time domain.
-        """ 
-        experiment_data=self._experiment_data
-        
-        freq, t, v = self.time_domain_builder.transform_to_time_domain(experiment_data)
-        return  freq, t, v
+        Transform experimental data to time domain.
+        """
+        return self.time_domain_builder.transform_to_time_domain(self._experiment_data)
 
     # ------------------------------
     # Private Methods
     # ------------------------------
-    #--------------Fit methods---------------
 
+    # ---------- Fitting Methods ----------
     def _fit_model(self, residual_func, initial_params: dict, prior_weight: float = 0) -> dict:
         """
-        Fit the model using a residual function and (optionally) a Gaussian prior
+        Fit the model using a provided residual function and (optionally) a Gaussian prior
         that penalizes deviation from the initial guess.
-        
-        This version minimizes overhead by precomputing the locked parameters
-        and inlining the conversion of free parameters.
         """
-        
         all_keys = list(initial_params.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
-        # Precompute locked parameters once.
         locked_params = {k: initial_params[k] for k in self.disabled_variables if k in initial_params}
         x0 = self._scale_params(free_keys, initial_params)
-        lower_bounds, upper_bounds = self._build_bounds(free_keys)
+        lower_bounds_scaled, upper_bounds_scaled = self._build_bounds(free_keys)
     
         def _residual_wrapper(x_free: np.ndarray) -> np.ndarray:
-            # Recover free parameters
             free_params = self._descale_params(free_keys, x_free)
             full_params = {**locked_params, **free_params}
     
-            # Safely compute the model residual
             try:
                 model_residual = residual_func(full_params)
             except ValueError:
-                # Return a large penalty if the model fails
+                # Return a large penalty if the model evaluation fails.
                 return np.ones(10000) * 1e6
     
-            # If Gaussian prior is enabled, add penalties
             if self.gaussian_prior:
-                prior_residual = self._compute_gaussian_prior(
-                    x_free, x0, lower_bounds, upper_bounds, prior_weight
-                )
-                deviation_residual = self._compute_invalid_guess_penalty(full_params, prior_weight)
-                model_residual = np.concatenate([model_residual, prior_residual, deviation_residual])
+                prior_res = self._compute_gaussian_prior(x_free, x0, lower_bounds_scaled, upper_bounds_scaled, prior_weight)
+                invalid_penalty = self._compute_invalid_guess_penalty(full_params, prior_weight)
+                model_residual = np.concatenate([model_residual, prior_res, invalid_penalty])
             
             return model_residual
 
         result = opt.least_squares(
             _residual_wrapper,
             x0=x0,
-            bounds=(lower_bounds, upper_bounds),
+            bounds=(lower_bounds_scaled, upper_bounds_scaled),
             method='trf',
             max_nfev=2000
         )
         best_fit_free = self._descale_params(free_keys, result.x)
-        best_fit = locked_params.copy()
-        best_fit.update(best_fit_free)
-        
+        best_fit = {**locked_params, **best_fit_free}
         self.model_manual_values.emit(best_fit)
-        
-        print("finished")
-        
         return best_fit
 
     def _residual_cole(self, params: dict) -> np.ndarray:
         """Return the residual vector for the Cole model."""
         freq_array = self._experiment_data["freq"]
-        z, throwaway = self._model_circuit.run_model(params, freq_array)
+        z, _ = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
-        real_res = z_real - exp_real
-        imag_res = z_imag - exp_imag
-        w = self._weight_function(params)
-        return np.concatenate([real_res * w, imag_res * w])
+        weight = self._weight_function(params)
+        return np.concatenate([(z_real - exp_real) * weight, (z_imag - exp_imag) * weight])
 
     def _residual_bode(self, params: dict) -> np.ndarray:
         """Return the residual vector for the Bode model."""
         freq_array = self._experiment_data["freq"]
-        z, throwaway = self._model_circuit.run_model(params, freq_array)
+        z, _ = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
-        z_abs = np.sqrt(z_real ** 2 + z_imag ** 2)
+        z_abs = np.hypot(z_real, z_imag)
         z_phase_deg = np.degrees(np.arctan2(z_imag, z_real))
         exp_real = self._experiment_data["Z_real"]
         exp_imag = self._experiment_data["Z_imag"]
-        exp_abs = np.sqrt(exp_real ** 2 + exp_imag ** 2)
+        exp_abs = np.hypot(exp_real, exp_imag)
         exp_phase_deg = np.degrees(np.arctan2(exp_imag, exp_real))
         res_abs = np.log10(z_abs) - np.log10(exp_abs)
         res_phase = np.log10(np.abs(z_phase_deg) + 1e-10) - np.log10(np.abs(exp_phase_deg) + 1e-10)
-        w = self._weight_function(params)
-        return np.concatenate([res_abs * w, res_phase * w])
+        weight = self._weight_function(params)
+        return np.concatenate([res_abs * weight, res_phase * weight])
 
     def _weight_function(self, params: dict) -> float:
-        """Assign dynamic weights to errors based on selected parameters."""
+        """
+        Assign dynamic weights to errors based on selected parameters.
+        """
         weight = 1
-        weight *= 1 + 3 * np.exp(-15 * params["Ph"])
-        weight *= 1 + 3 * np.exp(-15 * params["Pm"])
-        weight *= 1 + 3 * np.exp(-15 * params["Pl"])
-        weight *= 1 + 3 * np.exp(-15 * params["Pef"])
+        for key in ["Ph", "Pm", "Pl", "Pef"]:
+            weight *= 1 + 3 * np.exp(-15 * params[key])
         return weight
 
     def _build_bounds(self, free_keys: list) -> (np.ndarray, np.ndarray):
-        lower_bounds = self._scale_params(free_keys, self.lower_bounds)
-        upper_bounds = self._scale_params(free_keys, self.upper_bounds)
-        return lower_bounds, upper_bounds
+        """
+        Build scaled lower and upper bounds arrays for free parameters.
+        """
+        lower_scaled = self._scale_params(free_keys, self.lower_bounds)
+        upper_scaled = self._scale_params(free_keys, self.upper_bounds)
+        return lower_scaled, upper_scaled
 
     def _compute_invalid_guess_penalty(self, params: dict, prior_weight: float) -> np.ndarray:
         """
         Returns the penalty array if the guess is invalid, otherwise zeros.
         """
+        arbitrary_scaling =1e4
         deviation = self._invalid_guess(params)
-        # Scale by some factor and prior_weight (tweak as needed)
-        return deviation * 1e4 * prior_weight
+        return deviation * arbitrary_scaling * prior_weight
 
     def _compute_gaussian_prior(
-        self, x_guessing: np.ndarray, x0: np.ndarray,
+        self, x_guess: np.ndarray, x0: np.ndarray,
         lower_bounds: np.ndarray, upper_bounds: np.ndarray,
         prior_weight: float, gaussian_fraction: int = 5
     ) -> np.ndarray:
         """
         Calculate the Gaussian prior penalty for each parameter.
-        
-        The penalty is computed as:
-            penalty = prior_weight * ((x_guessing - x0) / sigma)
-        where sigma is an effective standard deviation derived from the parameter bounds.
         """
-        # Uncomment the next line to disable the penalty for debugging purposes.
-        
-        # Compute effective standard deviation for each parameter.
         sigmas = (upper_bounds - lower_bounds) * gaussian_fraction
-        
-        # Return the scaled normalized deviation.
-        return prior_weight * ((x_guessing - x0) / sigmas)
+        return prior_weight * ((x_guess - x0) / sigmas)
 
-    def _invalid_guess(self, params: dict) -> list:
+    def _invalid_guess(self, params: dict) -> np.ndarray:
         """
         Test validity criteria: Fh >= Fm >= Fl.
-        Returns zero if valid, or positive deviations if invalid.
+        Returns positive deviations if invalid, zeros otherwise.
         """
-        #return  np.array([0,0])
         return np.array([
             max(0.0, params["Fm"] - params["Fh"]),
             max(0.0, params["Fl"] - params["Fm"])
         ])
 
-    #---------------others-------------        
+    # ---------- Special Frequencies and Other Values of Interest ----------
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
-        Return three special frequency points based on slider values.
+        Return special frequency points based on slider values.
         """
-        f1 = slider_values["Fh"]
-        f2 = slider_values["Fm"]
-        f3 = slider_values["Fl"]
-        f4 = 0.1
-        return np.array([f1, f2, f3, f4], dtype=float)
+        return np.array([
+            slider_values["Fh"],
+            slider_values["Fm"],
+            slider_values["Fl"],
+            0.1
+        ], dtype=float)
     
-    def _calculator_variables(self, z_real, z_imag, params):
-        """ prints selected variables """
-        
-        experiment = self._experiment_data["Z_real"] + 1j * self._experiment_data["Z_imag"]
-        calculated = z_real + 1j * z_imag
-    
-        # Compute mismatch 
-        mismatch = np.sum(np.abs(experiment - calculated) ** 2)    
+    def _update_fit_variables(self, z_real, z_imag, params: dict) -> None:
+        """
+        Update internal fit variables such as mismatch and resistance at 0.1Hz.
+        """
+        exp_complex = self._experiment_data["Z_real"] + 1j * self._experiment_data["Z_imag"]
+        calc_complex = z_real + 1j * z_imag
+        mismatch = np.sum(np.abs(exp_complex - calc_complex) ** 2)
         self._fit_variables['mismatch'] = mismatch
         
-        #compute Res.1Hz
+        # Compute resistance at 0.1Hz.
         z_1Hz = self._model_circuit.run_model(params, [0.1])[0]
-        #Res_1Hz=abs(z_1Hz)
-        Res_1Hz=abs(z_1Hz.real)
-        print("called")
-        self._fit_variables['Res.1Hz'] = Res_1Hz
+        self._fit_variables['Res.1Hz'] = abs(z_1Hz.real)
         
-        length=len(self._experiment_data["freq"])
-        self._fit_variables['Fhigh'] = self._experiment_data["freq"][0]
-        self._fit_variables['Flow'] = self._experiment_data["freq"][length-1]
-        
+        freq_array = self._experiment_data["freq"]
+        self._fit_variables['Fhigh'] = freq_array[0]
+        self._fit_variables['Flow'] = freq_array[-1]
+
+    # ---------- Parameter Scaling ----------
     @staticmethod
     def _scale_params(keys: list, params: dict) -> np.ndarray:
         """
-        Convert parameter values into a scaled vector.
+        Convert parameter values into a scaled vector for optimization.
         """
         scaled = []
-        for k in keys:
-            if k.startswith('P'):
-                scaled.append(params[k] * 10.0)
+        for key in keys:
+            value = params[key]
+            if key.startswith('P'):
+                scaled.append(value * 10.0)
             else:
-                if params[k] <= 0:
-                    raise ValueError(f"Parameter {k} must be > 0; got {params[k]}.")
-                scaled.append(np.log10(params[k]))
+                if value <= 0:
+                    raise ValueError(f"Parameter {key} must be > 0; got {value}.")
+                scaled.append(np.log10(value))
         return np.array(scaled)
 
     @staticmethod
     def _descale_params(keys: list, x: np.ndarray) -> dict:
         """
-        Convert a scaled vector back to a parameter dictionary.
+        Convert a scaled vector back to the original parameter dictionary.
         """
         descale = {}
-        for i, k in enumerate(keys):
-            if k.startswith('P'):
-                descale[k] = x[i] / 10.0
+        for i, key in enumerate(keys):
+            if key.startswith('P'):
+                descale[key] = x[i] / 10.0
             else:
-                descale[k] = 10.0 ** x[i]
+                descale[key] = 10 ** x[i]
         return descale
+
     
 ######################################################################################
 

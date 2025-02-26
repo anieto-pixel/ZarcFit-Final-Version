@@ -169,23 +169,27 @@ class ParentGraph(pg.PlotWidget):
         """Clears and re-displays both the static and dynamic plots."""
         self.clear()
 
-        # Static plot (base data)
+
+        # Dynamic plot (manual data)
+        self._dynamic_plot = self.plot(
+            pen=pg.mkPen(color='c', width=4),
+            symbol='o',
+            symbolSize=10,
+            symbolBrush=None
+        )
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+           # Static plot (base data)
         self._static_plot = self.plot(
             pen='g',  # green line
             symbol='o',
             symbolSize=5,
             symbolBrush='g'
-        )
+            )
         self._refresh_plot(self._base_data, self._static_plot)
 
-        # Dynamic plot (manual data)
-        self._dynamic_plot = self.plot(
-            pen='c',
-            symbol='o',
-            symbolSize=7,
-            symbolBrush=None
-        )
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+
 
     def _refresh_plot(self, data_dict, plot_item):
         """
