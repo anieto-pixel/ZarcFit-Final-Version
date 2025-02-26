@@ -25,7 +25,8 @@ class WidgetSliders(QWidget):
     
     slider_value_updated = pyqtSignal(str, float)
     slider_was_disabled = pyqtSignal(str, bool)
-    all_sliders_reseted = pyqtSignal(dict)
+    all_sliders_values_reseted = pyqtSignal(dict)
+    all_sliders_disabling_reseted = pyqtSignal(dict)
 
     def __init__(self, slider_configurations: dict, slider_default_values: list):
         super().__init__()
@@ -34,12 +35,14 @@ class WidgetSliders(QWidget):
         self.slider_default_values = dict(
             zip(slider_configurations.keys(), slider_default_values)
         )
+        self.slider_default_disabled=dict.fromkeys(slider_configurations.keys(), False)
         
         # Create sliders and ensure each is wide enough.
         self.sliders = self._create_sliders(slider_configurations)
         
         # Set sliders to default values.
-        self.set_default_values()
+        self.set_to_default_values()
+        self.set_to_default_disabled()
         
         # Build the UI and connect signals.
         self._setup_layout(slider_configurations)
@@ -66,7 +69,7 @@ class WidgetSliders(QWidget):
             values[key] = slider.get_value()
         return values
 
-    def set_default_values(self):
+    def set_to_default_values(self):
         """
         Reset all sliders to their default values and emit the updated dict.
         """
@@ -75,14 +78,26 @@ class WidgetSliders(QWidget):
             slider = self.sliders[key]
             slider.set_value(default_value)
             values[key] = slider.get_value()
-        self.all_sliders_reseted.emit(values)
+        self.all_sliders_values_reseted.emit(values)
         
-    def set_default_activation(self):
-        pass
+    def set_default_disabled(self, default_values: list):
+        """
+        Reset all sliders default deactivation state to fit the given list.
+        """
+        #ensure that if there are extras, they are all turned to false
+        self.slider_default_disabled.update({
+            k: v for k, v in zip(self.slider_default_disabled, 
+                                  default_values
+                                  )})
+        self.set_to_default_disabled()
         
-    def set_activation(self):
-        #get this one to work with a list or a string? cna I?
-            pass
+    def set_to_default_disabled(self):
+        """
+        Reset all sliders to their default activation and emit the updated dict.
+        """
+        print("set to default disabled")
+        for k, state in self.slider_default_disabled.items():
+            self.sliders[k].set_is_disabled(state)
 
     def set_all_variables(self, variables: dict):
         """
@@ -99,12 +114,12 @@ class WidgetSliders(QWidget):
             slider = self.sliders[key]
             slider.set_value_exact(val)
             values[key] = slider.get_value()
-        self.all_sliders_reseted.emit(values)
+        self.all_sliders_values_reseted.emit(values)
 
     # -------------------------------
     # Private Methods
     # -------------------------------
-    def _signal_all_sliders_reseted(self):
+    def _signal_all_sliders_values_reseted(self):
         """(Placeholder) Signal that all sliders have been reset."""
         pass
 

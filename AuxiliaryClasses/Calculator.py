@@ -411,6 +411,8 @@ class Calculator(QObject):
             self.disabled_variables.add(key)
         else:
             self.disabled_variables.discard(key)
+            
+        print(f"disabled variables{self.disabled_variables}")
 
     def set_rinf_negative(self, state: bool) -> None:
         """Set negative resistance flag in the circuit model."""

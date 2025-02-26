@@ -50,11 +50,14 @@ class MainWidget(QWidget):
         self._connect_listeners()
         self._initialize_hotkeys_and_buttons()
 
+        #Optional initialization settings
         # Load current file and update UI
         self.widget_input_file.setup_current_file(self.config.input_file)
         self.widget_output_file.setup_current_file(self.config.output_file)
         self._update_sliders_data()
-
+        #Set default disabled sliders
+        self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
+        
     # ------------------- UI BUILD METHODS -------------------
     def _build_ui(self):
         """Assembles the main layout from smaller UI components."""
@@ -171,7 +174,7 @@ class MainWidget(QWidget):
 
         # Slider signals
         self.widget_sliders.slider_value_updated.connect(self._handle_slider_update)
-        self.widget_sliders.all_sliders_reseted.connect(self._reset_v_sliders)
+        self.widget_sliders.all_sliders_values_reseted.connect(self._reset_v_sliders)
         self.widget_sliders.slider_was_disabled.connect(self.calculator.set_disabled_variables)
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
         # Calculator signals
@@ -291,6 +294,7 @@ class MainWidget(QWidget):
         """
         Resets slider values to the values in the incoming dictionary.
         """
+        print(dictionary)
         if set(dictionary.keys()) != set(self.v_sliders.keys()):
             raise ValueError(
                 "Main._reset_v_sliders:Incoming dictionary keys do not match the slider keys in WidgetSliders."
@@ -335,7 +339,9 @@ class MainWidget(QWidget):
         """
         Resets sliders to their default values and refreshes frequency settings.
         """
-        self.widget_sliders.set_default_values() #self._handle_set_allfreqs()
+        self.widget_sliders.set_to_default_values() 
+        self.widget_sliders.set_to_default_disabled() 
+        #self._handle_set_allfreqs()
 
     def _handle_rinf_negative(self, state):
         """Handles toggling for Rinf being negative."""

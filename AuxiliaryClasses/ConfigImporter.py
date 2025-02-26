@@ -167,9 +167,8 @@ class ConfigImporter:
                 self.output_file = path
                 
         if 'SliderDisabled' in self.config:
-
-            defaults_str = self.config["SliderDefaultValues"]["defaults"]
-            self.slider_default_disabled = [bool(val.strip()) for val in defaults_str.split(",")]
+            defaults_str = self.config["SliderDisabled"]["defaults"]
+            self.slider_default_disabled = [val.strip().lower() == "true" for val in defaults_str.split(",")]
 
     @staticmethod
     def _safe_import(class_name: str):

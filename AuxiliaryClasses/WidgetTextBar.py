@@ -93,8 +93,8 @@ class WidgetTextBar(QWidget):
             if label:
                 color = self.key_colors[key]
                 label.setText(f"<b><font color='{color}'>{key}:</font></b> {value:.3g}")
-            else:
-                print(f"WidgetTextBar Warning: Key '{key}' is not configured. Add it in config.ini")
+#            else:
+#                print(f"WidgetTextBar Warning: Key '{key}' is not configured. Add it in config.ini")
                 
                 
 

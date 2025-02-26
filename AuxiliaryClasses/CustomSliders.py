@@ -77,8 +77,13 @@ class CustomSliders(QWidget):
         """
         return self._slider.valueChanged
       
-    def artificially_toggle_slider(self):
-        self._toggle_slider(self)
+    def set_is_disabled(self, state:bool):
+        """
+        Seets "is disabled" to the given state.Signals.
+        """
+        
+        self.is_disabled = state
+        self._react_to_is_disbled_state()
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
@@ -154,26 +159,31 @@ class CustomSliders(QWidget):
     #Listeners and handers
     def _toggle_slider(self):
         """
-        Flip the is_disabled state and update styles / signals.
+        Flip the is_disabled state and update styles. It signals.
         """
         self.is_disabled = not self.is_disabled
+        self._react_to_is_disbled_state()
+
+    def _react_to_is_disbled_state(self):
+        """
+        Adjusts appeareance to toggle state.
+        """
 
         if self.is_disabled:
             # In a "disabled" state: set gray background on label
             self._disable_button.setStyleSheet(
-                "font-size: 12px; background-color: gray; border: none;"
+                "background-color: gray;  border: none;"
             )
         else:
             # In an "enabled" state: revert background
             self._disable_button.setStyleSheet(
-                "font-size: 12px; background-color: none; border: none;"
+                "background-color: none;"
             )
-
-        # Emit a signal indicating the disabled state has changed
-        self.was_disabled.emit(self.is_disabled)
 
         # Update label text based on new slider value
         self._update_label()
+        # Emit a signal indicating the disabled state has changed
+        self.was_disabled.emit(self.is_disabled)
     
     def _update_slider_style(self, colour: str):
         style = textwrap.dedent(f"""
@@ -304,7 +314,6 @@ class DoubleSliderWithTicks(CustomSliders):
 
         # Toggling the push-button toggles disabled style
         self._disable_button.clicked.connect(self._toggle_slider)
-
 
     def _update_label(self):
         """
