@@ -445,7 +445,7 @@ class Calculator(QObject):
 
     def get_latest_secondaries(self) -> dict:
         """Return the most recent dictionary of secondary variables."""
-        return dict(self._model_circuit.v_second)
+        return dict(self._model_circuit.v_second | self._calculator_variables )
 
     def get_model_parameters(self) -> dict:
         """
@@ -676,10 +676,11 @@ class Calculator(QObject):
         special_freq = np.concatenate((dynamic_special_freq, fixed_special_frequencies))
         spec_zr = np.concatenate((dsf_z.real, fsf_z.real))
         spec_zi = np.concatenate((dsf_z.imag, np.zeros_like(fsf_z.real)))
+        
+        print(f"here we are, _calculate_special_frequencies {self._calculator_variables}")
     
         return special_freq, spec_zr, spec_zi
 
-    
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
         Return special frequency points based on slider values.
@@ -707,6 +708,8 @@ class Calculator(QObject):
         freq_array = self._experiment_data["freq"]
         self._fit_variables['Fhigh'] = freq_array[0]
         self._fit_variables['Flow'] = freq_array[-1]
+        
+        print("_update_fit_variables")
 
     # ---------- Parameter Scaling ----------
     @staticmethod
