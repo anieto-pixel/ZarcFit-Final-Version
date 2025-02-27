@@ -34,15 +34,12 @@ class CalculationResult:
         self.main_z_real = np.array([100, 80, 60])
         self.main_z_imag = np.array([-50, -40, -30])
             
-        self.rock_z_real: np.ndarray = ([100, 80, 60])
-        self.rock_z_imag: np.ndarray = ([-48, -32, -28])
+        self.rock_z_real = np.ndarray([100, 80, 60])
+        self.rock_z_imag = np.ndarray([-48, -32, -28])
 
         self.special_freq = np.array([10, 50, 90])
         self.special_z_real = np.array([70, 65, 55])
         self.special_z_imag = np.array([-40, -35, -28])
-        
-        self.special_resistance_frequency: np.ndarray = [0.1]
-        self.special_resistance: np.ndarray = [90]
 
         self.timedomain_freq = np.array([0.01, 4.5, 1.1])
         self.timedomain_time = np.linspace(0, 1, 100)
@@ -119,28 +116,47 @@ class ParentGraph(pg.PlotWidget):
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
-    def update_special_frequencies(self, freq_array, z_real_array, z_imag_array, my_symbol='x' ):
+ 
+    def update_special_frequencies(self, freq_array, z_real_array, z_imag_array):
         """
         Adds or updates special marker points on the graph.
         """
+        # Remove any existing markers
         for item in getattr(self, '_special_items', []):
             self.removeItem(item)
         self._special_items = []
     
-        colors = ['r', 'g', 'b', 'w']
+        symbols = ['x', 'd', 's']
+        colors = ['r', 'g', 'b']
+    
         for i, (freq, z_real, z_imag) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
-            color = colors[i % len(colors)]
+            group_index = i // 3
+            symbol_index = group_index % len(symbols)     # 0->x, 1->d, 2->s, repeat
+            color_index = i % len(colors)                 # cycles r, g, b
+    
+            symbol = symbols[symbol_index]
+            color = colors[color_index]
+            filled = (group_index % 2 == 0)
+    
+            # Prepare x, y for plotting
             x, y = self._prepare_xy(
                 np.array([freq]),
                 np.array([z_real]),
                 np.array([z_imag])
             )
+    
+            # If we want a thicker outline, create a pen with width>1
+            symbol_pen = pg.mkPen(color, width=2)
+            symbol_brush = color if filled else None
+    
             plot_item = self.plot(
-                x, y, pen=None,
-                symbol=my_symbol, symbolSize=15,
-                symbolBrush=None, symbolPen=color
+                x, y,pen=None,
+                symbol=symbol,symbolSize=12,
+                symbolPen=symbol_pen,
+                symbolBrush=symbol_brush
             )
             self._special_items.append(plot_item)
+
 
     # -----------------------------------------------------------------------
     #  Private Methods
@@ -522,6 +538,9 @@ class WidgetGraphs(QWidget):
         self._init_graphs()
         self._init_ui()
 
+    #-----------------------------------------
+    #   Private Methods
+    #--------------------------------------------
     def _init_graphs(self):
         """
         Initializes internal graph widgets.
@@ -599,6 +618,9 @@ class WidgetGraphs(QWidget):
         layout.setSpacing(0)
         return layout
 
+    #--------------------------------------------
+    #   Public Methods
+    #---------------------------------------------
     def update_front_graphs(self, freq, z_real, z_imag):
         """
         Updates the base (static) data for the Cole, Bode, Phase graphs.

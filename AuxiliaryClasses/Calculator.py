@@ -407,7 +407,7 @@ class Calculator(QObject):
 
         # Dictionary for additional fit variables.
         self._fit_variables = {'model': self._model_circuit.name}
-        self._special_frequencies = dict.fromkeys([   ])
+        self._calculator_variables = {}
 
     # ------------------------------
     # Public Methods (Interface Unchanged)
@@ -452,10 +452,11 @@ class Calculator(QObject):
         Return the combined dictionary of model parameters, integrating:
         """
         integral_variables = self.time_domain_builder.get_integral_variables()
-        model_variables = self._model_circuit.q | self._model_circuit.v_second|self._model_circuit.v_others_sec
+        model_variables = self._model_circuit.q | self._model_circuit.v_second|self._model_circuit.v_other_sec
         fit_variables = self._fit_variables
+        calc_variables = self._calculator_variables
         
-        return fit_variables | model_variables| integral_variables
+        return fit_variables | model_variables| integral_variables | calc_variables
 
     def switch_circuit_model(self, state: bool) -> None:
         """
@@ -504,22 +505,23 @@ class Calculator(QObject):
         z_real, z_imag = z.real, z.imag
         rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
-        #Get, and calculate, Z for the special frequencies
-        special_freq = self._get_special_freqs(params)
-        spec_z, _ = self._model_circuit.run_model(params, special_freq,old_v_second=True )
-        spec_zr, spec_zi = spec_z.real, spec_z.imag
-
+        special_freq,spec_zr,spec_zi=self. _calculate_special_frequencies(params)
+        
+        #time domain
         t_freq, t_time, t_volt = self.run_time_domain(params)
 
         result = CalculationResult(
             main_freq=freq_array,
             main_z_real=z_real,
             main_z_imag=z_imag,
+            
             rock_z_real=rock_z_real,
             rock_z_imag=rock_z_imag,
+            
             special_freq=special_freq,
             special_z_real=spec_zr,
             special_z_imag=spec_zi,
+            
             timedomain_freq=t_freq,
             timedomain_time=t_time,
             timedomain_volt=t_volt
@@ -659,6 +661,25 @@ class Calculator(QObject):
         ])
 
     # ---------- Special Frequencies and Other Values of Interest ----------
+    def _calculate_special_frequencies(self, params: dict):
+        
+        fixed_special_frequencies = np.array([0.1])  # Point of interest, f = 0.1Hz
+        dynamic_special_freq = self._get_special_freqs(params)
+    
+        fsf_z, _ = self._model_circuit.run_model(params, fixed_special_frequencies, old_v_second=True)
+        dsf_z, _ = self._model_circuit.run_model(params, dynamic_special_freq, old_v_second=True)
+    
+        # Adding reference resistance to the dictionary
+        self._calculator_variables['R01'] = float(fsf_z.real[0])  # Ensure correct extraction
+    
+        # Corrected concatenation using numpy
+        special_freq = np.concatenate((dynamic_special_freq, fixed_special_frequencies))
+        spec_zr = np.concatenate((dsf_z.real, fsf_z.real))
+        spec_zi = np.concatenate((dsf_z.imag, np.zeros_like(fsf_z.real)))
+    
+        return special_freq, spec_zr, spec_zi
+
+    
     def _get_special_freqs(self, slider_values: dict) -> np.ndarray:
         """
         Return special frequency points based on slider values.
@@ -681,7 +702,7 @@ class Calculator(QObject):
         
         # Compute resistance at 0.1Hz.
         z_1Hz = self._model_circuit.run_model(params, [0.1])[0]
-        self._fit_variables['Res.1Hz'] = abs(z_1Hz.real)
+        self._fit_variables['Res.1Hz'] = float(abs(z_1Hz.real))
         
         freq_array = self._experiment_data["freq"]
         self._fit_variables['Fhigh'] = freq_array[0]
