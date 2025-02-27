@@ -218,11 +218,14 @@ class WidgetOutputFile(QWidget):
             for line in reversed(lines):
                 columns = line.strip().split(",")
                 if columns and columns[0] == head:
-                    return dict(zip(self.variables_to_print, columns))
+                    dictionary = dict(zip(self.variables_to_print, columns))
+                    return dictionary
 
             return None
         except Exception as e:
-            ErrorWindow.show_error_message(f"Error reading file: {e}")
+            ErrorWindow.show_error_message(
+                f"WidgetOutputFile.find_row_in_file :Error reading file: {e}"
+            )
             return None
        
     # -----------------------------------------------------------------------

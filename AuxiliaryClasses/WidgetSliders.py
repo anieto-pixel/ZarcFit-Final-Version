@@ -95,7 +95,6 @@ class WidgetSliders(QWidget):
         """
         Reset all sliders to their default activation and emit the updated dict.
         """
-        print("set to default disabled")
         for k, state in self.slider_default_disabled.items():
             self.sliders[k].set_is_disabled(state)
 
@@ -108,7 +107,7 @@ class WidgetSliders(QWidget):
             raise ValueError(
                 "WidgetSlider.set_all_variables: Incoming dictionary keys do not match the slider keys in WidgetSliders."
             )
-
+        #here happens the difference
         values = {}
         for key, val in variables.items():
             slider = self.sliders[key]

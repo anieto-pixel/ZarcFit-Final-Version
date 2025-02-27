@@ -69,7 +69,9 @@ class ParentGraph(pg.PlotWidget):
         self._refresh_graph()
         self.auto_scale_button.setChecked(True)
 
-    #----Public Methods----------
+    # -----------------------------------------------------------------------
+    #  Public Methods
+    # -----------------------------------------------------------------------
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points within [f_min, f_max].
@@ -117,28 +119,32 @@ class ParentGraph(pg.PlotWidget):
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
 
-    def update_special_points(self, freq_array, z_real_array, z_imag_array):
+    def update_special_frequencies(self, freq_array, z_real_array, z_imag_array, my_symbol='x' ):
         """
         Adds or updates special marker points on the graph.
         """
         for item in getattr(self, '_special_items', []):
             self.removeItem(item)
         self._special_items = []
-
-        for i, color in enumerate(['r', 'g', 'b', 'w']):
+    
+        colors = ['r', 'g', 'b', 'w']
+        for i, (freq, z_real, z_imag) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
+            color = colors[i % len(colors)]
             x, y = self._prepare_xy(
-                np.array([freq_array[i]]),
-                np.array([z_real_array[i]]),
-                np.array([z_imag_array[i]])
+                np.array([freq]),
+                np.array([z_real]),
+                np.array([z_imag])
             )
             plot_item = self.plot(
                 x, y, pen=None,
-                symbol='x', symbolSize=12,
-                symbolBrush=color, symbolPen=color
+                symbol=my_symbol, symbolSize=15,
+                symbolBrush=None, symbolPen=color
             )
             self._special_items.append(plot_item)
 
-    #----Private Methods----------
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
     def _init_data(self):
         """Initialize default datasets and related flags."""
         # Default data for base and manual plots
@@ -172,9 +178,9 @@ class ParentGraph(pg.PlotWidget):
 
         # Dynamic plot (manual data)
         self._dynamic_plot = self.plot(
-            pen=pg.mkPen(color='c', width=4),
+            pen=pg.mkPen(color='c', width=2),
             symbol='o',
-            symbolSize=10,
+            symbolSize=9,
             symbolBrush=None
         )
         self._refresh_plot(self._manual_data, self._dynamic_plot)
@@ -183,13 +189,10 @@ class ParentGraph(pg.PlotWidget):
         self._static_plot = self.plot(
             pen='g',  # green line
             symbol='o',
-            symbolSize=5,
-            symbolBrush='g'
+            symbolSize=2,
+            symbolBrush='g', symbolPen ='g'
             )
         self._refresh_plot(self._base_data, self._static_plot)
-
-
-
 
     def _refresh_plot(self, data_dict, plot_item):
         """
@@ -217,7 +220,7 @@ class ParentGraph(pg.PlotWidget):
         """Create and configure the auto-scale button."""
         self.auto_scale_button = QPushButton("", self)
         self.auto_scale_button.setCheckable(True)
-        self.auto_scale_button.setGeometry(10, 10, 10, 10)
+        self.auto_scale_button.setGeometry(10, 10, 15, 15)
         self.auto_scale_button.toggled.connect(self._handle_auto_scale_toggle)
         self.auto_scale_button.setStyleSheet("""
             QPushButton { background-color: lightgray; }
@@ -634,9 +637,9 @@ class WidgetGraphs(QWidget):
         z_real_sp = calc_result.special_z_real
         z_imag_sp = calc_result.special_z_imag
         
-        self._big_graph.update_special_points(freq_sp, z_real_sp, z_imag_sp)
-        self._small_graph_1.update_special_points(freq_sp, z_real_sp, z_imag_sp)
-        self._small_graph_2.update_special_points(freq_sp, z_real_sp, z_imag_sp)
+        self._big_graph.update_special_frequencies(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_1.update_special_frequencies(freq_sp, z_real_sp, z_imag_sp)
+        self._small_graph_2.update_special_frequencies(freq_sp, z_real_sp, z_imag_sp)
 
         # Update time-domain graph with manual data
         self._tab_graph.update_parameters_manual(

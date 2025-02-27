@@ -254,7 +254,7 @@ class DoubleSliderWithTicks(CustomSliders):
 
     def __init__(self, min_value, max_value, colour, number_of_tick_intervals=10):
         
-        self._scale_factor = 1000
+        self._scale_factor = 1000000
         super().__init__(min_value, max_value, colour, number_of_tick_intervals)
         
     # -----------------------------------------------------------------------

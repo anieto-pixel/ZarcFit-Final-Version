@@ -42,36 +42,38 @@ class ModelCircuitParent(object):
     """
     Parent class for circuit models.
     """
-    def __init__(self, negative_rinf=False, q=None, v_second=None, v_others=None):
+    def __init__(self, negative_rinf=False, q=None, v_second=None, v_other_sec=None):
         super().__init__()
         # Avoid mutable default arguments; properly assign attributes.
         if q is None:
             q = {}
         if v_second is None:
             v_second = {}
+        if v_other_sec is None:
+            v_other_sec = {}
         # Attributes
         self.name=""
         
         self.negative_rinf = negative_rinf
         self.q = q
-        self.v_second = v_second
-        self.v_others=v_others
+        self.v_second = v_second #secondary variables used in the calculations
+        self.v_other_sec=v_other_sec   #other secondary variables not used in calculations
 
     # ------------------------------------------
     # Public Methods
     # ------------------------------------------
     def init_parameters(self):
         """Return the current state of the model's attributes."""
-        return self.negative_rinf, self.q, self.v_second
+        return self.negative_rinf, self.q, self.v_second, self.v_other_sec
 
-    def run_model(self, v: dict, freq_array: np.ndarray):
+    def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         """
         Model of an electric circuit that uses the received values v as variables
         and returns the impedance array of the circuit.
         """
         return np.array([])
 
-    def run_rock(self, v: dict, freq_array: np.ndarray):
+    def run_rock(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         """Placeholder method for a variant of the circuit model."""
         return np.array([])
 
@@ -100,12 +102,13 @@ class ModelCircuitParent(object):
         self.v_second["pRl"] = (v["Rinf"] + v["Rh"] + v["Rm"]) * (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"]) / v["Rl"]
         self.v_second["pQl"] = Ql * (v["Rl"] / (v["Rinf"] + v["Rh"] + v["Rm"] + v["Rl"])) ** 2
         
-        self.v_second["Ch"]= 1/(2*np.pi*v["Fh"]*v["Rh"] )
-        self.v_second["pCh"]=1/(2*np.pi*v["Fh"]*self.v_second["pRh"] )
-        self.v_second["Cm"]=1/(2*np.pi*v["Fm"]*v["Rm"] )
-        self.v_second["pCm"]=1/(2*np.pi*v["Fm"]*self.v_second["pRm"] )
-        self.v_second["Cl"]=1/(2*np.pi*v["Fl"]*v["Rl"] )
-        self.v_second["pCl"] =1/(2*np.pi*v["Fl"]*self.v_second["pRl"] )
+        self.v_other_sec["Ch"]= 1/(2*np.pi*v["Fh"]*v["Rh"] )
+        self.v_other_sec["pCh"]=1/(2*np.pi*v["Fh"]*self.v_second["pRh"] )
+        self.v_other_sec["Cm"]=1/(2*np.pi*v["Fm"]*v["Rm"] )
+        self.v_other_sec["pCm"]=1/(2*np.pi*v["Fm"]*self.v_second["pRm"] )
+        self.v_other_sec["Cl"]=1/(2*np.pi*v["Fl"]*v["Rl"] )
+        self.v_other_sec["pCl"] =1/(2*np.pi*v["Fl"]*self.v_second["pRl"] )
+        
         
     def _inductor(self, freq, linf):
         """
@@ -163,16 +166,17 @@ class ModelCircuitSeries(ModelCircuitParent):
     Circuit model where elements are in series.
     """
     
-    def __init__(self, negative_rinf=False, q=None, v_second=None, v_others=None):
-        super().__init__(negative_rinf, q, v_second, v_others)
+    def __init__(self, negative_rinf=False, q=None, v_second=None, v_other_sec=None):
+        super().__init__(negative_rinf, q, v_second, v_other_sec)
         self.name = "Series Circuit"
 
-    def run_rock(self, v: dict, freq_array: np.ndarray):
+    def run_rock(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         v_l = v.copy()
 
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
+        if not old_v_second:
+            self._calculate_secondary_variables(v_l)
 
         z = []
 
@@ -191,13 +195,14 @@ class ModelCircuitSeries(ModelCircuitParent):
 
         return np.array(z)
 
-    def run_model(self, v: dict, freq_array: np.ndarray):
-        z_rock = self.run_rock(v, freq_array)
+    def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         v_l = v.copy()
-
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
+        if not old_v_second:
+            self._calculate_secondary_variables(v_l)
+            
+        z_rock = self.run_rock(v_l, freq_array, old_v_second=True)
 
         zinf = [self._inductor(freq, v_l["Linf"]) + v_l["Rinf"] for freq in freq_array]
         z_cpee = [self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for freq in freq_array]
@@ -210,16 +215,18 @@ class ModelCircuitParallel(ModelCircuitParent):
     """
     Circuit model where elements are in parallel.
     """
-    def __init__(self, negative_rinf=False, q=None, v_second=None, v_others=None):
-        super().__init__(negative_rinf, q, v_second, v_others)
+    def __init__(self, negative_rinf=False, q=None, v_second=None, v_other_sec=None):
+        super().__init__(negative_rinf, q, v_second, v_other_sec)
         self.name = "Parallel Circuit"
 
-    def run_rock(self, v: dict, freq_array: np.ndarray):
+    def run_rock(self, v: dict, freq_array: np.ndarray, old_v_second=False):
+        
         v_l = v.copy()
-
+        
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
+        if not old_v_second:
+            self._calculate_secondary_variables(v_l)
 
         v2 = self.v_second
 
@@ -238,13 +245,16 @@ class ModelCircuitParallel(ModelCircuitParent):
 
         return np.array(z)
 
-    def run_model(self, v: dict, freq_array: np.ndarray):
-        z_rock = self.run_rock(v, freq_array)
+    def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
+        
         v_l = v.copy()
-
+        
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
-        self._calculate_secondary_variables(v_l)
+        if not old_v_second:
+            self._calculate_secondary_variables(v_l)
+        
+        z_rock = self.run_rock(v, freq_array, old_v_second=True)
 
         zinf = [self._inductor(f, v_l["Linf"]) for f in freq_array]
         z_cpee = [self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for f in freq_array]
@@ -397,6 +407,7 @@ class Calculator(QObject):
 
         # Dictionary for additional fit variables.
         self._fit_variables = {'model': self._model_circuit.name}
+        self._special_frequencies = dict.fromkeys([   ])
 
     # ------------------------------
     # Public Methods (Interface Unchanged)
@@ -411,8 +422,6 @@ class Calculator(QObject):
             self.disabled_variables.add(key)
         else:
             self.disabled_variables.discard(key)
-            
-        print(f"disabled variables{self.disabled_variables}")
 
     def set_rinf_negative(self, state: bool) -> None:
         """Set negative resistance flag in the circuit model."""
@@ -441,13 +450,12 @@ class Calculator(QObject):
     def get_model_parameters(self) -> dict:
         """
         Return the combined dictionary of model parameters, integrating:
-          - Circuit model parameters.
-          - Time domain integral variables.
-          - Additional fit variables.
         """
-        integral_vars = self.time_domain_builder.get_integral_variables()
-        circuit_params = self._model_circuit.q | self._model_circuit.v_second | self._fit_variables
-        return circuit_params | integral_vars
+        integral_variables = self.time_domain_builder.get_integral_variables()
+        model_variables = self._model_circuit.q | self._model_circuit.v_second|self._model_circuit.v_others_sec
+        fit_variables = self._fit_variables
+        
+        return fit_variables | model_variables| integral_variables
 
     def switch_circuit_model(self, state: bool) -> None:
         """
@@ -455,18 +463,20 @@ class Calculator(QObject):
           - True selects ModelCircuitSeries.
           - False selects ModelCircuitParallel.
         """
-        neg_rinf, old_q, old_vsec = self._model_circuit.init_parameters()
+        neg_rinf, old_q, old_vsec, old_ovsec = self._model_circuit.init_parameters()
         if state:
             self._model_circuit = ModelCircuitSeries(
                 negative_rinf=neg_rinf,
                 q=dict(old_q),
-                v_second=dict(old_vsec)
+                v_second=dict(old_vsec),
+                v_other_sec=dict(old_ovsec)
             )
         else:
             self._model_circuit = ModelCircuitParallel(
                 negative_rinf=neg_rinf,
                 q=dict(old_q),
-                v_second=dict(old_vsec)
+                v_second=dict(old_vsec),
+                v_other_sec=dict(old_ovsec)
             )
 
     def fit_model_cole(self, initial_params: dict) -> dict:
@@ -489,15 +499,15 @@ class Calculator(QObject):
         4) Pack all results into a CalculationResult and emit a signal.
         """
         freq_array = self._experiment_data["freq"]
+        #Calculate Z for the full model, and for the rock alone
         z, rock_z = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
         rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
+        #Get, and calculate, Z for the special frequencies
         special_freq = self._get_special_freqs(params)
-        spec_z, _ = self._model_circuit.run_model(params, special_freq)
+        spec_z, _ = self._model_circuit.run_model(params, special_freq,old_v_second=True )
         spec_zr, spec_zi = spec_z.real, spec_z.imag
-        # Adjust the special impedance marker.
-        spec_zi[len(spec_z) - 1] = 0
 
         t_freq, t_time, t_volt = self.run_time_domain(params)
 
@@ -657,7 +667,7 @@ class Calculator(QObject):
             slider_values["Fh"],
             slider_values["Fm"],
             slider_values["Fl"],
-            0.1
+            #0.1
         ], dtype=float)
     
     def _update_fit_variables(self, z_real, z_imag, params: dict) -> None:

@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
     QApplication, QLabel, QMainWindow, QShortcut, QSizePolicy, QSplitter,
     QWidget, QHBoxLayout, QVBoxLayout
 )
-# Ensure AuxiliaryClasses is included in sys.path. Import Aux Classes
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
+
+#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
 
 from AuxiliaryClasses.ConfigImporter import ConfigImporter
 from AuxiliaryClasses.CustomListSliders import ListSliderRange
@@ -51,12 +51,9 @@ class MainWidget(QWidget):
         self._initialize_hotkeys_and_buttons()
 
         #Optional initialization settings
-        # Load current file and update UI
-        self.widget_input_file.setup_current_file(self.config.input_file)
-        self.widget_output_file.setup_current_file(self.config.output_file)
+        self._optional_initialization()
         self._update_sliders_data()
-        #Set default disabled sliders
-        self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
+
         
     # ------------------- UI BUILD METHODS -------------------
     def _build_ui(self):
@@ -264,20 +261,32 @@ class MainWidget(QWidget):
         
         head = self.widget_input_file.get_current_file_name()
         dictionary = self.widget_output_file.find_row_in_file(head)
+        
         if dictionary is None:
-            print(f"Output file has no row with head: {head}")
-            return
+            print(f"Main._handle_recover_file_values: Output file has no row with head: {head}")
+            return 
 
+        #TODO, find a better way to handle negative rinf
         for key in set(self.config.slider_configurations.keys()).intersection(dictionary.keys()):
             self.v_sliders[key] = float(dictionary[key])
+            
+        if 'Rinf' in self.v_sliders:
+            if self.v_sliders['Rinf'] < 0:
+                self.v_sliders['Rinf']=abs(self.v_sliders['Rinf'])
+                self.widget_buttons.f9_button.setChecked(True)  # Toggle ON
+        else:
+            self.widget_buttons.f9_button.setChecked(False)  # Toggle OFF
+            
         self.widget_sliders.set_all_variables(self.v_sliders)
 
     def _handle_slider_update(self, key, value):
         """
         Handles incoming slider updates by storing them and starting the debounce timer.
         """
+        arbitrary_time_delay=5 #reduce for more responsive sliders, icnrease for more optimization
+        
         self.pending_updates[key] = value
-        self.update_timer.start(5)  # Adjust the timeout as needed
+        self.update_timer.start(arbitrary_time_delay)  
 
     def _update_sliders_data(self):
         """Processes all pending slider updates. Updates affected widgets and refreshes the UI."""
@@ -294,7 +303,6 @@ class MainWidget(QWidget):
         """
         Resets slider values to the values in the incoming dictionary.
         """
-        print(dictionary)
         if set(dictionary.keys()) != set(self.v_sliders.keys()):
             raise ValueError(
                 "Main._reset_v_sliders:Incoming dictionary keys do not match the slider keys in WidgetSliders."
@@ -347,6 +355,7 @@ class MainWidget(QWidget):
         """Handles toggling for Rinf being negative."""
         self.calculator.set_rinf_negative(state)
         self.widget_sliders.get_slider('Rinf').toggle_red_frame(state)
+        self.calculator.run_model_manual(self.v_sliders)
 
     def _handle_toggle_pei(self, state):
         """Handles toggling for Pei value."""
@@ -356,6 +365,21 @@ class MainWidget(QWidget):
             self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
 
     # ------------------- OTHER METHODS -------------------
+    
+    def _optional_initialization(self):
+        
+        # Load current file and update UI
+        input_file=self.config.input_file
+        output_file=self.config.output_file
+        
+        if isinstance(input_file, str):
+            self.widget_input_file.setup_current_file(input_file)
+        if isinstance(output_file, str):
+            self.widget_output_file.setup_current_file(self.config.output_file)
+
+        #Set default disabled sliders
+        self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
+    
     def _optimize_sliders_signaling(self):
         """Optimizes sliders signaling by initializing a debounce timer."""
         self.update_timer = QTimer()
@@ -371,8 +395,14 @@ class MainWidget(QWidget):
         """
         date = {'date/time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
         file = {'file': self.widget_input_file.get_current_file_name()}
+        v_copy = self.v_sliders.copy()
+        
+        # If button-9 is toggled, modify values accordingly (e.g., change sign of 'Rinf')
+        if self.widget_buttons.f9_button.isChecked():
+            if 'Rinf' in v_copy:
+                v_copy['Rinf'] *= -1  # Negate Rinf if needed
 
-        main_dictionary = self.v_sliders | date | file
+        main_dictionary = v_copy | date | file
         model_dictionary = self.calculator.get_model_parameters()
         graphs_dictionary = self.widget_graphs.get_graphs_parameters()
         self.widget_output_file.write_to_file(main_dictionary | model_dictionary | graphs_dictionary)
