@@ -405,7 +405,11 @@ class MainWidget(QWidget):
         main_dictionary = v_copy | date | file
         model_dictionary = self.calculator.get_model_parameters()
         graphs_dictionary = self.widget_graphs.get_graphs_parameters()
-        self.widget_output_file.write_to_file(main_dictionary | model_dictionary | graphs_dictionary)
+        bottom_dictionary= self.widget_at_bottom.get_comment()
+        
+        print(bottom_dictionary)
+
+        self.widget_output_file.write_to_file(main_dictionary | model_dictionary | graphs_dictionary | bottom_dictionary)
 
 
 if __name__ == "__main__":

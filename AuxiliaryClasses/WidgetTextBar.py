@@ -7,7 +7,8 @@ Created on Tue Jan  7 11:37:36 2025
 
 import sys
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QApplication, QHBoxLayout, QLabel, QMainWindow, QSlider, QWidget, QVBoxLayout
+from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow, QSlider,
+                             QWidget, QVBoxLayout, QTextEdit)
 
 class WidgetTextBar(QWidget):
     """A widget that displays key/value pairs with colored labels."""
@@ -20,6 +21,8 @@ class WidgetTextBar(QWidget):
         super().__init__()
         self.value_labels = {}  # Maps keys to QLabel instances.
         self.key_colors = {}    # Maps keys to HTML colors for label text.
+        
+        self._user_comment="default"
 
         keys_1 = keys_1 or []  # Ensure it's a list
 
@@ -28,7 +31,16 @@ class WidgetTextBar(QWidget):
 
         # Initialize labels and layout
         self._build_ui(ordered_keys)
-
+        
+    #--------------------------------------
+    #   Public Methods
+    #--------------------------------------- 
+    def get_comment(self):
+        return {'comment':self._user_comment}
+    
+    #--------------------------------------
+    #   Private Methods
+    #---------------------------------------
     def _sort_keys_by_suffix(self, keys):
         """
         Sorts and categorizes keys based on their suffix.
@@ -53,20 +65,22 @@ class WidgetTextBar(QWidget):
     def _assign_color_by_suffix(self, key):
         """
         Assigns colors based on the key suffix.
-
-        Returns:
-            str: Corresponding HTML color name.
         """
         return {"h": "red", "m": "green", "l": "blue"}.get(key[-1], "black")
 
+    
     def _build_ui(self, ordered_keys):
         """
         Creates labels with the correct order and formatting.
         """
+        main_layout = QHBoxLayout()
+        
+        #Layout for displayed text labels
         h_layout = QHBoxLayout()
         h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(20)
+        h_layout.setSpacing(10)
 
+        # Setting diplayed text labels
         for key in ordered_keys:
             color = self._assign_color_by_suffix(key)
             self.key_colors[key] = color
@@ -74,14 +88,28 @@ class WidgetTextBar(QWidget):
             initial_text = f"<b><font color='{color}'>{key}:</font></b> 0.000000"
             value_label = QLabel(initial_text)
             value_label.setAlignment(Qt.AlignLeft)
-            value_label.setFixedWidth(130 + len(key))
+            #arbitrary_space_per_element=130
+            arbitrary_space_per_element=85
+            value_label.setFixedWidth(arbitrary_space_per_element + len(key))
 
             h_layout.addWidget(value_label)
             self.value_labels[key] = value_label
-
         h_layout.addStretch()
-        self.setLayout(h_layout)
-
+        
+        #window to write on
+        # Now create a QTextEdit on the right
+        self._comment_edit = QTextEdit()
+        self._comment_edit.setFixedHeight(25)
+        self._comment_edit.setPlaceholderText("Type your comment here...")
+        self._comment_edit.textChanged.connect(self._on_text_changed)
+        
+        # Put them together in a main horizontal layout
+        main_layout.addLayout(h_layout)       # The row of keys on the left
+        main_layout.addWidget(self._comment_edit)  # The text box on the right
+        
+        
+        self.setLayout(main_layout)
+        
     def _update_text(self, dictionary):
         """
         Updates the text of labels based on the provided dictionary.
@@ -96,7 +124,13 @@ class WidgetTextBar(QWidget):
 #            else:
 #                print(f"WidgetTextBar Warning: Key '{key}' is not configured. Add it in config.ini")
                 
-                
+    def _on_text_changed(self):
+        """
+        Callback whenever the user modifies the text in `_comment_edit`.
+        We store it in `self.user_comment`.
+        """
+        self._user_comment = self._comment_edit.toPlainText()
+
 
 #########################
 # Manual Testing
