@@ -28,6 +28,7 @@ class ConfigImporter:
 
         # File paths for input and output.
         self.input_file: Optional[str] = None
+        self.input_file_type: Optional[str] = None
         self.output_file: Optional[str] = None
 
         # Widget configuration.
@@ -53,6 +54,13 @@ class ConfigImporter:
         if self._validate_path(new_input_file):
             self._update_config("InputFile", "path", new_input_file)
             self.input_file = new_input_file
+            
+    def set_input_file_type(self, new_input_file_type: str) -> None:
+        """
+        Set a new input file path and update the configuration file.
+        """
+        self._update_config("InputFileType", "type", new_input_file_type)
+        self.input_file_type = new_input_file_type
 
     def set_output_file(self, new_output_file: str) -> None:
         """

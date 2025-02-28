@@ -261,6 +261,8 @@ class MainWidget(QWidget):
         self.calculator.initialize_expdata(self.file_data)
         self.freq_slider.set_list(freq)
         self._update_sliders_data()
+        
+        self.config.set_input_file_type(self.widget_input_file.get_file_type_name())
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
 
     def _handle_recover_file_values(self):

@@ -12,11 +12,72 @@ import numpy as np
 import pandas as pd
 
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout
+    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout, QFileDialog, QInputDialog, QFileDialog, QMenu, QAction
 )
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QPoint
 from ConfigImporter import ConfigImporter
 from CustomListSliders import ListSlider
+
+
+
+#this is a file type
+class NewZFile:
+    """
+    Handles writing rows of data to CSV files safely.
+    """
+    
+    name='New .Z'
+    
+    caracteristics={
+        'supported_file_extension': '.z', 
+        'skip_rows': '128', 
+        'freq_column': '0', 
+        'z_real_column': '4', 
+        'z_imag_column': '5'
+    }
+    
+    
+class OldZFile:
+    """
+    Handles writing rows of data to CSV files safely.
+    """
+    name='Old .Z'
+    
+    caracteristics={
+        'supported_file_extension': '.jpg', 
+        'skip_rows': '128', 
+        'freq_column': '0', 
+        'z_real_column': '4', 
+        'z_imag_column': '5'
+    }
+
+
+class FileTypesRegistry:
+    
+    def __init__(self):
+        
+        self._registry = {
+        NewZFile.name: NewZFile,
+        OldZFile.name: OldZFile,
+    }
+
+    def get_file_type(self, file_type_name):
+        
+        file_cls = self._registry.get(file_type_name)
+        if file_cls is None:
+            raise ValueError(f"Unknown file type: {file_type_name}")
+        return file_cls()
+    
+    def get_default_file_type(self):
+        default_key = list(self._registry.keys())[0]
+        return self.get_file_type(default_key)
+    
+    def get_available_file_types(self):
+        """
+        Returns a list of all registered file type names.
+        """
+        return list(self._registry.keys())
+
 
 class WidgetInputFile(QWidget):
     """
@@ -26,11 +87,24 @@ class WidgetInputFile(QWidget):
 
     file_data_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
-    def __init__(self, config_parameters, current_file=None):
+    def __init__(self, config_parameters, current_file=None, filetype_name=None):
 
         super().__init__()
         
-        self.config_p = config_parameters
+        self.registry = FileTypesRegistry()
+        
+        self._file_type = None
+        
+        if filetype_name is None:
+            self._file_type =self.registry.get_default_file_type()
+        else: 
+            self._file_type = self.registry.get_file_type(filetype_name)
+
+        self.config_p = self._file_type.caracteristics
+        #self.config_p = config_parameters
+
+
+
 
         # Internal state
         self._folder_path = None
@@ -39,12 +113,13 @@ class WidgetInputFile(QWidget):
         
         # Declare UI elements
         self.select_folder_button = QPushButton("Select Input Folder")
+        self.select_file_type_button = QPushButton("Select File Type")
         self.previous_button = QPushButton("<")
         self.next_button = QPushButton(">")
         self.file_label = QLabel("No file selected")
         self._slider = ListSlider()
         
-        self._slider.valueChanged.connect(self._handle_slider_update)
+        self._slider.valueChanged.connect(self._slider_update_handler)
         # Build the UI layout
         self._initialize_ui() 
         self._validate_parameters()
@@ -55,22 +130,12 @@ class WidgetInputFile(QWidget):
     def get_folder_path(self) -> str:
         """
         Returns the currently selected folder path.
-        
-        Returns
-        -------
-        str
-            The currently selected folder path, or None if none selected.
         """
         return self._folder_path
 
     def get_current_file_path(self) -> str:
         """
         Returns the absolute path of the currently displayed file.
-        
-        Returns
-        -------
-        str
-            The absolute path of the currently displayed file, or None if invalid.
         """
         if 0 <= self._current_index < len(self._files):
             return os.path.join(self._folder_path, self._files[self._current_index])
@@ -79,16 +144,47 @@ class WidgetInputFile(QWidget):
     def get_current_file_name(self) -> str:
         """
         Returns the name of the currently displayed file.
-        
-        Returns
-        -------
-        str
-            The name of the currently displayed file, or None if invalid.
         """
         if 0 <= self._current_index < len(self._files):
             return self._files[self._current_index]
         return None
   
+    def get_file_type_name(self):
+        return self._file_type.name
+    
+    def setup_current_file(self, current_file):
+        """
+        Sets up the current file by verifying its existence, loading the files
+        in its directory, and updating the current index if found.
+        
+        Parameters
+        ----------
+        current_file : str, optional
+            The full path to a .z file to be initially selected, by default None.
+        """
+        if current_file and os.path.isfile(current_file):
+            folder_path = os.path.dirname(current_file)
+            self._folder_path = folder_path
+            self._load_files()
+            
+            file_name = os.path.basename(current_file)
+            if file_name in self._files:
+                self._current_index = self._files.index(file_name)
+                self._update_file_display()
+                self._update_navigation_buttons()
+                
+            else:
+                print(f"File '{file_name}' was not found in the folder '{self._folder_path}'.")
+        
+        elif current_file:
+            folder_path = os.path.dirname(current_file)
+            
+            if os.path.isdir(folder_path):
+                self._folder_path = folder_path
+                self._load_files()
+                print(f"File '{os.path.basename(current_file)}' was not found in the folder '{self._folder_path}'.")
+            else:
+                print(f"Path '{current_file}' was not found.")
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
@@ -98,7 +194,8 @@ class WidgetInputFile(QWidget):
         Creates and lays out all UI elements, and connects signals.
         """
         # Button actions
-        self.select_folder_button.clicked.connect(self._select_folder)
+        self.select_folder_button.clicked.connect(self._select_folder_handler)
+        self.select_file_type_button.clicked.connect(self._select_file_type_handler)
         self.previous_button.clicked.connect(self._show_previous_file)
         self.next_button.clicked.connect(self._show_next_file)
         self.previous_button.setEnabled(False)
@@ -106,7 +203,7 @@ class WidgetInputFile(QWidget):
         
         # Slider setup
         self._slider.setMinimumWidth(600)
-        self._slider.valueChanged.connect(self._handle_slider_update)
+        self._slider.valueChanged.connect(self._slider_update_handler)
         
         # File label
         self.file_label.setAlignment(Qt.AlignCenter)
@@ -114,6 +211,7 @@ class WidgetInputFile(QWidget):
         # Main layout
         layout = QHBoxLayout()
         layout.addWidget(self.select_folder_button)
+        layout.addWidget(self.select_file_type_button)
         layout.addWidget(self.previous_button)
         layout.addWidget(self.file_label)
         layout.addWidget(self.next_button)
@@ -154,7 +252,7 @@ class WidgetInputFile(QWidget):
             raise ValueError(f"WidgetInputFile._cast_config_parameters:Invalid configuration parameters: {e}")
 
     #  File/Folder Methods       
-    def _select_folder(self):
+    def _select_folder_handler(self):
         """
         Opens a directory selection dialog, then triggers file loading
         if a valid path is chosen.
@@ -210,6 +308,41 @@ class WidgetInputFile(QWidget):
         self.previous_button.setEnabled(self._current_index > 0)
         self.next_button.setEnabled(self._current_index < len(self._files) - 1)  
     
+    #File Type Methods
+    def _select_file_type_handler(self):
+
+        file_types = self.registry.get_available_file_types()
+        
+        # Create a popup menu
+        menu = QMenu(self)
+        
+        # Add one QAction per file type
+        for ft in file_types:
+            action = QAction(ft, self)
+            
+            # Connect the action's "triggered" signal
+            # Use a lambda to capture ft in the callback
+            action.triggered.connect(lambda checked, ft_name=ft: self._on_file_type_selected(ft_name))
+            menu.addAction(action)
+        
+        # Position the menu so it drops down from the button
+        # We'll map to global coords and just offset below the button
+        button_pos = self.select_file_type_button.mapToGlobal(QPoint(0, self.select_file_type_button.height()))
+        menu.exec_(button_pos)
+
+    def _on_file_type_selected(self, selected_type):
+        """
+        Internal slot called when a file type is chosen from the popup menu.
+        """
+        self._file_type = self.registry.get_file_type(selected_type)
+        self.config_p = self._file_type.caracteristics
+        self._validate_parameters()
+        
+        # If a folder is already selected, reload the files so the new extension
+        if self._folder_path:
+            self._load_files()
+                
+    
     # Private Navigation Methods  
     def _show_previous_file(self):
         """
@@ -233,44 +366,10 @@ class WidgetInputFile(QWidget):
             
             self._slider.up()
     
-    def _handle_slider_update(self, index):
+    def _slider_update_handler(self, index):
         self._current_index=index
         self._update_file_display()
         self._update_navigation_buttons()
-
-    def setup_current_file(self, current_file):
-        """
-        Sets up the current file by verifying its existence, loading the files
-        in its directory, and updating the current index if found.
-        
-        Parameters
-        ----------
-        current_file : str, optional
-            The full path to a .z file to be initially selected, by default None.
-        """
-        if current_file and os.path.isfile(current_file):
-            folder_path = os.path.dirname(current_file)
-            self._folder_path = folder_path
-            self._load_files()
-            
-            file_name = os.path.basename(current_file)
-            if file_name in self._files:
-                self._current_index = self._files.index(file_name)
-                self._update_file_display()
-                self._update_navigation_buttons()
-                
-            else:
-                print(f"File '{file_name}' was not found in the folder '{self._folder_path}'.")
-        
-        elif current_file:
-            folder_path = os.path.dirname(current_file)
-            
-            if os.path.isdir(folder_path):
-                self._folder_path = folder_path
-                self._load_files()
-                print(f"File '{os.path.basename(current_file)}' was not found in the folder '{self._folder_path}'.")
-            else:
-                print(f"Path '{current_file}' was not found.")
 
     # Content methods
     def _extract_content(self, file_path: str):
@@ -332,6 +431,7 @@ from PyQt5.QtCore import Qt
 
 class TestWindow(QWidget):
     def __init__(self, config_parameters):
+        
         super().__init__()
         self.setWindowTitle("Test for WidgetInputFile")
 
