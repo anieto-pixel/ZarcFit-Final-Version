@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout
 )
 
-#sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
 
 from AuxiliaryClasses.ConfigImporter import ConfigImporter
 from AuxiliaryClasses.CustomListSliders import ListSliderRange
@@ -66,12 +66,19 @@ class MainWidget(QWidget):
         splitter = QSplitter(Qt.Vertical)
         splitter.addWidget(middle_area)
         splitter.addWidget(bottom_area)
-        splitter.setSizes([500, 300])
+        
+        top_area=600
+        bottom_area=200
+        space_between_areas=20
+        splitter.setSizes([top_area, bottom_area])
+        splitter.setHandleWidth(space_between_areas)
+        #splitter.setStretchFactor(0, 1)  # Allow middle_area to expand with extra space
+        #splitter.setStretchFactor(1, 0)  # Keep bottom_area at its fixed size
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(top_bar)
         main_layout.addWidget(splitter)
-        main_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.setContentsMargins(5, 5, 5, 0)
         self.setLayout(main_layout)
 
     def _build_top_bar(self) -> QWidget:
@@ -111,7 +118,7 @@ class MainWidget(QWidget):
         bottom_half_layout.addWidget(self.widget_sliders)
         bottom_half_layout.addWidget(self.widget_buttons)
         bottom_half_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_half_layout.setSpacing(0)
+        bottom_half_layout.setSpacing(5)
         bottom_half_widget = QWidget()
         bottom_half_widget.setLayout(bottom_half_layout)
 

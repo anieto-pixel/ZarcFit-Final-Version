@@ -72,17 +72,27 @@ class WidgetButtonsRow(QWidget):
 
     def _setup_layout(self) -> None:
         """
-        Set up the vertical layout for all buttons.
+        Set up the vertical layout for all buttons without spacing.
         """
         layout = QVBoxLayout()
-        layout.setSpacing(0)
-        layout.setContentsMargins(0, 0, 0, 0)
-        # Add each button from the list to the layout.
+        layout.setSpacing(0)  # Remove spacing between buttons
+        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins around the layout
+        # Reduce button size
+        
+        button_height = 23  # Adjust height
+        font_size = 10  # Adjust font size
+        # Ensure buttons have no padding/margin and are tightly packed
         for button in self._buttons_list:
+            button.setStyleSheet(f"font-size: {font_size}px; margin: 0; padding: 0;")  # Remove internal button spacing
+            button.setFixedHeight(button_height)  # Ensures uniform height and no gaps
             layout.addWidget(button)
+    
+        widget_min_width = 30
+        widget_max_width = 150
         self.setLayout(layout)
-        self.setMaximumWidth(150)
-        self.setMinimumSize(130, 30 * len(self._buttons_list))
+        self.setMaximumWidth(widget_max_width)
+        self.setMinimumSize(widget_min_width, button_height * len(self._buttons_list))
+
 
     def _setup_connections(self) -> None:
         """

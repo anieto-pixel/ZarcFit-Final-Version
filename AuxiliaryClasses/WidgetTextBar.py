@@ -109,6 +109,7 @@ class WidgetTextBar(QWidget):
         
         
         self.setLayout(main_layout)
+        self.setFixedHeight(self.sizeHint().height())
         
     def _update_text(self, dictionary):
         """
