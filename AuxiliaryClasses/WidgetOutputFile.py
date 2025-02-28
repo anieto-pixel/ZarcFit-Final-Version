@@ -135,7 +135,7 @@ class WidgetOutputFile(QWidget):
 
     output_file_selected = pyqtSignal(str)
 
-    def __init__(self, variables_to_print=None):
+    def __init__(self, variables_to_print=None, output_file=None):
         super().__init__()
 
         if variables_to_print is None:

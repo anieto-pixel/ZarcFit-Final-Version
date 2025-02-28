@@ -31,9 +31,6 @@ class ConfigImporter:
         self.input_file_type: Optional[str] = None
         self.output_file: Optional[str] = None
 
-        # Widget configuration.
-        self.input_file_widget_config = {}
-
         # Slider configurations and default values.
         self.slider_configurations = {}
         self.slider_default_values = []
@@ -102,7 +99,6 @@ class ConfigImporter:
             "SliderConfigurations",
             "SliderDefaultValues",
             "VariablesToPrint",
-            "WidgetInputFile",
             "SecondaryVariablesToDisplay",
         ]
         for section in required_sections:
@@ -120,11 +116,6 @@ class ConfigImporter:
         # Process variables to print.
         vars_str = self.config["VariablesToPrint"]["variables"]
         self.variables_to_print = [v.strip() for v in vars_str.split(",") if v.strip()]
-
-        # Process input file widget configuration.
-        self.input_file_widget_config = {
-            key.strip(): value.strip() for key, value in self.config["WidgetInputFile"].items()
-        }
 
         # Process secondary variables to display.
         secondary_str = self.config["SecondaryVariablesToDisplay"]["variables"]
@@ -168,6 +159,10 @@ class ConfigImporter:
             path = self.config['InputFile'].get('path')
             if path and self._validate_path(path):
                 self.input_file = path
+        if 'InputFileType' in self.config:
+            my_type = self.config['InputFileType'].get('type')
+            if my_type and self._validate_path(path):
+                self.input_file_type = my_type
 
         if 'OutputFile' in self.config:
             path = self.config['OutputFile'].get('path')

@@ -137,7 +137,7 @@ class MainWidget(QWidget):
         self.config = ConfigImporter(config_file)
 
         # Initialize core widgets
-        self.widget_input_file = WidgetInputFile(self.config.input_file_widget_config)
+        self.widget_input_file = WidgetInputFile()
         self.widget_output_file = WidgetOutputFile(self.config.variables_to_print)
         self.widget_graphs = WidgetGraphs()
         self.freq_slider = ListSliderRange()
@@ -379,12 +379,13 @@ class MainWidget(QWidget):
         
         # Load current file and update UI
         input_file=self.config.input_file
+        input_file_type=self.config.input_file_type
         output_file=self.config.output_file
-        
+
         if isinstance(input_file, str):
-            self.widget_input_file.setup_current_file(input_file)
-        if isinstance(output_file, str):
-            self.widget_output_file.setup_current_file(self.config.output_file)
+            self.widget_input_file.setup_current_file(input_file, input_file_type)
+        #if isinstance(output_file, str):
+        #    self.widget_output_file.setup_current_file(self.config.output_file)
 
         #Set default disabled sliders
         self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
@@ -415,10 +416,10 @@ class MainWidget(QWidget):
         model_dictionary = self.calculator.get_model_parameters()
         graphs_dictionary = self.widget_graphs.get_graphs_parameters()
         bottom_dictionary= self.widget_at_bottom.get_comment()
-        
-        print(bottom_dictionary)
 
-        self.widget_output_file.write_to_file(main_dictionary | model_dictionary | graphs_dictionary | bottom_dictionary)
+        self.widget_output_file.write_to_file(
+            main_dictionary | model_dictionary | graphs_dictionary | bottom_dictionary
+        )
 
 
 if __name__ == "__main__":
