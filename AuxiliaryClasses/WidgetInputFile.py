@@ -12,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout, QFileDialog, QInputDialog, QFileDialog, QMenu, QAction
+    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout, QFileDialog, QInputDialog, QFileDialog, QMenu, QAction, QMessageBox
 )
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
 from ConfigImporter import ConfigImporter
@@ -113,7 +113,6 @@ class WidgetInputFile(QWidget):
         else:
             self.select_file_type_button.setText("Select File Type")
 
-  
     # -----------------------------------------------------------------------
     #  Public Methods
     # -----------------------------------------------------------------------
@@ -387,8 +386,7 @@ class WidgetInputFile(QWidget):
             self._load_files()
 
         self.select_file_type_button.setText(self._file_type.name)
-                
-    
+                 
     # Private Navigation Methods  
     def _show_previous_file(self):
         """
@@ -443,19 +441,40 @@ class WidgetInputFile(QWidget):
             max_col = max(freq_col, z_real_col, z_imag_col)
             
             if max_col >= len(df.columns):
-                raise ValueError("File does not contain the required columns.")
+                raise ValueError("WidgetInputFile._extract_content :File does not contain the required columns.")
 
             freq = df[freq_col].to_numpy()
             z_real = df[z_real_col].to_numpy()
             z_imag = df[z_imag_col].to_numpy()
-
-            self.file_data_updated.emit(freq, z_real, z_imag)
             
-            #print("emitted signal")
+            self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
+            
+        except Exception as e:
+            self._handle_file_read_error(e, file_path)
+            return
+
+
         
         except Exception as e:
-            print(f"Error reading file '{file_path}': {e}")
-            self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
+            print(f"WidgetInputFile._extract_content: Error reading file '{file_path}': {e}")
+
+    def _handle_file_read_error(self, exc: Exception, file_path: str):
+        """
+        Displays a warning, updates the file label, and emits empty arrays
+        to signal that reading has failed gracefully.
+        """
+        error_msg = f"WidgetInputFile._extract_content. Could not read file '{file_path}': {exc}"
+        print(error_msg)
+
+        # Optionally show a QMessageBox warning to the user
+        QMessageBox.warning(self, "File Read Error. Possibly wrong format", error_msg)
+
+        # Update label text
+        self.file_label.setText("Error reading file. Possibly wrong filetype.")
+
+        # Emit dummy data so the program doesn't crash downstream.
+        self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
+
 
 # -----------------------------------------------------------------------
 #  TEST
