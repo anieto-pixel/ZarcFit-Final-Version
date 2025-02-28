@@ -102,14 +102,11 @@ class WidgetInputFile(QWidget):
         
         # Build the UI layout
         self._initialize_ui() 
-        
-        print("initialization call++++++++++++++++++++")
+
         #initialize with parameters
         current_file, file_type_name= self._validate_given_parameters(current_file,file_type_name)
         self._initialize_file_parameters(file_type_name)
-        self._setup_current_file(current_file)#some intenral use thign of this? some way of internally calling the signal on demand?
-        #options options
-        print("end initialization call++++++++++++++++++++")
+        self._setup_current_file(current_file)
 
   
     # -----------------------------------------------------------------------
@@ -273,21 +270,15 @@ class WidgetInputFile(QWidget):
             raise ValueError(f"WidgetInputFile._cast_config_parameters:Invalid configuration parameters: {e}")
 
     def _setup_current_file(self, current_file:str):
-        print("internal setup current file")
-        print(f"_setup_current_file: current file {current_file}")
         
         if current_file and os.path.isfile(current_file):
-            print("inside first if")
             folder_path = os.path.dirname(current_file)
             self._folder_path = folder_path
             self._load_files()
             file_name = os.path.basename(current_file)
-            print("filename {file_name}. end of first if")
+
             if file_name in self._files:
-                print("inside the second if")
                 self._current_index = self._files.index(file_name)
-                print("under the idnex")
-                print(self._current_index)
                 self._update_file_display()
                 self._update_navigation_buttons()
                 
@@ -303,7 +294,6 @@ class WidgetInputFile(QWidget):
                 print(f"WidgetImputFile.setup_current_file: File '{os.path.basename(current_file)}' was not found in the folder '{self._folder_path}'.")
             else:
                 print(f"WidgetImputFile.setup_current_file: Path '{current_file}' was not found.")
-        print("finish puto metodo")
         
     #  File/Folder Methods       
     def _select_folder_handler(self):
@@ -321,7 +311,7 @@ class WidgetInputFile(QWidget):
         Scans the selected folder for files matching the supported extension,
         resets the current file index, and updates the UI.
         """
-        print("load files")
+
         if self._folder_path:
             supported_ext = self.config_p["supported_file_extension"]
             self._files = [
@@ -329,19 +319,15 @@ class WidgetInputFile(QWidget):
                 if f.lower().endswith(supported_ext)
             ]
             if self._files:
-                print("inside second if")
                 self._current_index = 0
                 self._update_file_display()
                 self._update_navigation_buttons()
-                print("second if")
             else:
-                print("inside else")
                 self.file_label.setText(
-                    f'No {self.config_p["supported_file_extension"]} files found in the selected folder.'
+                    f'WidgetImputFile._load_files: No {self.config_p["supported_file_extension"]} files found in the selected folder.'
                 )
                 self.previous_button.setEnabled(False)
                 self.next_button.setEnabled(False)
-            print("before slider set list")
             self._slider.set_list(self._files)
 
     def _update_file_display(self):
@@ -349,7 +335,6 @@ class WidgetInputFile(QWidget):
         Updates the UI to show the current file name, and calls
         _extract_content to read the file's data.
         """
-        print("what is wrong now?")
         if 0 <= self._current_index < len(self._files):
             current_file = self._files[self._current_index]
             self.file_label.setText(current_file)

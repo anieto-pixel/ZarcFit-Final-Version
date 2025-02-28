@@ -51,8 +51,7 @@ class MainWidget(QWidget):
         self._initialize_hotkeys_and_buttons()
 
         #Optional initialization settings
-        self._optional_initialization()
-        self._update_sliders_data()
+        self._session_initialization()
 
         
     # ------------------- UI BUILD METHODS -------------------
@@ -137,8 +136,8 @@ class MainWidget(QWidget):
         self.config = ConfigImporter(config_file)
 
         # Initialize core widgets
-        self.widget_input_file = WidgetInputFile()
-        self.widget_output_file = WidgetOutputFile(self.config.variables_to_print)
+        self.widget_input_file = WidgetInputFile(self.config.input_file,self.config.input_file_type)        
+        self.widget_output_file = WidgetOutputFile(self.config.variables_to_print,self.config.output_file)
         self.widget_graphs = WidgetGraphs()
         self.freq_slider = ListSliderRange()
         self.widget_sliders = WidgetSliders(
@@ -375,20 +374,13 @@ class MainWidget(QWidget):
 
     # ------------------- OTHER METHODS -------------------
     
-    def _optional_initialization(self):
-        
-        # Load current file and update UI
-        input_file=self.config.input_file
-        input_file_type=self.config.input_file_type
-        output_file=self.config.output_file
+    def _session_initialization(self):
 
-        if isinstance(input_file, str):
-            self.widget_input_file.setup_current_file(input_file, input_file_type)
-        #if isinstance(output_file, str):
-        #    self.widget_output_file.setup_current_file(self.config.output_file)
-
+        self.widget_input_file.force_emit_signal()
         #Set default disabled sliders
         self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
+        #self._update_sliders_data() #Needed anymore?
+        
     
     def _optimize_sliders_signaling(self):
         """Optimizes sliders signaling by initializing a debounce timer."""

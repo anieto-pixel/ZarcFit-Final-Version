@@ -144,7 +144,7 @@ class WidgetOutputFile(QWidget):
         self.variables_to_print = variables_to_print  # List of keys to look for.
         self._desired_type = ".csv"
         self._search_parameters = "CSV Files (*.csv);;All Files (*)"
-        self._output_file = None
+        self._output_file = output_file
 
         # Create UI elements.
         self._newfile_button = QPushButton("New File")
@@ -153,6 +153,7 @@ class WidgetOutputFile(QWidget):
 
         self._initialize_ui()
         self._connect_signals()
+        
  
     # -----------------------------------------------------------------------
     #  Public Methods
