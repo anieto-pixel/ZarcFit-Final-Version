@@ -30,7 +30,7 @@ class NewZFile:
     
     caracteristics={
         'supported_file_extension': '.z', 
-        'skip_rows': '128', 
+        'skip_rows': '11', 
         'freq_column': '0', 
         'z_real_column': '4', 
         'z_imag_column': '5'
@@ -44,7 +44,7 @@ class OldZFile:
     name='Old .Z'
     
     caracteristics={
-        'supported_file_extension': '.jpg', 
+        'supported_file_extension': '.z', 
         'skip_rows': '128', 
         'freq_column': '0', 
         'z_real_column': '4', 
@@ -105,8 +105,13 @@ class WidgetInputFile(QWidget):
 
         #initialize with parameters
         current_file, file_type_name= self._validate_given_parameters(current_file,file_type_name)
-        self._initialize_file_parameters(file_type_name)
+        self._initialize_file_type_parameters(file_type_name)
         self._setup_current_file(current_file)
+        
+        if self._file_type is not None:
+            self.select_file_type_button.setText(self._file_type.name)
+        else:
+            self.select_file_type_button.setText("Select File Type")
 
   
     # -----------------------------------------------------------------------
@@ -141,19 +146,13 @@ class WidgetInputFile(QWidget):
         """
         Sets up the current file by verifying its existence, loading the files
         in its directory, and updating the current index if found.
-        
-        Parameters
-        ----------
-        current_file : str, optional
-            The full path to a .z file to be initially selected, by default None.
         """
         
         current_file, current_file_type= self._validate_given_parameters(current_file,current_file_type)
-        
         if not isinstance(current_file, str):
                return
 
-        self._initialize_file_parameters(current_file_type)
+        self._initialize_file_type_parameters(current_file_type)
         self._setup_current_file(current_file)
             
     def force_emit_signal(self):
@@ -210,7 +209,7 @@ class WidgetInputFile(QWidget):
         self._slider.valueChanged.connect(self._slider_update_handler)
         
     # Configuration
-    def _initialize_file_parameters(self, file_type_name):
+    def _initialize_file_type_parameters(self, file_type_name):
         
         if file_type_name is None:
             self._file_type =self.registry.get_default_file_type()
@@ -381,11 +380,13 @@ class WidgetInputFile(QWidget):
         """
         self._file_type = self.registry.get_file_type(selected_type)
         self.config_p = self._file_type.caracteristics
-        self._validate_parameters()
+        self._validate_type_parameters()
         
         # If a folder is already selected, reload the files so the new extension
         if self._folder_path:
             self._load_files()
+
+        self.select_file_type_button.setText(self._file_type.name)
                 
     
     # Private Navigation Methods  
