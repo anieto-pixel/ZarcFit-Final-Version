@@ -79,8 +79,8 @@ class WidgetButtonsRow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)  # Remove margins around the layout
         # Reduce button size
         
-        button_height = 23  # Adjust height
-        font_size = 10  # Adjust font size
+        button_height = 20  # Adjust height
+        font_size = 9  # Adjust font size
         # Ensure buttons have no padding/margin and are tightly packed
         for button in self._buttons_list:
             button.setStyleSheet(f"font-size: {font_size}px; margin: 0; padding: 0;")  # Remove internal button spacing
@@ -88,10 +88,12 @@ class WidgetButtonsRow(QWidget):
             layout.addWidget(button)
     
         widget_min_width = 30
-        widget_max_width = 150
+        widget_max_width = 100
         self.setLayout(layout)
         self.setMaximumWidth(widget_max_width)
         self.setMinimumSize(widget_min_width, button_height * len(self._buttons_list))
+        #self.setMinimumWidth(widget_min_width)
+        #self.setMaximumWidth(widget_min_width)
 
 
     def _setup_connections(self) -> None:

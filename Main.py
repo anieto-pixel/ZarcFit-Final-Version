@@ -69,7 +69,7 @@ class MainWidget(QWidget):
         
         top_area=600
         bottom_area=200
-        space_between_areas=20
+        space_between_areas=10
         splitter.setSizes([top_area, bottom_area])
         splitter.setHandleWidth(space_between_areas)
         #splitter.setStretchFactor(0, 1)  # Allow middle_area to expand with extra space
@@ -118,7 +118,7 @@ class MainWidget(QWidget):
         bottom_half_layout.addWidget(self.widget_sliders)
         bottom_half_layout.addWidget(self.widget_buttons)
         bottom_half_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_half_layout.setSpacing(5)
+        bottom_half_layout.setSpacing(0)
         bottom_half_widget = QWidget()
         bottom_half_widget.setLayout(bottom_half_layout)
 
