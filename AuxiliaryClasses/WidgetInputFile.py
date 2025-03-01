@@ -30,11 +30,12 @@ class NewZFile:
     
     caracteristics={
         'supported_file_extension': '.z', 
-        'skip_rows': '11', 
+        'skip_rows': '128', 
         'freq_column': '0', 
         'z_real_column': '4', 
         'z_imag_column': '5'
     }
+    step ='\t'
     
     
 class OldZFile:
@@ -45,12 +46,13 @@ class OldZFile:
     
     caracteristics={
         'supported_file_extension': '.z', 
-        'skip_rows': '128', 
+        'skip_rows': '11', 
         'freq_column': '0', 
         'z_real_column': '4', 
         'z_imag_column': '5'
     }
-
+    step =','
+    
 
 class FileTypesRegistry:
     
@@ -146,18 +148,17 @@ class WidgetInputFile(QWidget):
         Sets up the current file by verifying its existence, loading the files
         in its directory, and updating the current index if found.
         """
-        
         current_file, current_file_type= self._validate_given_parameters(current_file,current_file_type)
         if not isinstance(current_file, str):
                return
-
         self._initialize_file_type_parameters(current_file_type)
         self._setup_current_file(current_file)
             
     def force_emit_signal(self):
+
         if 0 <= self._current_index < len(self._files):
             current_file = self._files[self._current_index]
-
+        else: return
         # Build full path and extract the file's content
         file_path = os.path.join(self._folder_path, current_file)
         self._extract_content(file_path)
@@ -333,16 +334,20 @@ class WidgetInputFile(QWidget):
         Updates the UI to show the current file name, and calls
         _extract_content to read the file's data.
         """
-        if 0 <= self._current_index < len(self._files):
-            current_file = self._files[self._current_index]
-            self.file_label.setText(current_file)
+        if not (0 <= self._current_index < len(self._files)):
+            return
+        
+        current_file = self._files[self._current_index]
+        self.file_label.setText(current_file)
             
-            #Set the slider
-            self._slider.setValue(self._current_index)
+        # Block signals so the slider doesn’t cause repeated calls
+        self._slider.blockSignals(True)
+        self._slider.setValue(self._current_index)
+        self._slider.blockSignals(False)
 
-            # Build full path and extract the file's content
-            file_path = os.path.join(self._folder_path, current_file)
-            self._extract_content(file_path)
+        # Build full path and extract the file's content
+        file_path = os.path.join(self._folder_path, current_file)
+        self._extract_content(file_path)
 
     def _update_navigation_buttons(self):
         """
@@ -420,43 +425,35 @@ class WidgetInputFile(QWidget):
         """
         Reads the file at file_path using the specified configuration,
         and emits a signal with the extracted data.
-        
-        Parameters
-        ----------
-        file_path : str
-            The absolute path to the file to be read.
         """
+        this_step= self._file_type.step
+        
         try:
             df = pd.read_csv(
                 file_path,
-                sep='\t',
+                sep=this_step,
                 skiprows=self.config_p["skip_rows"],
                 header=None
             )
-
-            # Ensure columns exist
+    
             freq_col = self.config_p["freq_column"]
             z_real_col = self.config_p["z_real_column"]
             z_imag_col = self.config_p["z_imag_column"]
             max_col = max(freq_col, z_real_col, z_imag_col)
-            
+    
             if max_col >= len(df.columns):
                 raise ValueError("WidgetInputFile._extract_content :File does not contain the required columns.")
-
+    
             freq = df[freq_col].to_numpy()
             z_real = df[z_real_col].to_numpy()
             z_imag = df[z_imag_col].to_numpy()
-            
-            self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
-            
+    
+            # Instead of empty arrays, send the arrays we just read:
+            self.file_data_updated.emit(freq, z_real, z_imag)
+    
         except Exception as e:
             self._handle_file_read_error(e, file_path)
-            return
 
-
-        
-        except Exception as e:
-            print(f"WidgetInputFile._extract_content: Error reading file '{file_path}': {e}")
 
     def _handle_file_read_error(self, exc: Exception, file_path: str):
         """
@@ -467,7 +464,7 @@ class WidgetInputFile(QWidget):
         print(error_msg)
 
         # Optionally show a QMessageBox warning to the user
-        QMessageBox.warning(self, "File Read Error. Possibly wrong format", error_msg)
+        #QMessageBox.warning(self, "File Read Error. Possibly wrong format", error_msg)
 
         # Update label text
         self.file_label.setText("Error reading file. Possibly wrong filetype.")
