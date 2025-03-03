@@ -436,10 +436,10 @@ class WidgetInputFile(QWidget):
         """
         if self._current_index > 0:
             self._current_index -= 1
-            self._update_file_display()
-            self._update_navigation_buttons()
-            
+            #slider already calls _update_file_display()
             self._slider.down()
+            #self._update_file_display()
+            self._update_navigation_buttons()
 
     def _show_next_file(self):
         """
@@ -447,10 +447,11 @@ class WidgetInputFile(QWidget):
         """
         if self._current_index < len(self._files) - 1:
             self._current_index += 1
-            self._update_file_display()
+            #slider already calls _update_file_display()
+            self._slider.up()
+            #self._update_file_display()
             self._update_navigation_buttons()
             
-            self._slider.up()
     
     def _slider_update_handler(self, index: int):
         self._current_index=index
