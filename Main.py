@@ -136,9 +136,7 @@ class MainWidget(QWidget):
         self.config = ConfigImporter(config_file)
 
         # Initialize core widgets
-        print("before we call imput")
-        self.widget_input_file = WidgetInputFile(self.config.input_file,self.config.input_file_type)
-        print("=================after we call imput")        
+        self.widget_input_file = WidgetInputFile(self.config.input_file,self.config.input_file_type)        
         self.widget_output_file = WidgetOutputFile(self.config.variables_to_print,self.config.output_file)
         self.widget_graphs = WidgetGraphs()
         self.freq_slider = ListSliderRange()

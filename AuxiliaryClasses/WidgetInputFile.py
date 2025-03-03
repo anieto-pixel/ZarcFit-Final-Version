@@ -310,7 +310,6 @@ class WidgetInputFile(QWidget):
         Scans the selected folder for files matching the supported extension,
         resets the current file index, and updates the UI.
         """
-        print("load files")
 
         if self._folder_path:
             supported_ext = self.config_p["supported_file_extension"]
@@ -336,14 +335,12 @@ class WidgetInputFile(QWidget):
             self.previous_button.setEnabled(False)
             self.next_button.setEnabled(False)
 
-
     def _update_file_display(self):
         """
         Updates the UI to show the current file name, and calls
         _extract_content to read the file's data.
         """
-        
-        print("update file display")
+
         if not (0 <= self._current_index < len(self._files)):
             return
         
@@ -364,8 +361,7 @@ class WidgetInputFile(QWidget):
         Reads the file at file_path using the specified configuration,
         and emits a signal with the extracted data.
         """
-        
-        print("we are in extract file now")
+
         this_step= self._file_type.step
         
         try:
@@ -459,8 +455,7 @@ class WidgetInputFile(QWidget):
             self._slider.up()
             #self._update_file_display()
             self._update_navigation_buttons()
-            
-    
+               
     def _slider_update_handler(self, index: int):
         self._current_index=index
         self._update_file_display()
