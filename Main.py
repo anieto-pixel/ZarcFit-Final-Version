@@ -245,6 +245,12 @@ class MainWidget(QWidget):
         shortcut_page_up = QShortcut(QKeySequence(Qt.Key_PageUp), self)
         shortcut_page_up.activated.connect(self.widget_buttons.fup_button.click)
         self.widget_buttons.fup_button.clicked.connect(self.freq_slider.up_min)
+        
+        # Add hotkey for space bar to call config.print()
+        shortcut_space = QShortcut(QKeySequence(Qt.Key_Space), self)
+        shortcut_space.activated.connect(
+            lambda: self.widget_output_file.print_variables_list()
+        )
 
     # ------------------- HANDLERS -------------------
     def _handle_update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):
@@ -372,16 +378,14 @@ class MainWidget(QWidget):
         else:
             self.widget_sliders.get_slider('Pei').set_value_exact(2.0)
 
-    # ------------------- OTHER METHODS -------------------
-    
+    # ------------------- OTHER METHODS ------------------- 
     def _session_initialization(self):
 
         self.widget_input_file.force_emit_signal()
         #Set default disabled sliders
         self.widget_sliders.set_default_disabled(self.config.slider_default_disabled)
         #self._update_sliders_data() #Needed anymore?
-        
-    
+         
     def _optimize_sliders_signaling(self):
         """Optimizes sliders signaling by initializing a debounce timer."""
         self.update_timer = QTimer()

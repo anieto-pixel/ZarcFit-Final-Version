@@ -19,14 +19,13 @@ from ConfigImporter import ConfigImporter
 from CustomListSliders import ListSlider
 
 
-
-#this is a file type
+#this is a file type. SHould I define a proper class?
 class NewZFile:
     """
     Handles writing rows of data to CSV files safely.
     """
     
-    name='New .Z'
+    name='*.Z'
     
     caracteristics={
         'supported_file_extension': '.z', 
@@ -53,6 +52,22 @@ class OldZFile:
     }
     step =','
     
+    
+class GamryFile:
+    """
+    Handles writing rows of data to CSV files safely.
+    """
+    name='Gamry'
+    
+    caracteristics={
+        'supported_file_extension': '.DTA', 
+        'skip_rows': '98', 
+        'freq_column': '2', 
+        'z_real_column': '3', 
+        'z_imag_column': '4'
+    }
+    step =r'\s+'
+    
 
 class FileTypesRegistry:
     
@@ -61,6 +76,7 @@ class FileTypesRegistry:
         self._registry = {
         NewZFile.name: NewZFile,
         OldZFile.name: OldZFile,
+        GamryFile.name: GamryFile,
     }
 
     def get_file_type(self, file_type_name):
@@ -207,7 +223,7 @@ class WidgetInputFile(QWidget):
         self.next_button.setEnabled(False)
         self._slider.valueChanged.connect(self._slider_update_handler)
         
-    # Configuration
+    # Configuration of file type
     def _initialize_file_type_parameters(self, file_type_name):
         
         if file_type_name is None:
@@ -267,6 +283,7 @@ class WidgetInputFile(QWidget):
         except (KeyError, ValueError) as e:
             raise ValueError(f"WidgetInputFile._cast_config_parameters:Invalid configuration parameters: {e}")
 
+    #Configuration oc current input
     def _setup_current_file(self, current_file:str):
         
         if current_file and os.path.isfile(current_file):
@@ -356,6 +373,7 @@ class WidgetInputFile(QWidget):
         file_path = os.path.join(self._folder_path, current_file)
         self._extract_content(file_path)
 
+    #Content extraction from selected file
     def _extract_content(self, file_path: str):
         """
         Reads the file at file_path using the specified configuration,
@@ -369,9 +387,10 @@ class WidgetInputFile(QWidget):
                 file_path,
                 sep=this_step,
                 skiprows=self.config_p["skip_rows"],
-                header=None
+                header=None,
+                
+                encoding="cp1252"  
             )
-    
             freq_col = self.config_p["freq_column"]
             z_real_col = self.config_p["z_real_column"]
             z_imag_col = self.config_p["z_imag_column"]

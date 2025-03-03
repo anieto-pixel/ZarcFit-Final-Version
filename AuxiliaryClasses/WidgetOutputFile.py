@@ -153,8 +153,8 @@ class WidgetOutputFile(QWidget):
 
         self._initialize_ui()
         self._connect_signals()
+        self._set_output_file(output_file)
         
- 
     # -----------------------------------------------------------------------
     #  Public Methods
     # -----------------------------------------------------------------------
@@ -162,9 +162,9 @@ class WidgetOutputFile(QWidget):
         """Returns the currently selected output file path or None."""
         return self._output_file
 
-    def setup_current_file(self, new_input_file):
+    def set_current_file(self, output_file):
         """Sets the widget's file to 'new_input_file' and updates the UI."""
-        self._set_output_file(new_input_file)
+        self._set_output_file(output_file)
 
     def print_variables_list(self):
         """
@@ -267,6 +267,8 @@ class WidgetOutputFile(QWidget):
             self._set_output_file,
             self._set_file_message
         )
+        if self.variables_to_print:
+            self.print_variables_list()
 
     def _handle_open_file_dialog(self):
         """
@@ -284,13 +286,18 @@ class WidgetOutputFile(QWidget):
         Called when the user picks or creates a file.
         Stores the file path and updates the UI.
         """
+        if not isinstance(file_path, str):
+               return
+        
         self._output_file = file_path
         self._file_label.setText(os.path.basename(file_path))
         self.output_file_selected.emit(self._output_file)
 
         # Immediately write variables if available.
-        if self.variables_to_print:
-            self.print_variables_list()
+        #Code commented out at Randy's request
+        # Enable for automatic writting of headers on open outputfile
+        #if self.variables_to_print:
+        #    self.print_variables_list()
 
     def _set_file_message(self, message):
         """
