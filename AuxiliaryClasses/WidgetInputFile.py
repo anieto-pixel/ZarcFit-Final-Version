@@ -179,15 +179,14 @@ class WidgetInputFile(QWidget):
         self.file_label = QLabel("No file selected")
         self._slider = ListSlider()
         
-        # Button actions
-        self._connect_listeners()
-        
         # Slider setup
         self._slider.setMinimumWidth(600)
-        self._slider.valueChanged.connect(self._slider_update_handler)
         
         # File label
         self.file_label.setAlignment(Qt.AlignCenter)
+        
+        # Button and Slider actions
+        self._connect_listeners()
         
         # Main layout
         layout = QHBoxLayout()
@@ -310,6 +309,7 @@ class WidgetInputFile(QWidget):
         Scans the selected folder for files matching the supported extension,
         resets the current file index, and updates the UI.
         """
+        print("load files")
 
         if self._folder_path:
             supported_ext = self.config_p["supported_file_extension"]
@@ -334,6 +334,8 @@ class WidgetInputFile(QWidget):
         Updates the UI to show the current file name, and calls
         _extract_content to read the file's data.
         """
+        
+        print("update file display")
         if not (0 <= self._current_index < len(self._files)):
             return
         
@@ -348,6 +350,41 @@ class WidgetInputFile(QWidget):
         # Build full path and extract the file's content
         file_path = os.path.join(self._folder_path, current_file)
         self._extract_content(file_path)
+
+    def _extract_content(self, file_path: str):
+        """
+        Reads the file at file_path using the specified configuration,
+        and emits a signal with the extracted data.
+        """
+        
+        print("we are in extract file now")
+        this_step= self._file_type.step
+        
+        try:
+            df = pd.read_csv(
+                file_path,
+                sep=this_step,
+                skiprows=self.config_p["skip_rows"],
+                header=None
+            )
+    
+            freq_col = self.config_p["freq_column"]
+            z_real_col = self.config_p["z_real_column"]
+            z_imag_col = self.config_p["z_imag_column"]
+            max_col = max(freq_col, z_real_col, z_imag_col)
+    
+            if max_col >= len(df.columns):
+                raise ValueError("WidgetInputFile._extract_content :File does not contain the required columns.")
+    
+            freq = df[freq_col].to_numpy()
+            z_real = df[z_real_col].to_numpy()
+            z_imag = df[z_imag_col].to_numpy()
+    
+            # Instead of empty arrays, send the arrays we just read:
+            self.file_data_updated.emit(freq, z_real, z_imag)
+    
+        except Exception as e:
+            self._handle_file_read_error(e, file_path)
 
     def _update_navigation_buttons(self):
         """
@@ -421,40 +458,6 @@ class WidgetInputFile(QWidget):
         self._update_navigation_buttons()
 
     # Content methods
-    def _extract_content(self, file_path: str):
-        """
-        Reads the file at file_path using the specified configuration,
-        and emits a signal with the extracted data.
-        """
-        this_step= self._file_type.step
-        
-        try:
-            df = pd.read_csv(
-                file_path,
-                sep=this_step,
-                skiprows=self.config_p["skip_rows"],
-                header=None
-            )
-    
-            freq_col = self.config_p["freq_column"]
-            z_real_col = self.config_p["z_real_column"]
-            z_imag_col = self.config_p["z_imag_column"]
-            max_col = max(freq_col, z_real_col, z_imag_col)
-    
-            if max_col >= len(df.columns):
-                raise ValueError("WidgetInputFile._extract_content :File does not contain the required columns.")
-    
-            freq = df[freq_col].to_numpy()
-            z_real = df[z_real_col].to_numpy()
-            z_imag = df[z_imag_col].to_numpy()
-    
-            # Instead of empty arrays, send the arrays we just read:
-            self.file_data_updated.emit(freq, z_real, z_imag)
-    
-        except Exception as e:
-            self._handle_file_read_error(e, file_path)
-
-
     def _handle_file_read_error(self, exc: Exception, file_path: str):
         """
         Displays a warning, updates the file label, and emits empty arrays
