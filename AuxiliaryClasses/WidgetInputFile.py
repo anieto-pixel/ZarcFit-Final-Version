@@ -272,15 +272,16 @@ class WidgetInputFile(QWidget):
         if current_file and os.path.isfile(current_file):
             folder_path = os.path.dirname(current_file)
             self._folder_path = folder_path
-            self._load_files()
-            file_name = os.path.basename(current_file)
+            self._load_files(skip_extract_default_file=True)#this is the one who needs to have the flag
+            file_name = os.path.basename(current_file)#this would need to dissapear I guess?
 
             if file_name in self._files:
                 self._current_index = self._files.index(file_name)
                 self._update_file_display()
                 self._update_navigation_buttons()
                 
-            else:
+            else:#and you go to the first value
+                self. _extract_default_file_from_folder()
                 print(f"WidgetImputFile.setup_current_file: File '{file_name}' was not found in the folder '{self._folder_path}'.")
         
         elif current_file:
@@ -304,7 +305,7 @@ class WidgetInputFile(QWidget):
             self._folder_path = folder
             self._load_files()
 
-    def _load_files(self):
+    def _load_files(self, skip_extract_default_file=False):
         """
         Scans the selected folder for files matching the supported extension,
         resets the current file index, and updates the UI.
@@ -317,17 +318,24 @@ class WidgetInputFile(QWidget):
                 f for f in os.listdir(self._folder_path)
                 if f.lower().endswith(supported_ext)
             ]
-            if self._files:
-                self._current_index = 0
-                self._update_file_display()
-                self._update_navigation_buttons()
-            else:
-                self.file_label.setText(
-                    f'WidgetImputFile._load_files: No {self.config_p["supported_file_extension"]} files found in the selected folder.'
-                )
-                self.previous_button.setEnabled(False)
-                self.next_button.setEnabled(False)
+            if not skip_extract_default_file:
+                self._extract_default_file_from_folder()
+            
             self._slider.set_list(self._files)
+
+    def _extract_default_file_from_folder(self):
+        
+        if self._files:
+            self._current_index = 0
+            self._update_file_display()
+            self._update_navigation_buttons()
+        else:
+            self.file_label.setText(
+                f'WidgetImputFile._extract_default_file_from_folder: No {self.config_p["supported_file_extension"]} files found in the selected folder.'
+            )
+            self.previous_button.setEnabled(False)
+            self.next_button.setEnabled(False)
+
 
     def _update_file_display(self):
         """
