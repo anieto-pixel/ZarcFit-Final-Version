@@ -74,8 +74,32 @@ class ModelCircuitParent(object):
         return np.array([])
 
     def run_rock(self, v: dict, freq_array: np.ndarray, old_v_second=False):
-        """Placeholder method for a variant of the circuit model."""
+        """Placeholder method for a variant of the rock's circuit model."""
         return np.array([])
+    
+    def estimate_rock(self, v: dict, freq_array: np.ndarray, impedance: np.ndarray):
+        """Estimates the rock impedance from experimental data."""
+        
+        z_to_subtract = np.zeros_like(freq_array, dtype=complex)
+    
+        # Precompute z_cpee and zarce for all frequencies (avoids redundant recalculations)
+        z_cpee = np.array([self._cpe(f, v["Qe"], v["Pef"], v["Pei"]) for f in freq_array])
+        zarce = np.array([self._parallel(z_cpee[i], v["Re"]) for i in range(len(freq_array))])
+    
+        for i, freq in enumerate(freq_array):
+            z_cpeh = self._cpe(freq, self.q["Qh"], v["Ph"], v["Ph"])
+            zarch = self._parallel(z_cpeh, v["Rh"])
+            
+            z_to_subtract[i] = zarch + zarce[i] - v["Rh"]
+    
+        # Ensure correct shape for subtraction
+        if z_to_subtract.shape != impedance.shape:
+            raise ValueError(f"Shape mismatch: impedance has shape {impedance.shape}, but z_to_subtract has shape {z_to_subtract.shape}")
+    
+        z_estimated_rock = impedance - z_to_subtract
+    
+        return z_estimated_rock
+    
 
     # ------------------------------------------
     # Private Methods
@@ -108,8 +132,7 @@ class ModelCircuitParent(object):
         self.v_other_sec["pCm"]=1/(2*np.pi*v["Fm"]*self.v_second["pRm"] )
         self.v_other_sec["Cl"]=1/(2*np.pi*v["Fl"]*v["Rl"] )
         self.v_other_sec["pCl"] =1/(2*np.pi*v["Fl"]*self.v_second["pRl"] )
-        
-        
+             
     def _inductor(self, freq, linf):
         """
         Return the impedance of an inductor at a given frequency and inductance.
@@ -153,11 +176,22 @@ class ModelCircuitParent(object):
     def _parallel(self, z_1, z_2):
         """
         Return the impedance of two components in parallel.
+        This function accepts either scalars or NumPy arrays.
         """
-        if z_1 == 0 or z_2 == 0:
+        # Convert inputs to NumPy arrays for element-wise operations.
+        z1 = np.asarray(z_1)
+        z2 = np.asarray(z_2)
+        
+        # Check for any zero entries, which would lead to infinite admittance.
+        if np.any(z1 == 0) or np.any(z2 == 0):
             raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
-        denominator = (1 / z_1) + (1 / z_2)
+        
+        denominator = (1 / z1) + (1 / z2)
         result = 1 / denominator
+        
+        # If the result is a 0-dimensional array, return a scalar.
+        if result.shape == ():
+            return result.item()
         return result
 
 
@@ -181,8 +215,6 @@ class ModelCircuitSeries(ModelCircuitParent):
         z = []
 
         for freq in freq_array:
-            z_cpeh = self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"])
-            zarch = self._parallel(z_cpeh, v_l["Rh"])
 
             z_cpem = self._cpe(freq, self.q["Qm"], v_l["Pm"], v_l["Pm"])
             zarcm = self._parallel(z_cpem, v_l["Rm"])
@@ -190,12 +222,13 @@ class ModelCircuitSeries(ModelCircuitParent):
             z_cpel = self._cpe(freq, self.q["Ql"], v_l["Pl"], v_l["Pl"])
             zarcl = self._parallel(z_cpel, v_l["Rl"])
 
-            z_total = zarch + zarcm + zarcl
+            z_total = zarcm + zarcl
             z.append(z_total)
 
         return np.array(z)
 
     def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
+        
         v_l = v.copy()
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
@@ -205,10 +238,14 @@ class ModelCircuitSeries(ModelCircuitParent):
         z_rock = self.run_rock(v_l, freq_array, old_v_second=True)
 
         zinf = [self._inductor(freq, v_l["Linf"]) + v_l["Rinf"] for freq in freq_array]
+        
+        z_cpeh =[ self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"]) for freq in freq_array]
+        zarch = [self._parallel(z_cpeh[i], v_l["Rh"]) for i in range(len(freq_array))]
+        
         z_cpee = [self._cpe(freq, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for freq in freq_array]
         zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
 
-        return np.array([zinf[i] + z_rock[i] + zarce[i] for i in range(len(freq_array))]), np.array(z_rock)
+        return np.array([zinf[i] + zarch[i] + z_rock[i] + zarce[i] for i in range(len(freq_array))]), np.array(z_rock)
     
 
 class ModelCircuitParallel(ModelCircuitParent):
@@ -229,25 +266,23 @@ class ModelCircuitParallel(ModelCircuitParent):
             self._calculate_secondary_variables(v_l)
 
         v2 = self.v_second
-
         z = []
 
         for f in freq_array:
-            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
             z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
             z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
 
             z_lines = self._parallel(z_line_m, z_line_l)
             z_rock = self._parallel(z_lines, v2["R0"])
-            zparallel = self._parallel(z_line_h, z_rock)
 
-            z.append(zparallel)
+            z.append(z_rock)
 
         return np.array(z)
 
     def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         
         v_l = v.copy()
+        v2 = self.v_second
         
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
@@ -255,8 +290,13 @@ class ModelCircuitParallel(ModelCircuitParent):
             self._calculate_secondary_variables(v_l)
         
         z_rock = self.run_rock(v, freq_array, old_v_second=True)
+        z_line_h =[ v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"]) for f in freq_array]
+        
+        z_rock_and_line_h = self._parallel(z_line_h, z_rock)
+        
 
         zinf = [self._inductor(f, v_l["Linf"]) for f in freq_array]
+        
         z_cpee = [self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for f in freq_array]
         zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
 
@@ -276,7 +316,7 @@ class Fit(QObject):
 class TimeDomainBuilder(QObject):
     def __init__(self) -> None:
         super().__init__()
-        self.N = 2 ** 8
+        self.N = 2 ** 10
         self.T = 4
         
         self._integral_variables={}
@@ -500,9 +540,13 @@ class Calculator(QObject):
         4) Pack all results into a CalculationResult and emit a signal.
         """
         freq_array = self._experiment_data["freq"]
+        z_experimental= self._experiment_data["Z_real"].copy() +1j*self._experiment_data["Z_imag"].copy()
+        
         #Calculate Z for the full model, and for the rock alone
         z, rock_z = self._model_circuit.run_model(params, freq_array)
         z_real, z_imag = z.real, z.imag
+        
+        #rock_z = self._model_circuit.estimate_rock(params, freq_array, z_experimental)
         rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
         special_freq,spec_zr,spec_zi=self. _calculate_special_frequencies(params)
