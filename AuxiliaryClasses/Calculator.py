@@ -176,22 +176,11 @@ class ModelCircuitParent(object):
     def _parallel(self, z_1, z_2):
         """
         Return the impedance of two components in parallel.
-        This function accepts either scalars or NumPy arrays.
         """
-        # Convert inputs to NumPy arrays for element-wise operations.
-        z1 = np.asarray(z_1)
-        z2 = np.asarray(z_2)
-        
-        # Check for any zero entries, which would lead to infinite admittance.
-        if np.any(z1 == 0) or np.any(z2 == 0):
+        if z_1 == 0 or z_2 == 0:
             raise ValueError("Cannot take parallel of impedance 0 (=> infinite admittance).")
-        
-        denominator = (1 / z1) + (1 / z2)
+        denominator = (1 / z_1) + (1 / z_2)
         result = 1 / denominator
-        
-        # If the result is a 0-dimensional array, return a scalar.
-        if result.shape == ():
-            return result.item()
         return result
 
 
@@ -215,6 +204,8 @@ class ModelCircuitSeries(ModelCircuitParent):
         z = []
 
         for freq in freq_array:
+            z_cpeh = self._cpe(freq, self.q["Qh"], v_l["Ph"], v_l["Ph"])
+            zarch = self._parallel(z_cpeh, v_l["Rh"])
 
             z_cpem = self._cpe(freq, self.q["Qm"], v_l["Pm"], v_l["Pm"])
             zarcm = self._parallel(z_cpem, v_l["Rm"])
@@ -266,23 +257,25 @@ class ModelCircuitParallel(ModelCircuitParent):
             self._calculate_secondary_variables(v_l)
 
         v2 = self.v_second
+
         z = []
 
         for f in freq_array:
+            z_line_h = v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"])
             z_line_m = v2["pRm"] + self._cpe(f, v2["pQm"], v_l["Pm"], v_l["Pm"])
             z_line_l = v2["pRl"] + self._cpe(f, v2["pQl"], v_l["Pl"], v_l["Pl"])
 
             z_lines = self._parallel(z_line_m, z_line_l)
             z_rock = self._parallel(z_lines, v2["R0"])
+            zparallel = self._parallel(z_line_h, z_rock)
 
-            z.append(z_rock)
+            z.append(zparallel)
 
         return np.array(z)
 
     def run_model(self, v: dict, freq_array: np.ndarray, old_v_second=False):
         
         v_l = v.copy()
-        v2 = self.v_second
         
         if self.negative_rinf:
             v_l['Rinf'] = -v_l['Rinf']
@@ -290,13 +283,8 @@ class ModelCircuitParallel(ModelCircuitParent):
             self._calculate_secondary_variables(v_l)
         
         z_rock = self.run_rock(v, freq_array, old_v_second=True)
-        z_line_h =[ v2["pRh"] + self._cpe(f, v2["pQh"], v_l["Ph"], v_l["Ph"]) for f in freq_array]
-        
-        z_rock_and_line_h = self._parallel(z_line_h, z_rock)
-        
 
         zinf = [self._inductor(f, v_l["Linf"]) for f in freq_array]
-        
         z_cpee = [self._cpe(f, v_l["Qe"], v_l["Pef"], v_l["Pei"]) for f in freq_array]
         zarce = [self._parallel(z_cpee[i], v_l["Re"]) for i in range(len(freq_array))]
 
