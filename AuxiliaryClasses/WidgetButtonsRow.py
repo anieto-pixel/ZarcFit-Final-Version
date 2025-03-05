@@ -79,7 +79,7 @@ class WidgetButtonsRow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)  # Remove margins around the layout
         # Reduce button size
         
-        button_height = 20  # Adjust height
+        button_height = 25  # Adjust height
         font_size = 9  # Adjust font size
         # Ensure buttons have no padding/margin and are tightly packed
         for button in self._buttons_list:

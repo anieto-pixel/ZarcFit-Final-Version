@@ -53,6 +53,12 @@ class CustomSliders(QWidget):
         Programmatically sets the slider to a given integer value.
         """
         self._slider.setValue(int(value))
+    
+    def set_value_exact(self, value):
+        """
+        Programmatically sets the slider to a given integer value.
+        """
+        return self.set_value(self)
 
     def toggle_red_frame(self, state: bool):
         """
@@ -95,6 +101,7 @@ class CustomSliders(QWidget):
 
         # Creates disable button with label overlay
         self._create_disable_button()
+        self._create_setvalue_box()
         self._connect_signals()
         self._setup_layout()
         self._setup_slider()
@@ -118,6 +125,22 @@ class CustomSliders(QWidget):
     
         #set button's dimensions
         self._disable_button.setFixedSize(width, 20)
+        
+    def _create_setvalue_box(self):
+        """ 
+        Create an imput window to manually set the slider 
+        """
+        placeholder_text="Set Value"
+        self._input_box = QLineEdit()
+        self._input_box.setPlaceholderText(placeholder_text)
+        
+        self._input_box.setFixedWidth(self._disable_button.width())
+        self._input_box.setStyleSheet("""
+            QLineEdit {
+                background-color: lightgrey;
+                border: 1px solid lightgrey;
+            }
+        """)
 
     def _connect_signals(self):
         """
@@ -128,6 +151,8 @@ class CustomSliders(QWidget):
 
         # Toggling the push-button toggles disabled style
         self._disable_button.clicked.connect(self._toggle_slider)
+        #connect set value button
+        self._input_box.returnPressed.connect(lambda: self.set_value(self._input_box.text()))
 
     def _setup_layout(self):
         """
@@ -136,6 +161,7 @@ class CustomSliders(QWidget):
         self._layout = QVBoxLayout()
         self._layout.addWidget(self._slider)
         self._layout.addWidget(self._disable_button)
+        self._layout.addWidget(self._input_box)
         self.setLayout(self._layout)
         
         # Ensure the widget has a minimum width equal to the button width + padding
@@ -205,6 +231,7 @@ class CustomSliders(QWidget):
         Update the on-screen label whenever the slider value changes.
         """
         self._disable_button.setText(str(self.get_value()))
+        self._input_box.setText(str(self.get_value()))
 
     def _string_by_tick(self, i):
         """
@@ -314,12 +341,14 @@ class DoubleSliderWithTicks(CustomSliders):
 
         # Toggling the push-button toggles disabled style
         self._disable_button.clicked.connect(self._toggle_slider)
+        self._input_box.returnPressed.connect(lambda: self.set_value_exact(float(self._input_box.text())))
 
     def _update_label(self):
         """
         Show the floating-point value with three decimal places.
         """
         self._disable_button.setText(f"{self.get_value():.3f}")
+        self._input_box.setText(f"{self.get_value():.3f}")
 
     def _emit_corrected_value(self, _):
         """
