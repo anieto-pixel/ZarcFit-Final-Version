@@ -182,7 +182,7 @@ class MainWidget(QWidget):
         self.freq_slider.sliderMoved.connect(self._handle_frequency_update)
         # Calculator signals
         self.calculator.model_manual_result.connect(self.widget_graphs.update_manual_plot)
-        self.calculator.model_manual_values.connect(self.widget_sliders.set_all_variables)
+        self.calculator.fit_builder.model_manual_values.connect(self.widget_sliders.set_all_variables)
 
     def _initialize_hotkeys_and_buttons(self):
         """Initializes keyboard shortcuts and connects button actions."""

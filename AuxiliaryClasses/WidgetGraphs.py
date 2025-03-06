@@ -43,7 +43,9 @@ class CalculationResult:
 
         self.timedomain_freq = np.array([0.01, 4.5, 1.1])
         self.timedomain_time = np.linspace(0, 1, 100)
-        self.timedomain_volt = np.sin(2 * np.pi * 10 * self.timedomain_time)
+        self.timedomain_volt_down = np.sin(2 * np.pi * 10 * self.timedomain_time)
+        self.timedomain_volt_up = np.cos(2 * np.pi * 10 * self.timedomain_time)
+
 
 class ParentGraph(pg.PlotWidget):
     """
@@ -115,7 +117,6 @@ class ParentGraph(pg.PlotWidget):
         self._manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
-
  
     def update_special_frequencies(self, freq_array, z_real_array, z_imag_array):
         """
@@ -156,7 +157,6 @@ class ParentGraph(pg.PlotWidget):
                 symbolBrush=symbol_brush
             )
             self._special_items.append(plot_item)
-
 
     # -----------------------------------------------------------------------
     #  Private Methods
@@ -402,9 +402,16 @@ class TimeGraph(ParentGraph):
     The Mx, Mt, M0 labels remain pinned in the top-left of the plot view
     (they do NOT move when panning or zooming).
     """
-    
     def __init__(self):
-
+        # Initialize secondary manual data and placeholder for plot
+        self._secondary_manual_data = {
+            'freq': np.array([]),
+            'Z_real': np.array([]),  # time
+            'Z_imag': np.array([]),  # volt_up
+        }
+        # Use consistent naming for the dynamic plot attribute:
+        self._secondary_dynamic_plot = None
+        
         self._init_child_attributes()
         
         super().__init__()
@@ -412,6 +419,22 @@ class TimeGraph(ParentGraph):
         self._setup_text_items()
         self._refresh_graph()
     
+    #-----------------------------------------
+    #   Public Method
+    #-----------------------------------------   
+    def get_special_values(self):
+        """
+        Return a dictionary of the special values: Mx, Mt, and M0.
+        """
+        return {'mx': self.mx, 'mt': self.mt, 'm0': self.m0}
+    
+    def update_parameters_base(self, freq, z_real, z_imag):
+        super().update_parameters_base(freq, z_real, z_imag)
+        self._refresh_graph()
+
+    #--------------------------
+    #   Private Methods
+    #------------------------
     def _init_child_attributes(self):
         """Initialize attributes specific to the time graph."""
         self.mx = None
@@ -425,6 +448,7 @@ class TimeGraph(ParentGraph):
     
     def _configure_plot(self):
         """Configure the plot title and axis labels."""
+        
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Voltage")
@@ -444,18 +468,28 @@ class TimeGraph(ParentGraph):
         self.mt_text.setPos(300, 30)  # Stack below Mx
         self.m0_text.setPos(300, 50)  # Stack below Mt
     
-    def _prepare_xy(self, freq, z_real, z_imag):
-        """Interpret Z_real as time, Z_imag as voltage."""
-        return z_real, z_imag
+    
+    def update_parameters_manual(self, freq, time, voltage_down, voltage_up):
+        super().update_parameters_manual(freq, time, voltage_down)
+        self._update_parameters_secondary_manual(freq, time, voltage_up)
 
-    def update_parameters_base(self, freq, z_real, z_imag):
-        super().update_parameters_base(freq, z_real, z_imag)
         self._refresh_graph()
-
-    def update_parameters_manual(self, freq, z_real, z_imag):
-        super().update_parameters_manual(freq, z_real, z_imag)
-        self._refresh_graph()
-
+    
+    def _update_parameters_secondary_manual(self, freq, time, voltage_up):
+        """
+        Assign new data to the 'third line' (secondary manual data),
+        then refresh only that plot.
+        
+        """
+        self._secondary_manual_data = {
+            'freq': freq,
+            'Z_real': time,
+            'Z_imag': voltage_up
+        }
+        # If the plot exists, update it; otherwise it will be updated in _refresh_graph
+        if self._secondary_plot is not None:
+            self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
+    
     def _refresh_graph(self):
         """
         Draw the green (base) + blue (manual) lines via the parent,
@@ -473,7 +507,9 @@ class TimeGraph(ParentGraph):
             return
 
         # 3) Shade the region [0.45, 1.1]
-        t_start, t_end = 0.45, 1.1
+        start_shading=0.45
+        end_shading=1.1
+        t_start, t_end = start_shading, end_shading
         mask = (t >= t_start) & (t <= t_end)
         if np.any(mask):
             self.plot(
@@ -505,6 +541,20 @@ class TimeGraph(ParentGraph):
 
         # 6) Auto-range the plot.
         self.plotItem.getViewBox().autoRange()
+        
+        # 7) Secondary plot
+        self._secondary_plot = self.plot(
+            pen=mkPen(color='red', style=Qt.DashLine),  # Pale pink
+            symbol='o',
+            symbolSize=6,
+            symbolBrush=None
+        )
+        # Immediately refresh with whatever data is in _secondary_manual_data
+        self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
+        
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """Interpret Z_real as time, Z_imag as voltage."""
+        return z_real, z_imag
 
     def _integrate_chargeability(self, t, v, tmin, tmax):
         """
@@ -515,12 +565,6 @@ class TimeGraph(ParentGraph):
             return 0.0
         return np.trapz(y=v[mask], x=t[mask])
     
-    def get_special_values(self):
-        """
-        Return a dictionary of the special values: Mx, Mt, and M0.
-        """
-        return {'mx': self.mx, 'mt': self.mt, 'm0': self.m0}
-
 
 class WidgetGraphs(QWidget):
     """
@@ -667,8 +711,11 @@ class WidgetGraphs(QWidget):
         self._tab_graph.update_parameters_manual(
             calc_result.timedomain_freq,
             calc_result.timedomain_time,
-            calc_result.timedomain_volt
+            calc_result.timedomain_volt_down,
+            calc_result.timedomain_volt_up
         )
+
+        
 
     def apply_filter_frequency_range(self, f_min, f_max):
         """
@@ -683,12 +730,11 @@ class WidgetGraphs(QWidget):
         graphs_parameters= self._tab_graph.get_special_values()
         
         return graphs_parameters
-    
+
 
 # -----------------------------------------------------------------------
 #  Quick Test
 # -----------------------------------------------------------------------
-
 import sys
 import numpy as np
 from PyQt5.QtWidgets import (
