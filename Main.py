@@ -1,26 +1,23 @@
 
-import inspect
-import logging
 import os
 import sys
 from datetime import datetime
 
 import numpy as np
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QFontMetrics, QKeySequence
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import Qt, QTimer, QEvent
+from PyQt5.QtGui import QKeySequence, QMouseEvent
 from PyQt5.QtWidgets import (
-    QApplication, QLabel, QMainWindow, QShortcut, QSizePolicy, QSplitter,
-    QWidget, QHBoxLayout, QVBoxLayout
+    QApplication, QMainWindow, QShortcut, QSizePolicy, QSplitter,
+    QWidget, QHBoxLayout, QVBoxLayout,  QPushButton
 )
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "AuxiliaryClasses")))
 
 from AuxiliaryClasses.ConfigImporter import ConfigImporter
 from AuxiliaryClasses.CustomListSliders import ListSliderRange
-from AuxiliaryClasses.CustomSliders import DoubleSliderWithTicks, EPowerSliderWithTicks
-from AuxiliaryClasses.Calculator import CalculationResult, Calculator
+from AuxiliaryClasses.Calculator import Calculator
 from AuxiliaryClasses.WidgetButtonsRow import WidgetButtonsRow
 from AuxiliaryClasses.WidgetGraphs import WidgetGraphs
 from AuxiliaryClasses.WidgetInputFile import WidgetInputFile
@@ -52,7 +49,6 @@ class MainWidget(QWidget):
 
         #Optional initialization settings
         self._session_initialization()
-
         
     # ------------------- UI BUILD METHODS -------------------
     def _build_ui(self):
@@ -251,6 +247,7 @@ class MainWidget(QWidget):
         shortcut_space.activated.connect(
             lambda: self.widget_output_file.print_variables_list()
         )
+
 
     # ------------------- HANDLERS -------------------
     def _handle_update_file_data(self, freq: np.ndarray, Z_real: np.ndarray, Z_imag: np.ndarray):

@@ -62,14 +62,17 @@ class TimeDomainBuilder(QObject):
         Transform experimental data to the time domain.
         """
         n_freq = (self.N // 2) #+1
-        
-        dt = self.T / self.N
-        df = 1.0 / self.T
+        prune= 10 #will only use every 10th element of the array
+                #reason beign extrapolate works poorly with size differences
+        dt = self.T / (self.N/prune)
+        #df = 1.0 / self.T
 
         fmin   = 0
         fmax   = n_freq / self.T
         freq_even = np.linspace(fmin, fmax, int(n_freq + 1))
         freq_even[0] = 0.001
+
+        freq_even = freq_even[::prune]
               
         z_interp = self._interpolate_points_for_time_domain(freq_even, experiment_data)
         t, volt_down, volt_up=self._fourier_transform(z_interp, dt)   
@@ -84,13 +87,17 @@ class TimeDomainBuilder(QObject):
         """
         Interpolate measured impedance data for the time-domain transform.
         """
+        print("in the method")
         freq   = experiment_data["freq"]
         z_real = experiment_data["Z_real"]
         z_imag = experiment_data["Z_imag"]
     
+        print(len(freqs_even))
+        print(len(freq))
+    
         # Create interpolation functions that extrapolate outside the measured range.
-        interp_real = interp1d(freq, z_real, kind="cubic", fill_value="extrapolate")
-        interp_imag = interp1d(freq, z_imag, kind="cubic", fill_value="extrapolate")
+        interp_real = interp1d(freq, z_real, kind="linear", fill_value="extrapolate")
+        interp_imag = interp1d(freq, z_imag, kind="linear", fill_value="extrapolate")
     
 #        interp_real = PchipInterpolator(freq, z_real, extrapolate=True)
 #        interp_imag = PchipInterpolator(freq, z_imag, extrapolate=True)
@@ -98,15 +105,13 @@ class TimeDomainBuilder(QObject):
         # Evaluate the interpolants at the uniformly spaced frequencies.
         z_real_interp = interp_real(freqs_even)
         z_imag_interp = interp_imag(freqs_even)
-        
+
         return z_real_interp + 1j * z_imag_interp
 
     def _fourier_transform(self, z_complex: np.ndarray, dt: float):
         """
         Build the single-sided array for IRFFT and perform a real IFFT.
-        """
-        v = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
-                                        #largest value is 0.28         
+        """       
         b, a = sig.butter(2, 0.45) 
         z_inversefft = np.fft.irfft(z_complex)       #to transform the impedance data from the freq domain to the time domain.
                    #largest value is 0.28       

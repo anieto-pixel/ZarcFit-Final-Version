@@ -222,7 +222,7 @@ class ParentGraph(pg.PlotWidget):
             pen=pg.mkPen(color='c', width=2),
             symbol='o',
             symbolSize=9,
-            symbolBrush=None
+            symbolBrush=None, symbolPen='c'
         )
 
     def _refresh_graph(self):
@@ -371,7 +371,7 @@ class ColeColeGraph(ParentGraph):
 class TimeGraph(ParentGraph):
     """
     A time-domain plot that interprets (Z_real -> time) and (Z_imag -> voltage).
-    It also has a secondary line for "voltage_up" data, plus a shaded region.
+    It also has a secondary line for "voltage_up" data, plus a dedicated shading item.
     """
 
     def __init__(self):
@@ -388,12 +388,16 @@ class TimeGraph(ParentGraph):
         self.mt_text = pg.TextItem(color='w', anchor=(0, 0))
         self.m0_text = pg.TextItem(color='w', anchor=(0, 0))
 
-        # 2) IMPORTANT: Call the parent constructor last.
+        # 2) IMPORTANT: Call the parent constructor last so _create_plot_items() etc. run first.
         super().__init__()
 
         # 3) Configure the plot labels and text items.
         self._configure_plot()
         self._setup_text_items()
+
+        # 4) Force an immediate refresh + autoRange so the first view is properly scaled.
+        self._refresh_graph()
+        self.plotItem.getViewBox().autoRange()
 
     def _configure_plot(self):
         self.setTitle("Time Domain Graph")
@@ -408,6 +412,9 @@ class TimeGraph(ParentGraph):
           (c) then create the secondary line for voltage_up
         """
         super()._create_plot_items()  # Creates self._static_plot and self._dynamic_plot
+        
+        if self._dynamic_plot is not None:
+            self._dynamic_plot.setSymbolSize(4)       
 
         # (b) Create a dedicated PlotDataItem for shading
         self._shading_item = pg.PlotDataItem(
@@ -421,8 +428,8 @@ class TimeGraph(ParentGraph):
         self._secondary_dynamic_plot = self.plot(
             pen=pg.mkPen(color='#F4C2C2'),
             symbol='o',
-            symbolSize=2,
-            symbolBrush='#F4C2C2'
+            symbolSize=4,
+            symbolBrush='#F4C2C2', symbolPen='#F4C2C2'
         )
 
     def _setup_text_items(self):

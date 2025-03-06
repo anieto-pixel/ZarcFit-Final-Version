@@ -206,6 +206,21 @@ class Calculator(QObject):
         #todo Do nto send experiemtn data, send extrapolated rock
         
         return self.time_domain_builder.transform_to_time_domain(self._experiment_data)
+    
+    """
+    def transform_to_time_domain(self, parameters: dict):
+        #todo Do nto send experiemtn data, send extrapolated rock
+        freq_array = self._experiment_data['freq']
+        impedance = self._experiment_data['Z_real'] + 1j*self._experiment_data['Z_imag']
+        estimate_rock_z= self.circuit.estimate_rock(parameters, freq_array, impedance)
+        
+        estimate_rock_data = {
+            "freq":freq_array,
+            "Z_real":estimate_rock_z.real,
+            "Z_imag":estimate_rock_z.imag,
+            }
+        return self.time_domain_builder.transform_to_time_domain(estimate_rock_data)
+    """
 
     # Private Methods
     def _calculate_special_frequencies(self, params: dict):
