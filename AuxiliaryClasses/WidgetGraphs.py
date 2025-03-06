@@ -9,7 +9,6 @@ Graphs for impedance data visualization:
   - TimeGraph
   - WidgetGraphs (displays multiple graphs)
 """
-
 import sys
 import copy
 import numpy as np
@@ -54,14 +53,12 @@ class ParentGraph(pg.PlotWidget):
       - Plotting or filtering frequency ranges
       - Overridden methods to transform freq, Z_real, Z_imag into X, Y
     """
-
     def __init__(self):
         super().__init__()
         self._init_data()
         self._init_ui()
         self._init_signals()
-        self._special_items = [] #Special points marker
-        
+        self._special_items = []  # Special points marker
         self.fill_region = None
 
         # Initial display and auto-scale setup
@@ -117,7 +114,7 @@ class ParentGraph(pg.PlotWidget):
         self._manual_data = {'freq': freq, 'Z_real': Z_real, 'Z_imag': Z_imag}
         self._original_manual_data = copy.deepcopy(self._manual_data)
         self._refresh_plot(self._manual_data, self._dynamic_plot)
- 
+
     def update_special_frequencies(self, freq_array, z_real_array, z_imag_array):
         """
         Adds or updates special marker points on the graph.
@@ -126,33 +123,33 @@ class ParentGraph(pg.PlotWidget):
         for item in getattr(self, '_special_items', []):
             self.removeItem(item)
         self._special_items = []
-    
+
         symbols = ['x', 'd', 's']
         colors = ['r', 'g', 'b']
-    
+
         for i, (freq, z_real, z_imag) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
             group_index = i // 3
             symbol_index = group_index % len(symbols)     # 0->x, 1->d, 2->s, repeat
-            color_index = i % len(colors)                 # cycles r, g, b
-    
+            color_index = i % len(colors)                   # cycles r, g, b
+
             symbol = symbols[symbol_index]
             color = colors[color_index]
             filled = (group_index % 2 == 0)
-    
+
             # Prepare x, y for plotting
             x, y = self._prepare_xy(
                 np.array([freq]),
                 np.array([z_real]),
                 np.array([z_imag])
             )
-    
+
             # If we want a thicker outline, create a pen with width>1
             symbol_pen = pg.mkPen(color, width=2)
             symbol_brush = color if filled else None
-    
+
             plot_item = self.plot(
-                x, y,pen=None,
-                symbol=symbol,symbolSize=12,
+                x, y, pen=None,
+                symbol=symbol, symbolSize=12,
                 symbolPen=symbol_pen,
                 symbolBrush=symbol_brush
             )
@@ -186,52 +183,6 @@ class ParentGraph(pg.PlotWidget):
         self.showGrid(x=True, y=True)
         self._create_auto_scale_button()
 
-    # methods related to ploting
-    def _refresh_graph(self):
-        """Clears and re-displays both the static and dynamic plots."""
-        self.clear()
-
-
-        # Dynamic plot (manual data)
-        self._dynamic_plot = self.plot(
-            pen=pg.mkPen(color='c', width=2),
-            symbol='o',
-            symbolSize=9,
-            symbolBrush=None
-        )
-        self._refresh_plot(self._manual_data, self._dynamic_plot)
-
-           # Static plot (base data)
-        self._static_plot = self.plot(
-            pen='g',  # green line
-            symbol='o',
-            symbolSize=2,
-            symbolBrush='g', symbolPen ='g'
-            )
-        self._refresh_plot(self._base_data, self._static_plot)
-
-    def _refresh_plot(self, data_dict, plot_item):
-        """
-        Updates a single plot (static or dynamic) with new data.
-        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
-        """
-        
-        x, y = self._prepare_xy(
-            data_dict['freq'],
-            data_dict['Z_real'],
-            data_dict['Z_imag']
-        )
-        if plot_item:
-            plot_item.setData(x, y)
-
-    def _prepare_xy(self, freq, z_real, z_imag):
-        """
-        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
-        Default is (Z_real, Z_imag). Subclasses override this if needed.
-        """
-        return z_real, z_imag
-    
-    # methods related to escale button
     def _create_auto_scale_button(self):
         """Create and configure the auto-scale button."""
         self.auto_scale_button = QPushButton("", self)
@@ -246,7 +197,49 @@ class ParentGraph(pg.PlotWidget):
     def _init_signals(self):
         """Connect signals to their handlers."""
         self.plotItem.getViewBox().sigRangeChanged.connect(self._on_view_range_changed)
-        
+
+    def _refresh_graph(self):
+        """Clears and re-displays both the static and dynamic plots."""
+        self.clear()
+
+        # Dynamic plot (manual data)
+        self._dynamic_plot = self.plot(
+            pen=pg.mkPen(color='c', width=2),
+            symbol='o',
+            symbolSize=9,
+            symbolBrush=None
+        )
+        self._refresh_plot(self._manual_data, self._dynamic_plot)
+
+        # Static plot (base data)
+        self._static_plot = self.plot(
+            pen='g',  # green line
+            symbol='o',
+            symbolSize=2,
+            symbolBrush='g', symbolPen='g'
+        )
+        self._refresh_plot(self._base_data, self._static_plot)
+
+    def _refresh_plot(self, data_dict, plot_item):
+        """
+        Updates a single plot (static or dynamic) with new data.
+        data_dict must contain 'freq', 'Z_real', 'Z_imag'.
+        """
+        x, y = self._prepare_xy(
+            data_dict['freq'],
+            data_dict['Z_real'],
+            data_dict['Z_imag']
+        )
+        if plot_item:
+            plot_item.setData(x, y)
+
+    def _prepare_xy(self, freq, z_real, z_imag):
+        """
+        Transforms impedance data (freq, Z_real, Z_imag) into (x, y) for plotting.
+        Default is (Z_real, Z_imag). Subclasses override this if needed.
+        """
+        return z_real, z_imag
+
     def _handle_auto_scale_toggle(self, checked):
         """
         Called when the auto-scale button is toggled.
@@ -292,7 +285,6 @@ class PhaseGraph(ParentGraph):
     """
     def __init__(self):
         super().__init__()
-        
         self.setTitle("Phase (Log Scale of Degrees)")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
@@ -338,7 +330,6 @@ class ColeColeGraph(ParentGraph):
     with an optional third (secondary) line.
     """
     def __init__(self):
-        
         # Initialize secondary manual data and placeholder for plot
         self._secondary_manual_data = {
             'freq': np.array([]),
@@ -346,15 +337,18 @@ class ColeColeGraph(ParentGraph):
             'Z_imag': np.array([]),
         }
         self._secondary_plot = None
-        
+
         super().__init__()
-        
+
         # Adjust Cole-Cole specific properties
         self.getPlotItem().setAspectLocked(True, 1)
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
         self.setLabel('left', "-Z'' [Ohms]")
 
+    # -----------------------------------------------------------------------
+    #  Public Methods
+    # -----------------------------------------------------------------------
     def update_parameters_secondary_manual(self, freq, Z_real, Z_imag):
         """
         Assign new data to the 'third line' (secondary manual data),
@@ -369,6 +363,9 @@ class ColeColeGraph(ParentGraph):
         if self._secondary_plot is not None:
             self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
 
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
     def _refresh_graph(self):
         """
         Override the parent method to add a third line after the usual
@@ -378,7 +375,6 @@ class ColeColeGraph(ParentGraph):
         super()._refresh_graph()
 
         # Now create (or recreate) the third line plot.
-        # Example: red line with circle symbols.
         self._secondary_plot = self.plot(
             pen=mkPen(color='#F4C2C2', style=Qt.DashLine),  # Pale pink
             symbol='o',
@@ -409,32 +405,36 @@ class TimeGraph(ParentGraph):
             'Z_real': np.array([]),  # time
             'Z_imag': np.array([]),  # volt_up
         }
-        # Use consistent naming for the dynamic plot attribute:
         self._secondary_dynamic_plot = None
-        
+
         self._init_child_attributes()
-        
+
         super().__init__()
         self._configure_plot()
         self._setup_text_items()
         self._refresh_graph()
-    
-    #-----------------------------------------
-    #   Public Method
-    #-----------------------------------------   
+
+    # -----------------------------------------------------------------------
+    #  Public Methods
+    # -----------------------------------------------------------------------
     def get_special_values(self):
         """
         Return a dictionary of the special values: Mx, Mt, and M0.
         """
         return {'mx': self.mx, 'mt': self.mt, 'm0': self.m0}
-    
+
     def update_parameters_base(self, freq, z_real, z_imag):
         super().update_parameters_base(freq, z_real, z_imag)
         self._refresh_graph()
 
-    #--------------------------
-    #   Private Methods
-    #------------------------
+    def update_parameters_manual(self, freq, time, voltage_down, voltage_up):
+        super().update_parameters_manual(freq, time, voltage_down)
+        self._update_parameters_secondary_manual(freq, time, voltage_up)
+        self._refresh_graph()
+
+    # -----------------------------------------------------------------------
+    #  Private Methods
+    # -----------------------------------------------------------------------
     def _init_child_attributes(self):
         """Initialize attributes specific to the time graph."""
         self.mx = None
@@ -445,14 +445,13 @@ class TimeGraph(ParentGraph):
         self.mx_text = pg.TextItem(color='w', anchor=(0, 0))
         self.mt_text = pg.TextItem(color='w', anchor=(0, 0))
         self.m0_text = pg.TextItem(color='w', anchor=(0, 0))
-    
+
     def _configure_plot(self):
         """Configure the plot title and axis labels."""
-        
         self.setTitle("Time Domain Graph")
         self.setLabel('bottom', "Time [s]")
         self.setLabel('left', "Voltage")
-    
+
     def _setup_text_items(self):
         """
         Make each label a child of the ViewBox in device coordinates so that they stay
@@ -462,34 +461,25 @@ class TimeGraph(ParentGraph):
         self.mx_text.setParentItem(vb)
         self.mt_text.setParentItem(vb)
         self.m0_text.setParentItem(vb)
-        
+
         # Position the text items in the top-left corner (device coordinates)
         self.mx_text.setPos(300, 10)
         self.mt_text.setPos(300, 30)  # Stack below Mx
         self.m0_text.setPos(300, 50)  # Stack below Mt
-    
-    
-    def update_parameters_manual(self, freq, time, voltage_down, voltage_up):
-        super().update_parameters_manual(freq, time, voltage_down)
-        self._update_parameters_secondary_manual(freq, time, voltage_up)
 
-        self._refresh_graph()
-    
     def _update_parameters_secondary_manual(self, freq, time, voltage_up):
         """
         Assign new data to the 'third line' (secondary manual data),
         then refresh only that plot.
-        
         """
         self._secondary_manual_data = {
             'freq': freq,
             'Z_real': time,
             'Z_imag': voltage_up
         }
-        # If the plot exists, update it; otherwise it will be updated in _refresh_graph
         if self._secondary_plot is not None:
             self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
-    
+
     def _refresh_graph(self):
         """
         Draw the green (base) + blue (manual) lines via the parent,
@@ -507,10 +497,9 @@ class TimeGraph(ParentGraph):
             return
 
         # 3) Shade the region [0.45, 1.1]
-        start_shading=0.45
-        end_shading=1.1
-        t_start, t_end = start_shading, end_shading
-        mask = (t >= t_start) & (t <= t_end)
+        start_shading = 0.45
+        end_shading = 1.1
+        mask = (t >= start_shading) & (t <= end_shading)
         if np.any(mask):
             self.plot(
                 t[mask], v[mask],
@@ -528,7 +517,7 @@ class TimeGraph(ParentGraph):
         else:
             integral_mx = self._integrate_chargeability(t, v, 0.45, 1.1)
             integral_mt = self._integrate_chargeability(t, v, 0.0, 2.0)
-            v_at_0p01   = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
+            v_at_0p01 = np.interp(0.01, t, v) if np.any(t >= 0.01) else 0.0
 
             self.mx = 1000.0 * (integral_mx / Vp)
             self.mt = 1000.0 * (integral_mt / Vp)
@@ -541,17 +530,16 @@ class TimeGraph(ParentGraph):
 
         # 6) Auto-range the plot.
         self.plotItem.getViewBox().autoRange()
-        
+
         # 7) Secondary plot
         self._secondary_plot = self.plot(
-            pen=mkPen(color='red', style=Qt.DashLine),  # Pale pink
+            pen=mkPen(color='red', style=Qt.DashLine),
             symbol='o',
             symbolSize=6,
             symbolBrush=None
         )
-        # Immediately refresh with whatever data is in _secondary_manual_data
         self._refresh_plot(self._secondary_manual_data, self._secondary_plot)
-        
+
     def _prepare_xy(self, freq, z_real, z_imag):
         """Interpret Z_real as time, Z_imag as voltage."""
         return z_real, z_imag
@@ -564,7 +552,8 @@ class TimeGraph(ParentGraph):
         if not np.any(mask):
             return 0.0
         return np.trapz(y=v[mask], x=t[mask])
-    
+
+
 
 class WidgetGraphs(QWidget):
     """
