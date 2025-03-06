@@ -344,8 +344,8 @@ class ColeColeGraph(ParentGraph):
         self._secondary_plot = self.plot(
             pen=pg.mkPen(color='#F4C2C2', style=Qt.DashLine),
             symbol='o',
-            symbolSize=6,
-            symbolBrush=None
+            symbolSize=2,
+            symbolBrush='#F4C2C2'
         )
 
     def _refresh_graph(self):
@@ -419,10 +419,10 @@ class TimeGraph(ParentGraph):
 
         # (c) Create the secondary line for "voltage_up"
         self._secondary_dynamic_plot = self.plot(
-            pen=pg.mkPen(color='red', style=Qt.DashLine),
+            pen=pg.mkPen(color='#F4C2C2'),
             symbol='o',
-            symbolSize=6,
-            symbolBrush=None
+            symbolSize=2,
+            symbolBrush='#F4C2C2'
         )
 
     def _setup_text_items(self):
