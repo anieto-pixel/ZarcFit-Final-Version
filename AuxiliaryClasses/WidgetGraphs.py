@@ -46,13 +46,6 @@ class CalculationResult:
         self.timedomain_volt_up = np.cos(2 * np.pi * 10 * self.timedomain_time)
 
 
-import copy
-import numpy as np
-import pyqtgraph as pg
-from PyQt5.QtWidgets import QPushButton, QWidget, QHBoxLayout, QVBoxLayout, QFrame, QTabWidget, QSizePolicy
-from PyQt5.QtCore import Qt
-# Assume CalculationResult is defined somewhere with required arrays
-
 class ParentGraph(pg.PlotWidget):
     """
     A base PlotWidget that manages 'base' data, 'manual' data, and special markers.
