@@ -7,22 +7,27 @@ Created on Thu Feb  6 15:21:01 2025
 
 import sys
 import math
+from PyQt5.QtGui import QFontMetrics, QFont
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QApplication, QSlider, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtWidgets import QApplication, QSlider, QVBoxLayout, QWidget, QLabel
 
 
 # ---------------------------------------------------------------------
 # Single-handle slider that maps a list of discrete values.
 # ---------------------------------------------------------------------
 class ListSlider(QtWidgets.QSlider):
+    
     """
     A single-handle slider that maps a list of discrete values.
     The slider's internal integer range corresponds directly to the indices
     of the provided values_list.
     """
-
-    def __init__(self, values_list=None, *args, **kwargs):
+    
+    #emmits a signal when the slider is set to a new list
+    new_list_was_set = pyqtSignal(int)
+    
+    def __init__(self, values_list=None, font = 7, *args, **kwargs):
         """
         Initialize the slider.
         Args:values_list (list, optional): List of discrete values.
@@ -30,63 +35,20 @@ class ListSlider(QtWidgets.QSlider):
         super().__init__(*args, **kwargs)
         if values_list is None:
             values_list = [0.0]
+            
         self.values_list = values_list
-
+        self.my_font = font
+        
+        font = QtGui.QFont("Arial")
+        font.setPointSizeF(self.my_font)
         self._initialize_orientation()
         self._configure_range()
-        self._configure_ticks()
         self._apply_custom_style()
-
-    def _initialize_orientation(self):
-        """Set the slider orientation to horizontal."""
-        self.setOrientation(Qt.Horizontal)
-
-    def _configure_range(self):
-        """
-        Configure the slider's range to match the indices of values_list,
-        and set its initial value.
-        """
-        self.setMinimum(0)
-        self.setMaximum(len(self.values_list) - 1)
-        self.setValue(self.minimum())
-
-    def _configure_ticks(self):
-        """
-        Configure tick marks for the slider.
-        The tick position is set below the slider and the interval is proportional
-        to the number of discrete values.
-        """
-        self.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        interval = max(1, int(len(self.values_list) / 10))
-        self.setTickInterval(interval)
-
-    def _apply_custom_style(self):
-        """Apply a custom style to improve the slider's visual appearance."""
-        self.setStyleSheet("""
-            QSlider::groove:horizontal {
-                border: 1px solid #bbb;
-                background: white;
-                height: 10px;
-                border-radius: 4px;
-                margin: 2px 0;
-            }
-            QSlider::sub-page:horizontal {
-                background: #0078D7;
-                border-radius: 4px;
-            }
-            QSlider::add-page:horizontal {
-                background: #bbb;
-                border-radius: 4px;
-            }
-            QSlider::handle:horizontal {
-                background: #005999;
-                border: 1px solid #0078D7;
-                width: 16px;
-                margin: -5px 0;
-                border-radius: 8px;
-            }
-        """)
-
+        self.setContentsMargins(0, 0, 0, 0) #new change
+        
+    #-----------------------
+    # public Methods
+    #------------------------
     def get_list_value(self):
         """
         Return the value corresponding to the current slider index.
@@ -110,6 +72,22 @@ class ListSlider(QtWidgets.QSlider):
             index = self.values_list.index(value)
             self.setValue(index)
             self.update()
+        else: print("Value not found.")
+
+    def set_list_value_index(self, index):
+        """
+        Set the slider based on the given index of the list.
+
+        Args:
+            index: The index to select from values_list.
+        """
+    
+        index = int(index)
+        
+        if 0 < index < len(self.values_list):
+            self.setValue(index)
+            self.update()
+        else: print(f"Index {index} is out of bounds.")
 
     def set_list(self, values_list: list[float]):
         """
@@ -127,6 +105,9 @@ class ListSlider(QtWidgets.QSlider):
         self.setMaximum(len(self.values_list) - 1)
         self.setValue(self.minimum())
         self.update()
+        
+        #emit signal to allow updating label in OutputWidget
+        self.new_list_was_set.emit(len(self.values_list))
 
     def up(self):
         """
@@ -145,6 +126,124 @@ class ListSlider(QtWidgets.QSlider):
         new_val = current - 1
         if new_val >= self.minimum():
             self.setValue(new_val)
+    
+    def minimumSizeHint(self) -> QSize:
+        base = super().minimumSizeHint()
+        # figure out how tall your font is
+        fm = QFontMetrics(self.font())
+        label_height = fm.height()
+        # plus a couple pixels of spacing
+        extra = label_height + 4  
+        return QSize(base.width(), base.height() + extra)
+    
+    def sizeHint(self) -> QSize:
+        # same idea for sizeHint if you want “preferred” size to grow, too
+        base = super().sizeHint()
+        fm = QFontMetrics(self.font())
+        label_height = fm.height()
+        extra = label_height + 4
+        return QSize(base.width(), base.height() + extra)
+
+    #-----------------------
+    # Private Methods
+    #------------------------
+
+    def _initialize_orientation(self):
+        """Set the slider orientation to horizontal."""
+        self.setOrientation(Qt.Horizontal)
+
+    def _configure_range(self):
+        """
+        Configure the slider's range to match the indices of values_list,
+        and set its initial value.
+        """
+        self.setMinimum(0)
+        self.setMaximum(len(self.values_list) - 1)
+        self.setValue(self.minimum())
+
+    def _apply_custom_style(self):
+        """Apply a custom style to improve the slider's visual appearance."""
+        groove_height = 6            
+        groove_radius = 4           
+        groove_margin = 2           
+        handle_width = 6           
+        handle_margin = -5          
+        handle_radius = 8        
+        border_width = 1       
+
+        self.setStyleSheet(f"""
+            QSlider::groove:horizontal {{
+                border: {border_width}px solid #bbb;
+                background: white;
+                height: {groove_height}px;
+                border-radius: {groove_radius}px;
+                margin: {groove_margin}px 0;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: #0078D7;
+                border-radius: {groove_radius}px;
+            }}
+            QSlider::add-page:horizontal {{
+                background: #bbb;
+                border-radius: {groove_radius}px;
+            }}
+            QSlider::handle:horizontal {{
+                background: #005999;
+                border: {border_width}px solid #0078D7;
+                width: {handle_width}px;
+                margin: {handle_margin}px 0;
+                border-radius: {handle_radius}px;
+            }}
+        """)
+         
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if not self.values_list:
+            return
+        if len(self.values_list) <2:
+            return
+        
+        painter = QtGui.QPainter(self)
+        font = QtGui.QFont("Arial")
+        font.setPointSizeF(self.my_font)
+        painter.setFont(font)
+        font_metrics= painter.fontMetrics()
+        
+        slider_opt = QtWidgets.QStyleOptionSlider()
+        
+        self.initStyleOption(slider_opt)
+        groove_rect = self.style().subControlRect(
+            QtWidgets.QStyle.CC_Slider, slider_opt,
+            QtWidgets.QStyle.SC_SliderGroove, self
+        )
+        box_x = groove_rect.x()
+        box_y = groove_rect.y()
+        box_length = groove_rect.width()  #clumsy accounting for tick length. Neess to refine later
+        box_height = groove_rect.height()
+        groove_bottom = groove_rect.bottom()
+
+        space_of_tick= box_length / (len(self.values_list) -1 )
+        
+        tick_height = max(4, int(box_height * 0.3))
+        step = ((len(self.values_list)  - 1) //10) +1
+        
+        for i, value in enumerate(self.values_list):
+            if i % step == 0:
+                
+               label = f"{i+1}" 
+               
+               x = box_x + int(i * space_of_tick)
+               label_width = font_metrics.horizontalAdvance(label)
+               label_height = font_metrics.height()
+               
+               # Align text *centered horizontally* under the tick
+               text_x = x - label_width // 2
+               # Place text below the groove with DPI-aware padding
+               padding = 4   # or tweak as needed
+               text_y = groove_bottom + tick_height + label_height + padding
+               
+               painter.drawLine(x, groove_bottom + 1, x, groove_bottom + 1 + tick_height)
+               painter.drawText(text_x, text_y, label)
 
 
 # ---------------------------------------------------------------------
@@ -159,40 +258,17 @@ class ListSliderRange(QtWidgets.QSlider):
     sliderMoved = pyqtSignal(int, int, float, float)
     # The signal emits: (low_index, high_index, low_value, high_value)
 
-    def __init__(self, values_list=None, *args):
+    def __init__(self, values_list=None, font=8, *args):
         """Initialize the range slider."""
         
         super().__init__(*args)
+        self.my_font = font
         self._setup_slider_configuration(values_list)
         self._init_mouse_variables()
 
-    def _setup_slider_configuration(self, values_list):
-        """
-        Setup the slider configuration: set the discrete value list, orientation,
-        tick marks, range, handle positions, and dimensions.
-        """
-        if values_list is None:
-            values_list = [0.0]
-        self.values_list = values_list
-
-        self.setOrientation(Qt.Vertical)
-        self.setTickPosition(QtWidgets.QSlider.TicksBelow)
-        self.setMinimum(0)
-        self.setMaximum(len(self.values_list) - 1)
-        self._low = self.minimum()
-        self._high = self.maximum()
-        self.setMinimumWidth(100)
-        self.number_of_ticks = 20
-
-    def _init_mouse_variables(self):
-        """
-        Initialize variables needed for mouse interaction.
-        """
-        self.pressed_control = QtWidgets.QStyle.SC_None
-        self.hover_control = QtWidgets.QStyle.SC_None
-        self.click_offset = 0
-        self.active_slider = -1
-
+#-------------------------------------
+# Public methods
+#-----------------------------------------
     def up(self):
         """
         Move the slider one step upward (to a higher index).
@@ -256,9 +332,7 @@ class ListSliderRange(QtWidgets.QSlider):
     def set_list_value(self, value: float):
         """
         Set one of the handles based on the given value.
-
-        Args:
-            value: The desired value from values_list.
+        Args:value: The desired value from values_list.
         """
         if value not in self.values_list:
             return  # Ignore if value is not valid.
@@ -274,9 +348,7 @@ class ListSliderRange(QtWidgets.QSlider):
     def set_list(self, values_list: list):
         """
         Update the slider with a new list of valid values and adjust its range.
-
-        Args:
-            values_list (list): New list of discrete values.
+        Args:values_list (list): New list of discrete values.
         """
         if values_list is None or len(values_list) == 0:
             values_list = [0.0]
@@ -287,6 +359,9 @@ class ListSliderRange(QtWidgets.QSlider):
         self._low = self.minimum()
         self._high = self.maximum()
         self.update()
+        self.sliderMoved.emit(self._low, self._high,
+                              self.values_list[self._low],
+                              self.values_list[self._high])
 
     def up_min(self):
         """
@@ -324,31 +399,35 @@ class ListSliderRange(QtWidgets.QSlider):
                               self.values_list[self._low],
                               self.values_list[self._high])
 
-    def paintEvent(self, event):
+#-----------------------------------------------
+# Private methods
+#-------------------------------------------
+    def _setup_slider_configuration(self, values_list):
         """
-        Custom paint event to draw the slider groove, ticks, labels, span, and handles.
+        Setup the slider configuration: set the discrete value list, orientation,
+        tick marks, range, handle positions, and dimensions.
         """
-        painter = QtGui.QPainter(self)
-        style = QtWidgets.QApplication.style()
+        if values_list is None:
+            values_list = [0.0]
+        self.values_list = values_list
 
-        # 1) Draw the groove.
-        opt = QtWidgets.QStyleOptionSlider()
-        self.initStyleOption(opt)
-        opt.sliderValue = 0
-        opt.sliderPosition = 0
-        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
-        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
-        groove_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
-                                           QtWidgets.QStyle.SC_SliderGroove, self)
+        self.setOrientation(Qt.Vertical)
+        self.setTickPosition(QtWidgets.QSlider.TicksBelow)
+        self.setMinimum(0)
+        self.setMaximum(len(self.values_list) - 1)
+        self._low = self.minimum()
+        self._high = self.maximum()
+        self.setMinimumWidth(100)
+        self.number_of_ticks = 20
 
-        # 2) Draw ticks and labels in logarithmic steps.
-        self._draw_ticks_and_labels(painter, groove_rect, style, opt)
-
-        # 3) Draw the highlighted span between the two handles.
-        self._draw_span(painter, style, groove_rect, opt)
-
-        # 4) Draw the slider handles.
-        self._draw_handles(painter, style, opt)
+    def _init_mouse_variables(self):
+        """
+        Initialize variables needed for mouse interaction.
+        """
+        self.pressed_control = QtWidgets.QStyle.SC_None
+        self.hover_control = QtWidgets.QStyle.SC_None
+        self.click_offset = 0
+        self.active_slider = -1
 
     def _draw_ticks_and_labels(self, painter, groove_rect, style, opt):
         """
@@ -360,11 +439,12 @@ class ListSliderRange(QtWidgets.QSlider):
             style: Current application style.
             opt: QStyleOptionSlider instance.
         """
+
         # Calculate tick interval based on the number of ticks.
         step = math.ceil((self.maximum() - self.minimum()) / (self.number_of_ticks - 1))
         if step:
             painter.setPen(QtGui.QPen(QtCore.Qt.black))
-            painter.setFont(QtGui.QFont("Arial", 7))
+            painter.setFont(QtGui.QFont("Arial", self.my_font))
             tick_length = 8
             head_thickness = 5
 
@@ -452,6 +532,67 @@ class ListSliderRange(QtWidgets.QSlider):
             opt.subControls = QtWidgets.QStyle.SC_SliderHandle
             style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
 
+    def __pick(self, pt):
+        """
+        Return the x-coordinate if horizontal, else the y-coordinate.
+        """
+        return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
+
+    def __pixel_pos_to_range_value(self, pos):
+        """
+        Convert a pixel position to the slider's value.
+        """
+        style = QtWidgets.QApplication.style()
+        opt = QtWidgets.QStyleOptionSlider()
+        self.initStyleOption(opt)
+        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
+        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
+
+        if self.orientation() == Qt.Horizontal:
+            slider_length = sr.width()
+            slider_min = gr.x()
+            slider_max = gr.right() - slider_length + 1
+        else:
+            slider_length = sr.height()
+            slider_min = gr.y()
+            slider_max = gr.bottom() - slider_length + 1
+
+        # Convert the pixel offset to a value within the slider's range.
+        return style.sliderValueFromPosition(self.minimum(),
+                                             self.maximum(),
+                                             pos - slider_min,
+                                             slider_max - slider_min,
+                                             opt.upsideDown)
+    
+#----------------------------------
+# Events
+#----------------------------------
+    def paintEvent(self, event):
+        """
+        Custom paint event to draw the slider groove, ticks, labels, span, and handles.
+        """
+        painter = QtGui.QPainter(self)
+        style = QtWidgets.QApplication.style()
+
+        # 1) Draw the groove.
+        opt = QtWidgets.QStyleOptionSlider()
+        self.initStyleOption(opt)
+        opt.sliderValue = 0
+        opt.sliderPosition = 0
+        opt.subControls = QtWidgets.QStyle.SC_SliderGroove
+        style.drawComplexControl(QtWidgets.QStyle.CC_Slider, opt, painter, self)
+        groove_rect = style.subControlRect(QtWidgets.QStyle.CC_Slider, opt,
+                                           QtWidgets.QStyle.SC_SliderGroove, self)
+
+        # 2) Draw ticks and labels in logarithmic steps.
+        self._draw_ticks_and_labels(painter, groove_rect, style, opt)
+
+        # 3) Draw the highlighted span between the two handles.
+        self._draw_span(painter, style, groove_rect, opt)
+
+        # 4) Draw the slider handles.
+        self._draw_handles(painter, style, opt)
+
     def mousePressEvent(self, event):
         """
         Handle mouse press events to determine which handle is being moved.
@@ -530,38 +671,6 @@ class ListSliderRange(QtWidgets.QSlider):
                               self.values_list[self._low],
                               self.values_list[self._high])
 
-    def __pick(self, pt):
-        """
-        Return the x-coordinate if horizontal, else the y-coordinate.
-        """
-        return pt.x() if self.orientation() == Qt.Horizontal else pt.y()
-
-    def __pixel_pos_to_range_value(self, pos):
-        """
-        Convert a pixel position to the slider's value.
-        """
-        style = QtWidgets.QApplication.style()
-        opt = QtWidgets.QStyleOptionSlider()
-        self.initStyleOption(opt)
-        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
-        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
-
-        if self.orientation() == Qt.Horizontal:
-            slider_length = sr.width()
-            slider_min = gr.x()
-            slider_max = gr.right() - slider_length + 1
-        else:
-            slider_length = sr.height()
-            slider_min = gr.y()
-            slider_max = gr.bottom() - slider_length + 1
-
-        # Convert the pixel offset to a value within the slider's range.
-        return style.sliderValueFromPosition(self.minimum(),
-                                             self.maximum(),
-                                             pos - slider_min,
-                                             slider_max - slider_min,
-                                             opt.upsideDown)
-
 
 # ---------------------------------------------------------------------
 # Testing both classes.
@@ -574,7 +683,7 @@ if __name__ == "__main__":
     layout = QVBoxLayout(central_widget)
 
     # ----- Test for ListSlider (Single Handle) -----
-    single_slider = ListSlider([0, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40])
+    single_slider = ListSlider([0, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40, 10, 20, 30, 40])
     single_slider.setMinimumHeight(60)
     # Connect the sliderMoved signal with a lambda that accepts a single parameter.
     single_slider.sliderMoved.connect(

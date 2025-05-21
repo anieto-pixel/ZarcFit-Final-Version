@@ -12,9 +12,11 @@ import numpy as np
 import pandas as pd
 
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout, QFileDialog, QInputDialog, QFileDialog, QMenu, QAction, QMessageBox
+    QApplication, QWidget, QPushButton, QLabel, QFileDialog, QHBoxLayout, QFileDialog, 
+    QInputDialog, QFileDialog, QMenu, QAction, QMessageBox, QSizePolicy, QLineEdit, QLayout
 )
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
+from PyQt5.QtGui import QFontMetrics
 from ConfigImporter import ConfigImporter
 from CustomListSliders import ListSlider
 
@@ -105,7 +107,7 @@ class WidgetInputFile(QWidget):
 
     file_data_updated = pyqtSignal(np.ndarray, np.ndarray, np.ndarray)
 
-    def __init__(self, current_file=None, file_type_name=None):
+    def __init__(self, current_file=None, file_type_name=None, font = 8):
 
         super().__init__()
         # Internal state
@@ -119,6 +121,7 @@ class WidgetInputFile(QWidget):
         self.config_p = None
         
         # Build the UI layout
+        self.font = font
         self._initialize_ui() 
 
         #initialize with parameters
@@ -184,44 +187,156 @@ class WidgetInputFile(QWidget):
     # -----------------------------------------------------------------------
     # UI Methods
     def _initialize_ui(self):
-        """
-        Creates and lays out all UI elements, and connects signals.
-        """
-        # Declare UI elements
-        self.select_folder_button = QPushButton("Select Input Folder")
+        self._initialize_widgets()
+        self._configure_layout()
+        self._apply_styles_and_sizing()
+        self._connect_listeners()
+    
+    def _initialize_widgets(self):
+        """Create all UI components."""
+        # Buttons
+        self.select_folder_button = QPushButton(" Select Input Folder ")
         self.select_file_type_button = QPushButton("Select File Type")
         self.previous_button = QPushButton("<")
         self.next_button = QPushButton(">")
         self.file_label = QLabel("No file selected")
-        self._slider = ListSlider()
-        
-        # Slider setup
-        self._slider.setMinimumWidth(600)
-        
-        # File label
+        # Slider
+        self._slider = ListSlider(font = self.font)
+        self._slider.setMinimumWidth(400)
+        # Imput box and label
+        self._input_box = QLineEdit()
+        self._length_slider_label = QLabel("/ Not init")
+        # file label
         self.file_label.setAlignment(Qt.AlignCenter)
-        
-        # Button and Slider actions
-        self._connect_listeners()
-        
-        # Main layout
+                  
+    def _configure_layout(self):
+        """Create and apply the main layout."""
+        # Create the main horizontal layout
         layout = QHBoxLayout()
-        layout.addWidget(self.select_folder_button)
-        layout.addWidget(self.select_file_type_button)
-        layout.addWidget(self.previous_button)
-        layout.addWidget(self.file_label)
-        layout.addWidget(self.next_button)
-        layout.addWidget(self._slider)
-        self.setLayout(layout)
+        layout.setContentsMargins(5, 0, 5, 0)  # left, top, right, bottom
+        layout.setSpacing(0)
+    
+        # Wrap folder and filetype buttons in their own container
+        button_container = QWidget()
+        button_layout = QVBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 0, 0, 0)
+        button_layout.setSpacing(0)
+        button_layout.addWidget(self.select_folder_button)
+        button_layout.addWidget(self.select_file_type_button)
+    
+        #  Create slider container with margin customization ---
+        slider_container = self._create_slider_container()
+        slider_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         
+        # Configure input box width ---
+        font = self._input_box.font()
+        metrics = QFontMetrics(font)
+        text_width = metrics.horizontalAdvance("9999")
+        padding = 5
+        self._input_box.setFixedWidth(text_width + padding)
+        
+        # Wrap input box and label container
+        input_and_label_container = QWidget()
+        input_and_label_layout = QHBoxLayout(input_and_label_container)
+        input_and_label_layout.setContentsMargins(0, 0, 0, 0)
+        input_and_label_layout.setSpacing(0)
+        input_and_label_layout.addWidget(self._input_box)
+        input_and_label_layout.addWidget(self._length_slider_label)
+        
+        # File‑navigation container (<, filename, >)
+        nav_container = QWidget()
+        nav_layout = QHBoxLayout(nav_container)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
+        nav_layout.setSpacing(0)
+        nav_layout.addWidget(self.previous_button)
+        nav_layout.addWidget(self.file_label)
+        nav_layout.addWidget(self.next_button)
+        
+        # Stack input_container & nav_container vertically
+        bottom_container = QWidget()
+        bottom_layout = QVBoxLayout(bottom_container)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(0)
+        #bottom_layout.addWidget(input_and_label_container, alignment=Qt.AlignHCenter)
+        #bottom_layout.addWidget(nav_container,   alignment=Qt.AlignHCenter)
+        bottom_layout.addWidget(input_and_label_container)
+        bottom_layout.addWidget(nav_container)
+    
+        #layout.addWidget(button_container, 0, Qt.AlignTop)
+        layout.addWidget(button_container, 0, Qt.AlignVCenter)
+        layout.addSpacing(5)  # or whatever inter‑block padding you like
+        layout.addWidget(slider_container, 1, Qt.AlignTop)
+        layout.addSpacing(5)
+        #layout.addWidget(bottom_container, 0, Qt.AlignTop)
+        layout.addWidget(bottom_container, 0, Qt.AlignVCenter)
+    
+        # Finally
+        self.setLayout(layout)
+    
+    def _create_slider_container(self):
+        """Build a QWidget that holds the slider, with no extra top margin."""
+        slider_container = QWidget()
+        slider_container.setContentsMargins(0, 0, 0, 0)
+        slider_layout = QHBoxLayout(slider_container)
+        slider_layout.setContentsMargins(4, 0, 4, 0) # left, top, right, bottom
+        slider_layout.setSpacing(0)
+        # slider_layout.addWidget(self._slider, alignment=Qt.AlignTop)
+        slider_layout.addWidget(self._slider, 0, Qt.AlignTop)
+        return slider_container
+
+    def _apply_styles_and_sizing(self):
+        """Apply font sizes, padding, and size policies."""
+        
+        file_label_font = self.file_label.font()
+        file_label_font.setPointSizeF(self.font + 1)
+        self.file_label.setFont(file_label_font)
+        
+        for btn in (
+            self.select_folder_button,
+            self.select_file_type_button,
+            self.previous_button,
+            self.next_button
+        ):
+            f = btn.font()
+            f.setPointSize(self.font)
+            btn.setFont(f)
+    
+            fm = QFontMetrics(f)
+            btn.setFixedHeight(fm.height() + 9)
+            btn.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
+    
+            # Set width only for previous/next buttons ("<" and ">")
+            if btn in [self.previous_button, self.next_button]:
+                symbol_width = fm.horizontalAdvance(btn.text())
+                padding = 20  # Add a bit of extra space
+                btn.setFixedWidth(symbol_width + padding)
+            else:
+                btn.adjustSize()
+                
+        label_font = self._length_slider_label.font()
+        label_font.setPointSize(self.font)
+        self._length_slider_label.setFont(label_font)
+        
+        # Apply font to _input_box
+        input_font = self._input_box.font()
+        input_font.setPointSize(self.font)
+        self._input_box.setFont(input_font)   
+
+    # Conectors
     def _connect_listeners(self):
+        # Buttons and fodler related
         self.select_folder_button.clicked.connect(self._select_folder_handler)
         self.select_file_type_button.clicked.connect(self._select_file_type_handler)
         self.previous_button.clicked.connect(self._show_previous_file)
         self.next_button.clicked.connect(self._show_next_file)
         self.previous_button.setEnabled(False)
         self.next_button.setEnabled(False)
+        
+        # Input box related
         self._slider.valueChanged.connect(self._slider_update_handler)
+        self._slider.new_list_was_set.connect(lambda length: self._length_slider_label.setText(f"/{length}"))
+        self._slider.valueChanged.connect(lambda v: self._input_box.setText(str(v + 1))) #mine
+        self._input_box.editingFinished.connect(self._handle_input_box_update)
         
     # Configuration of file type
     def _initialize_file_type_parameters(self, file_type_name):
@@ -334,6 +449,7 @@ class WidgetInputFile(QWidget):
                 f for f in os.listdir(self._folder_path)
                 if f.lower().endswith(supported_ext)
             ]
+            self._files = sorted(self._files)
             if not skip_extract_default_file:
                 self._extract_default_file_from_folder()
             
@@ -364,10 +480,11 @@ class WidgetInputFile(QWidget):
         current_file = self._files[self._current_index]
         self.file_label.setText(current_file)
             
-        # Block signals so the slider doesn’t cause repeated calls
+        # Block extra signals so the slider doesn’t cause repeated calls
         self._slider.blockSignals(True)
         self._slider.setValue(self._current_index)
         self._slider.blockSignals(False)
+        self._input_box.setText(str(self._current_index + 1))
 
         # Build full path and extract the file's content
         file_path = os.path.join(self._folder_path, current_file)
@@ -490,7 +607,7 @@ class WidgetInputFile(QWidget):
         print(error_msg)
 
         # Optionally show a QMessageBox warning to the user
-        #QMessageBox.warning(self, "File Read Error. Possibly wrong format", error_msg)
+        QMessageBox.warning(self, "File Read Error. Possibly wrong format", error_msg)
 
         # Update label text
         self.file_label.setText("Error reading file. Possibly wrong filetype.")
@@ -498,11 +615,21 @@ class WidgetInputFile(QWidget):
         # Emit dummy data so the program doesn't crash downstream.
         self.file_data_updated.emit(np.array([]), np.array([]), np.array([]))
 
+    # Input box handlers
+    def _handle_input_box_update(self):
+        
+        txt = self._input_box.text()
+        if txt.isdigit():
+            self._slider.set_list_value_index(int(txt) - 1)
+        else:
+            print("Invalid input")
 
+        self._input_box.editingFinished.connect(self._handle_input_box_update)
+         
+        
 # -----------------------------------------------------------------------
 #  TEST
 # -----------------------------------------------------------------------
-
 import sys
 import numpy as np
 
@@ -580,10 +707,11 @@ class TestWindow(QWidget):
     #  Slot for file_data_updated
     # -----------------------------------------------------------------------
     def handle_file_data_updated(self, freq, z_real, z_imag):
-        print("Received file_data_updated signal:")
-        print("  freq:", freq)
-        print("  z_real:", z_real)
-        print("  z_imag:", z_imag)
+        pass
+#        print("Received file_data_updated signal:")
+#        print("  freq:", freq)
+#        print("  z_real:", z_real)
+#        print("  z_imag:", z_imag)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,10 @@ class ConfigImporter:
         # Secondary variables to display.
         self.secondary_variables_to_display = []
         self.variables_to_print = []
+        
+        # Display Preferences
+        self.general_font: Optional[int] = None
+        self.small_font: Optional[int] = None
 
         # Read and process the configuration file.
         self._read_config_file()
@@ -155,10 +159,12 @@ class ConfigImporter:
         """
         Extract optional parameters such as input and output file paths from the configuration.
         """
+
         if 'InputFile' in self.config:
             path = self.config['InputFile'].get('path')
             if path and self._validate_path(path):
                 self.input_file = path
+                
         if 'InputFileType' in self.config:
             my_type = self.config['InputFileType'].get('type')
             if my_type and self._validate_path(path):
@@ -172,6 +178,10 @@ class ConfigImporter:
         if 'SliderDisabled' in self.config:
             defaults_str = self.config["SliderDisabled"]["defaults"]
             self.slider_default_disabled = [val.strip().lower() == "true" for val in defaults_str.split(",")]
+            
+        if 'GeneralFont' in self.config:
+            self.general_font=int(self.config['GeneralFont'].get('font'))
+            self.small_font=int(self.config['GeneralFont'].get('small_font'))
 
     @staticmethod
     def _safe_import(class_name: str):
@@ -192,26 +202,32 @@ class ConfigImporter:
             TypeError: If the path is not a string.
             ValueError: If the directory for the path does not exist.
         """
-        if not isinstance(path, str):
-            raise TypeError("Path must be a string.")
-
-        directory = os.path.dirname(path) or '.'
-        if not os.path.isdir(directory):
-            raise ValueError("ConfigImporter._validate_path :Invalid file path. The directory does not exist.")
-        return True
-        """
-        Validate the given file path.
-        Raises:
-            TypeError: If the path is not a string.
-            ValueError: If the directory for the path does not exist.
-        """
-        if not isinstance(path, str):
-            raise TypeError("ConfigImporter._validate_path:Path must be a string.")
-
-        output_dir = os.path.dirname(path) or '.'
-        if not os.path.isdir(output_dir):
-            raise ValueError("ConfigImporter._validate_path:Invalid file path. The directory does not exist.")
-        return True
+        try:
+            if not isinstance(path, str):
+                raise TypeError("Path must be a string.")
+    
+            directory = os.path.dirname(path) or '.'
+            if not os.path.isdir(directory):
+                raise ValueError("ConfigImporter._validate_path :Invalid file path. The directory does not exist.")
+            return True
+        
+            """
+            Validate the given file path.
+            Raises:
+                TypeError: If the path is not a string.
+                ValueError: If the directory for the path does not exist.
+            """
+            if not isinstance(path, str):
+                raise TypeError("ConfigImporter._validate_path:Path must be a string.")
+    
+            output_dir = os.path.dirname(path) or '.'
+            if not os.path.isdir(output_dir):
+                raise ValueError("ConfigImporter._validate_path:Invalid file path. The directory does not exist.")
+            return True
+        
+        except (TypeError, ValueError) as e:
+            print(f"Path validation error: {e}")
+            return False
 
     def _check_sliders_length(self):
         

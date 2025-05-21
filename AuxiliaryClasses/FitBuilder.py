@@ -12,7 +12,7 @@ from ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuit
 ###############################################################################
 # Fit_class 
 ###############################################################################
-class Fit(QObject):
+class FitBuilder(QObject):
     """
     This class replicates the circuit calculation by evaluating formulas from
     config.ini. It also calculates secondary variables that were previously in Main.
@@ -29,6 +29,11 @@ class Fit(QObject):
         self.upper_bounds = {}
         self.disabled_variables = set()
         self.gaussian_prior = False
+        self._previous_fit_params = {}
+        
+        #Base weigthing variables
+        self.base_weight =3 #Randy changes this value to change the weight against low p
+        self.exp_weight =-15
         
     # Public Methods (Interface Unchanged)
     def set_bounds(self, slider_configurations: dict) -> None:
@@ -42,6 +47,9 @@ class Fit(QObject):
             else:
                 self.lower_bounds[key] = config[1]
                 self.upper_bounds[key] = config[2]
+                
+        self.lower_bounds["Pei"] = -np.inf
+        self.upper_bounds["Pei"] = +np.inf
                 
     def set_disabled_variables(self, key: str, disabled: bool) -> None:
         """Enable or disable a parameter for the fit based on its key."""
@@ -64,12 +72,18 @@ class Fit(QObject):
     def fit_model_bode(self, initial_params: dict, prior_weight: float) -> dict:
         """Fit the model using the Bode cost function."""
         return self.fit_model(self._residual_bode, initial_params, prior_weight)
+    
+    def recover_previous_fit(self):
+
+        self.model_manual_values.emit(self._previous_fit_params)
             
     def fit_model(self, residual_func, initial_params: dict, prior_weight: float = 0) -> dict:
         """
         Fit the model using a provided residual function and (optionally) a Gaussian prior
         that penalizes deviation from the initial guess.
         """
+        self._previous_fit_params = initial_params
+        
         all_keys = list(initial_params.keys())
         free_keys = [k for k in all_keys if k not in self.disabled_variables]
         locked_params = {k: initial_params[k] for k in self.disabled_variables if k in initial_params}
@@ -102,6 +116,10 @@ class Fit(QObject):
         )
         best_fit_free = self._descale_params(free_keys, result.x)
         best_fit = {**locked_params, **best_fit_free}
+        
+        if 'Pei' in best_fit.keys(): #special case angle Pei
+            best_fit['Pei'] = (best_fit['Pei']+1)%4. - 1
+        
         self.model_manual_values.emit(best_fit)
         return best_fit
 
@@ -138,7 +156,7 @@ class Fit(QObject):
         """
         weight = 1
         for key in ["Ph", "Pm", "Pl", "Pef"]:
-            weight *= 1 + 3 * np.exp(-15 * params[key])
+            weight *= 1 + self.base_weight * np.exp(self.exp_weight * params[key])
         return weight
                  
     def _compute_invalid_guess_penalty(self, params: dict, prior_weight: float) -> np.ndarray:

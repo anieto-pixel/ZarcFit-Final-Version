@@ -153,34 +153,7 @@ class ParentGraph(pg.PlotWidget):
                 filled=filled
             )
             self._special_items.append(plot_item)
-            
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        """
-        Handles the coordinate transform + single‐point plotting.
-        By extracting the scalar out of the 1‐element arrays, we
-        avoid any surprises in how PlotDataItem interprets the x,y shapes.
-        """
-        # transform into plot coordinates
-        x_arr, y_arr = self._prepare_xy(
-            np.array([freq]),
-            np.array([zr]),
-            np.array([zi])
-        )
-        # pull out the scalar floats
-        x = float(x_arr[0])
-        y = float(y_arr[0])
 
-        pen   = pg.mkPen(color, width=2)
-        brush = color if filled else None
-
-        return self.plot(
-            [x], [y],              # pass single‐element lists
-            pen=None,
-            symbol=symbol,
-            symbolSize=12,
-            symbolPen=pen,
-            symbolBrush=brush
-        )
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
@@ -267,6 +240,34 @@ class ParentGraph(pg.PlotWidget):
         Subclasses override for Bode, Phase, etc.
         """
         return z_real, z_imag
+
+    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
+        """
+        Handles the coordinate transform + single‐point plotting.
+        By extracting the scalar out of the 1‐element arrays, we
+        avoid any surprises in how PlotDataItem interprets the x,y shapes.
+        """
+        # transform into plot coordinates
+        x_arr, y_arr = self._prepare_xy(
+            np.array([freq]),
+            np.array([zr]),
+            np.array([zi])
+        )
+        # pull out the scalar floats
+        x = float(x_arr[0])
+        y = float(y_arr[0])
+
+        pen   = pg.mkPen(color, width=2)
+        brush = color if filled else None
+
+        return self.plot(
+            [x], [y],              # pass single‐element lists
+            pen=None,
+            symbol=symbol,
+            symbolSize=12,
+            symbolPen=pen,
+            symbolBrush=brush
+        )
 
     def _handle_auto_scale_toggle(self, checked):
         if checked:
@@ -399,11 +400,9 @@ class PhaseGraph(ParentGraph):
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
         
-        # self.getPlotItem().getViewBox().enableAutoRange(enable=False, x=True, y=False)
-        
         self.setYRange(-1, 2, padding=0.0)
         self.setXRange(-1, 6, padding=0.0)
-#        self.getViewBox().invertX(True)
+        self.getViewBox().invertX(True)
         
 #        x_ticks = [(i, str(i)) for i in range(-1, 7)]
 #        y_ticks = [(i, str(i)) for i in range(-1, 3)]
@@ -419,25 +418,6 @@ class PhaseGraph(ParentGraph):
     def _apply_auto_scale(self):
             # override the parent method so it does nothing
             return
-        
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        if symbol == 'x':
-            x_vals, _ = self._prepare_xy(
-                np.array([freq]), np.array([zr]), np.array([zi])
-            )
-            x0 = x_vals[0]
-            y_min, y_max = self.getViewBox().viewRange()[1]
-            return self.plot(
-                [x0, x0], [y_min, y_max],
-                pen=mkPen(color, width=2),
-                symbol=None
-            )
-        else:
-            return super()._draw_special_marker(
-                freq, zr, zi,
-                symbol, color, filled
-            )
-        
                     
 class BodeGraph(ParentGraph):
     def __init__(self):
@@ -446,10 +426,8 @@ class BodeGraph(ParentGraph):
         self.setTitle("Impedance Magnitude Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
-        
-        self.setYRange(3, 7, padding=0.00)
-        #self.setXRange(-1.5, 6, padding=0.05)
-        self.setXRange(-1, 6, padding=0.0)
+        self.setYRange(3, 7, padding=0.08)
+        self.setXRange(-1.5, 6, padding=0.05)
         self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, z_real, z_imag):
@@ -457,26 +435,6 @@ class BodeGraph(ParentGraph):
         mag = np.sqrt(z_real**2 + z_imag**2)
         mag_db = np.log10(mag)  # or 20*np.log10(mag) if you really want dB
         return freq_log, mag_db
-
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        if symbol == 'x':
-            x_vals, _ = self._prepare_xy(
-                np.array([freq]), np.array([zr]), np.array([zi])
-            )
-            x0 = x_vals[0]
-            y_min, y_max = self.getViewBox().viewRange()[1]
-            return self.plot(
-                [x0, x0], [y_min, y_max],
-                pen=mkPen(color, width=2),
-                symbol=None
-            )
-        else:
-            # **CORRECT super call** – keep the same order
-            return super()._draw_special_marker(
-                freq, zr, zi,
-                symbol, color, filled
-            )
-    
     
 class ColeColeGraph(ParentGraph):
     """

@@ -11,10 +11,14 @@ from scipy.interpolate import PchipInterpolator
 from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
 from ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
 from TimeDomainBuilder import TimeDomainBuilder
-from Fit import Fit
+from FitBuilder import FitBuilder
 
 # Bounds are scaled. Need to add padding for 0 values, handle Qei,
 # and implement a way of making Rinf negative.
+
+#--------------------------------NOTE TO RANDY-------------------------------------------:
+# The calculations related to the circuit models have been moved to the class "models"
+#--------------------------------------------------------------------------------------
 
 @dataclass
 class CalculationResult:
@@ -58,7 +62,7 @@ class Calculator(QObject):
         # Initialize the circuit model.
         self._model_circuit = ModelCircuitParallel()
         # Instantiate Fit with both experiment data and the circuit model.
-        self.fit_builder = Fit(self._experiment_data, self._model_circuit)
+        self.fit_builder = FitBuilder(self._experiment_data, self._model_circuit)
         self.time_domain_builder = TimeDomainBuilder(self._model_circuit)
 
         # Dictionary for additional fit variables.
@@ -98,14 +102,14 @@ class Calculator(QObject):
     def get_latest_secondaries(self) -> dict:
         """Return the most recent dictionary of secondary variables."""
         
-        return dict(self._model_circuit.par_second | self._calculator_variables)
+        return dict(self._model_circuit.par_second | self._calculator_variables | self._model_circuit.par_other_sec)
 
     def get_model_parameters(self) -> dict:
         """
         Return the combined dictionary of model parameters, integrating:
         """
         integral_variables = self.time_domain_builder.get_integral_variables()
-        model_variables = self._model_circuit.q | self._model_circuit.v_second | self._model_circuit.v_other_sec
+        model_variables = self._model_circuit.q | self._model_circuit.par_second | self._model_circuit.par_other_sec
         fit_variables = self._fit_variables
         calc_variables = self._calculator_variables
         
@@ -117,6 +121,7 @@ class Calculator(QObject):
           - True selects ModelCircuitSeries.
           - False selects ModelCircuitParallel.
         """
+        
         neg_rinf, old_q, old_vsec, old_ovsec = self._model_circuit.init_parameters()
         if state:
             self._model_circuit = ModelCircuitSeries(
@@ -134,6 +139,8 @@ class Calculator(QObject):
             )
         self.time_domain_builder.set_model_circuit(self._model_circuit)
         self.fit_builder.set_model_circuit(self._model_circuit)
+        
+        print(f"Using {self._model_circuit.name}")
 
     def fit_model_cole(self, initial_params: dict) -> dict:
         """Fit the model using the Cole cost function."""
@@ -143,7 +150,7 @@ class Calculator(QObject):
 
     def fit_model_bode(self, initial_params: dict) -> dict:
         """Fit the model using the Bode cost function."""
-        
+                
         prior_weight = 400
         return self.fit_builder.fit_model_bode(initial_params, prior_weight)
 
@@ -156,6 +163,7 @@ class Calculator(QObject):
         3) Compute the time-domain response.
         4) Pack all results into a CalculationResult and emit a signal.
         """
+
         freq_array = self._experiment_data["freq"]
         z_experimental = self._experiment_data["Z_real"].copy() + 1j * self._experiment_data["Z_imag"].copy()
         
@@ -166,6 +174,7 @@ class Calculator(QObject):
         rock_z = self._model_circuit.estimate_rock(params, freq_array, z_experimental)
         rock_z_real, rock_z_imag = rock_z.real, rock_z.imag
 
+        #calculate the special frequencies wanted
         special_freq, spec_zr, spec_zi = self._calculate_special_frequencies(params)
         
         # Time domain response.
@@ -191,6 +200,7 @@ class Calculator(QObject):
         
         self.model_manual_result.emit(result)
         self._update_fit_variables(z_real, z_imag, params)
+
         return result
 
     def run_time_domain(self, params: dict):
@@ -224,11 +234,18 @@ class Calculator(QObject):
 
     # Private Methods
     def _calculate_special_frequencies(self, params: dict):
+
+        #enkin 2025-05-07  Set params without influence of electrode
+        params_no_electrode = params.copy()
+        params_no_electrode['Re']=1E8
+        params_no_electrode['Qe']=1E2
+        
         
         fixed_special_frequencies = np.array([0.1])  # Point of interest, f = 0.1Hz
-        dynamic_special_freq = self._get_special_freqs(params)
+        dynamic_special_freq = self._get_special_freqs(params)     #slider frequencies
     
-        fsf_z, _ = self._model_circuit.run_model(params, fixed_special_frequencies, old_par_second=True)
+        #fsf_z, _ = self._model_circuit.run_model(params, fixed_special_frequencies, old_par_second=True)
+        fsf_z, _ = self._model_circuit.run_model(params_no_electrode, fixed_special_frequencies, old_par_second=True)   #enkin 2025-05-07
         dsf_z, _ = self._model_circuit.run_model(params, dynamic_special_freq, old_par_second=True)
     
         # Adding reference resistance to the dictionary

@@ -1,167 +1,166 @@
-
-"""
-Created on Tue Jan  7 11:37:36 2025
-
-@author: agarcian
-"""
-
 import sys
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow, QSlider,
-                             QWidget, QVBoxLayout, QTextEdit)
+from PyQt5.QtWidgets import (
+    QApplication, QHBoxLayout, QVBoxLayout,  #  ← added QVBoxLayout
+    QLabel, QWidget, QTextEdit, QSlider, QLineEdit
+)
+from PyQt5.QtGui import QFontMetrics, QFont
 
+# --------------------------------------------------
+# Main widget
+# --------------------------------------------------
 class WidgetTextBar(QWidget):
-    """A widget that displays key/value pairs with colored labels."""
-
-    def __init__(self, keys_1=None):
-        """
-        Initialize the WidgetTextBar.
-        Parameters: keys_1 (list): A list of keys with the values to be displayed labels.
-        """
+    """Displays key/value pairs with coloured labels plus a comment box."""
+    # --------------------------
+    # Construction
+    # --------------------------
+    def __init__(self, keys_1=None, font = 8):
         super().__init__()
-        self.value_labels = {}  # Maps keys to QLabel instances.
-        self.key_colors = {}    # Maps keys to HTML colors for label text.
-        
-        self._user_comment="default"
 
-        keys_1 = keys_1 or []  # Ensure it's a list
+        # ---- user‑tunable font size (points) ----
+        self.my_font_size = font             # Master size knob
 
-        # Sort and order the keys by type/colour
+        # ----------------------------------------
+        self.default_text  = "Comment"
+        self.value_labels  = {}              # key → QLabel
+        self.key_colors    = {}              # key → colour string
+        self._user_comment = self.default_text
+        self._user_comment  = ""
+
+        # Build UI
+        keys_1 = keys_1 or []
         ordered_keys = self._sort_keys_by_suffix(keys_1)
-
-        # Initialize labels and layout
         self._build_ui(ordered_keys)
-        
-    #--------------------------------------
-    #   Public Methods
-    #--------------------------------------- 
+
+    # --------------------------
+    # Public helpers
+    # --------------------------
     def get_comment(self):
-        return {'comment':self._user_comment}
-    
-    #--------------------------------------
-    #   Private Methods
-    #---------------------------------------
-    def _sort_keys_by_suffix(self, keys):
-        """
-        Sorts and categorizes keys based on their suffix.
+        return {'comment': self._user_comment}
 
-        Returns:
-            list: Ordered list of keys for display.
-        """
-        categorized_keys = {"h": [], "m": [], "l": [], "other": []}
+    def clear_text_box(self):
+        self._comment_edit.clear()
+        self._comment_edit.setText(self.default_text)
+        self._user_comment = ""
 
-        for key in keys:
-            suffix = key[-1] if key[-1] in categorized_keys else "other"
-            categorized_keys[suffix].append(key)
-
-        # Sort within each category and return merged ordered keys
+    # --------------------------
+    # Internal helpers
+    # --------------------------
+    @staticmethod
+    def _sort_keys_by_suffix(keys):
+        """Return keys grouped by final letter (h/m/l) then alphabetic."""
+        buckets = {"h": [], "m": [], "l": [], "other": []}
+        for k in keys:
+            buckets[k[-1] if k[-1] in buckets else "other"].append(k)
         return (
-            sorted(categorized_keys["h"]) +
-            sorted(categorized_keys["m"]) +
-            sorted(categorized_keys["l"]) +
-            sorted(categorized_keys["other"])
+            sorted(buckets["h"], reverse=True) +
+            sorted(buckets["m"], reverse=True) +
+            sorted(buckets["l"], reverse=True) +
+            sorted(buckets["other"], reverse=True)
         )
 
-    def _assign_color_by_suffix(self, key):
-        """
-        Assigns colors based on the key suffix.
-        """
+    @staticmethod
+    def _assign_color_by_suffix(key):
         return {"h": "red", "m": "green", "l": "blue"}.get(key[-1], "black")
 
-    
+    # --------------------------
+    # Build the interface
+    # --------------------------
     def _build_ui(self, ordered_keys):
-        """
-        Creates labels with the correct order and formatting.
-        """
-        main_layout = QHBoxLayout()
+        font = QFont()
+        font.setPointSize(self.my_font_size)              
+        fm = QFontMetrics(font)
+        line_px = fm.lineSpacing()       
         
-        #Layout for displayed text labels
-        h_layout = QHBoxLayout()
-        h_layout.setContentsMargins(0, 0, 0, 0)
-        h_layout.setSpacing(10)
+        # ---- main horizontal layout (labels + comment box) ----
+        main = QHBoxLayout(self)
+        main.setContentsMargins(0, 0, 0, 0)
+        main.setSpacing(0)
 
-        # Setting diplayed text labels
+        # ---- sub‑layout for the labels ----
+        h_labels = QHBoxLayout()
+        h_labels.setContentsMargins(0, 0, 0, 0)
+        h_labels.setSpacing(10)
+
         for key in ordered_keys:
-            color = self._assign_color_by_suffix(key)
-            self.key_colors[key] = color
+            colour       = self._assign_color_by_suffix(key)
+            self.key_colors[key] = colour
 
-            initial_text = f"<b><font color='{color}'>{key}:</font></b> 0.000000"
-            value_label = QLabel(initial_text)
-            value_label.setAlignment(Qt.AlignLeft)
-            #arbitrary_space_per_element=130
-            arbitrary_space_per_element=85
-            value_label.setFixedWidth(arbitrary_space_per_element + len(key))
+            html = (
+                f"<b>"
+                f"<span style='font-size:{self.my_font_size}pt; color:{colour};'>{key}:</span>"
+                f"</b> 0.000000"
+            )
 
-            h_layout.addWidget(value_label)
-            self.value_labels[key] = value_label
-        h_layout.addStretch()
-        
-        #window to write on
-        # Now create a QTextEdit on the right
-        self._comment_edit = QTextEdit()
-        self._comment_edit.setFixedHeight(25)
-        self._comment_edit.setPlaceholderText("Type your comment here...")
+            lbl = QLabel(html)
+            lbl.setAlignment(Qt.AlignLeft)
+            lbl.setStyleSheet(f"font-size:{self.my_font_size}pt;")      # makes numbers match
+            lbl.setFixedHeight(line_px)
+            lbl.setFixedWidth(125  + len(key))
+
+            h_labels.addWidget(lbl)
+            self.value_labels[key] = lbl
+
+        # ---- comment box ----
+        self._comment_edit = QLineEdit()
+        self._comment_edit.setFont(font)
+        self._comment_edit.setPlaceholderText(self.default_text)
+        # enforce same font size in placeholder
+        self._comment_edit.setStyleSheet(f"font-size:{self.my_font_size}pt;")
+        # height = line + descent to avoid clipping
+        self._comment_edit.setFixedHeight(line_px + fm.descent())
         self._comment_edit.textChanged.connect(self._on_text_changed)
-        
-        # Put them together in a main horizontal layout
-        main_layout.addLayout(h_layout)       # The row of keys on the left
-        main_layout.addWidget(self._comment_edit)  # The text box on the right
-        
-        
-        self.setLayout(main_layout)
-        self.setFixedHeight(self.sizeHint().height())
-        
-    def _update_text(self, dictionary):
-        """
-        Updates the text of labels based on the provided dictionary.
 
-        The key text remains colored, while the value text is displayed in black.
-        """
-        for key, value in dictionary.items():
-            label = self.value_labels.get(key)
-            if label:
-                color = self.key_colors[key]
-                label.setText(f"<b><font color='{color}'>{key}:</font></b> {value:.3g}")
-#            else:
-#                print(f"WidgetTextBar Warning: Key '{key}' is not configured. Add it in config.ini")
-                
+        # ---- assemble ----
+        main.addLayout(h_labels)
+        main.addWidget(self._comment_edit)
+
+        # overall widget height also tracks font size
+        self.setFixedHeight(line_px + fm.descent())
+
+    # --------------------------
+    # Runtime updates
+    # --------------------------
+    def _update_text(self, dictionary):
+        font_pt = self.my_font_size
+        for key, val in dictionary.items():
+            lbl = self.value_labels.get(key)
+            if lbl:
+                colour = self.key_colors[key]
+                lbl.setText(
+                    f"<b><span style='font-size:{font_pt}pt; color:{colour};'>{key}:</span></b> "
+                    f"{val:.3g}"
+                )
+
     def _on_text_changed(self):
-        """
-        Callback whenever the user modifies the text in `_comment_edit`.
-        We store it in `self.user_comment`.
-        """
-        self._user_comment = self._comment_edit.toPlainText()
+        self._user_comment = self._comment_edit.text()
 
 
 #########################
 # Manual Testing
 #########################
-
 if __name__ == "__main__":
+    from PyQt5.QtWidgets import QMainWindow
     app = QApplication(sys.argv)
 
-    # Dictionary 1 has keys ending with h, m, l (red, green, blue).
-    dic_1 = {"pQh": 2.0067, "pQm": 0.00008, "pQl": 20.450004, "pS": 999.0}
-
-    # Dictionary 2 has keys that do not follow the h/m/l suffix convention.
+    # Example dictionaries.
+    dic_1 = {"pQh": 2.0067, "pRh": 2.0067, "pQm": 0.00008, "pQl": 20.450004, "pS": 999.0}
     dic_2 = {"unknown": 0.0067}
-
-    # Merge dictionaries for updating.
     dic_3 = dic_1 | dic_2
 
-    # Create main window.
+    # Create a main window.
     window = QMainWindow()
 
-    # Create the WidgetTextBar with keys from both dictionaries.
+    # Create the WidgetTextBar using keys from both dictionaries.
     text_bar = WidgetTextBar(dic_1.keys() | dic_2.keys())
     text_bar._update_text(dic_3)
 
-    # Create a central widget and layout to hold the text bar and sliders.
+    # Create a central widget and layout.
     central_widget = QWidget()
     central_layout = QVBoxLayout()
     central_layout.addWidget(text_bar)
 
-    # For each key, create a label and a corresponding horizontal slider.
+    # For each key, create a label and corresponding horizontal slider.
     sliders = {}
     for key, value in dic_3.items():
         lbl = QLabel(key)
@@ -171,7 +170,6 @@ if __name__ == "__main__":
         slider.setMinimum(-1000000)
         slider.setMaximum(1000000)
         slider.setValue(int(value * 10))
-        # Update the dictionary and text bar when the slider value changes.
         slider.valueChanged.connect(
             lambda val, k=key: (
                 dic_3.update({k: val / 100.0}),

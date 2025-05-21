@@ -99,11 +99,14 @@ class ModelCircuitParent(object):
         self.par_second["pQl"] = Ql * (par["Rl"] / (par["Rinf"] + par["Rh"] + par["Rm"] + par["Rl"])) ** 2
         
         self.par_other_sec["Ch"]= 1/(2*np.pi*par["Fh"]*par["Rh"] )
-        self.par_other_sec["pCh"]=1/(2*np.pi*par["Fh"]*self.par_second["pRh"] )
-        self.par_other_sec["Cm"]=1/(2*np.pi*par["Fm"]*par["Rm"] )
-        self.par_other_sec["pCm"]=1/(2*np.pi*par["Fm"]*self.par_second["pRm"] )
+        #self.par_other_sec["pCh"]=1/(2*np.pi*par["Fh"]*self.par_second["pRh"] )
+        self.par_other_sec["pCh"]= self.par_other_sec["Ch"]*(par["Rh"]/(par["Rinf"] + par["Rh"]))**2
+        self.par_other_sec["Cm"]= 1/(2*np.pi*par["Fm"]*par["Rm"] )
+        #self.par_other_sec["pCm"]=1/(2*np.pi*par["Fm"]*self.par_second["pRm"] )
+        self.par_other_sec["pCm"]= self.par_other_sec["Cm"]*(par["Rm"]/(par["Rinf"] + par["Rh"] + par["Rm"]))**2
         self.par_other_sec["Cl"]=1/(2*np.pi*par["Fl"]*par["Rl"] )
-        self.par_other_sec["pCl"] =1/(2*np.pi*par["Fl"]*self.par_second["pRl"] )
+        #self.par_other_sec["pCl"] =1/(2*np.pi*par["Fl"]*self.par_second["pRl"] )
+        self.par_other_sec["pCl"] = self.par_other_sec["Cl"]*(par["Rl"]/(par["Rinf"] + par["Rh"] + par["Rm"] + par["Rl"]))**2
              
     def _inductor(self, freq, linf):
         """
@@ -124,13 +127,15 @@ class ModelCircuitParent(object):
             raise ValueError("Resistance r cannot be zero.")
         if f0 <= 0:
             raise ValueError("Resonant frequency f0 must be positive.")
-        result = 1.0 / (r * (2.0 * np.pi * f0) ** p)
+        result = 1.0 / (r * ((2.0 * np.pi * f0) ** p))
+        
         return result
 
     def _cpe(self, freq, q, pf, pi):
         """
         Return the impedance of a CPE for a given frequency.
         """
+
         if q == 0:
             raise ValueError("Parameter q cannot be zero.")
         if freq < 0:
@@ -143,6 +148,7 @@ class ModelCircuitParent(object):
         phase_factor = (1j) ** pi
         omega_exp = (2.0 * np.pi * freq) ** pf
         result = 1.0 / (q * phase_factor * omega_exp)
+    
         return result
 
     def _parallel(self, z_1, z_2):
@@ -154,6 +160,7 @@ class ModelCircuitParent(object):
         
         denominator = (1.0 / z_1) + (1.0 / z_2)
         result = 1.0 / denominator
+  
         return result
     
     def _parallel_arrays(self, z_1, z_2):
@@ -187,10 +194,8 @@ class ModelCircuitSeries(ModelCircuitParent):
         z = []
 
         for freq in freq_array:
-
             z_cpem = self._cpe(freq, self.q["Qm"], par["Pm"], par["Pm"])
             zarcm = self._parallel(z_cpem, par["Rm"])
-
             z_cpel = self._cpe(freq, self.q["Ql"], par["Pl"], par["Pl"])
             zarcl = self._parallel(z_cpel, par["Rl"])
 
@@ -210,7 +215,6 @@ class ModelCircuitSeries(ModelCircuitParent):
         z_rock = self.run_rock(par, freq_array, old_par_second=True)
 
         zinf = [self._inductor(freq, par["Linf"]) + par["Rinf"] for freq in freq_array]
-        
         z_cpeh =[ self._cpe(freq, self.q["Qh"], par["Ph"], par["Ph"]) for freq in freq_array]
         zarch = [self._parallel(z_cpeh[i], par["Rh"]) for i in range(len(freq_array))]
         
@@ -272,6 +276,7 @@ class ModelCircuitParallel(ModelCircuitParent):
         zarce = [self._parallel(z_cpee[i], par["Re"]) for i in range(len(freq_array))]
         
         z_circuit= np.array([zinf[i] + z_rock_line_h[i] + zarce[i] for i in range(len(freq_array))])
+
 
         return z_circuit, np.array(z_rock)
 

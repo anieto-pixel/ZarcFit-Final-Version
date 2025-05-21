@@ -50,6 +50,7 @@ class ParentGraph(pg.PlotWidget):
     A base PlotWidget that manages 'base' data, 'manual' data, and special markers.
     Subclasses may override _prepare_xy(...) and certain UI aspects.
     """
+
     def __init__(self):
         super().__init__()
         self.setMouseTracking(True)
@@ -131,56 +132,40 @@ class ParentGraph(pg.PlotWidget):
         """
         Adds or updates special marker points on the graph.
         """
-        # 1) Clear out the old items
+        # Remove any existing markers
         for item in self._special_items:
             self.removeItem(item)
         self._special_items = []
 
         symbols = ['x', 'd', 's']
-        colors  = ['r', 'g', 'b']
+        colors = ['r', 'g', 'b']
 
-        # 2) For each frequency triplet, compute its styling then plot it
         for i, (freq, zr, zi) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
-            group_index  = i // 3
-            symbol       = symbols[ group_index % len(symbols) ]
-            color        = colors[ i % len(colors) ]
-            filled       = (group_index % 2 == 0)
+            group_index = i // 3
+            symbol_index = group_index % len(symbols)
+            color_index = i % len(colors)
 
-            plot_item = self._draw_special_marker(
-                freq, zr, zi,
-                symbol=symbol,
-                color=color,
-                filled=filled
+            symbol = symbols[symbol_index]
+            color = colors[color_index]
+            filled = (group_index % 2 == 0)
+
+            x, y = self._prepare_xy(
+                np.array([freq]),
+                np.array([zr]),
+                np.array([zi])
+            )
+
+            symbol_pen = pg.mkPen(color, width=2)
+            symbol_brush = color if filled else None
+
+            plot_item = self.plot(
+                x, y, pen=None,
+                symbol=symbol, symbolSize=12,
+                symbolPen=symbol_pen,
+                symbolBrush=symbol_brush
             )
             self._special_items.append(plot_item)
-            
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        """
-        Handles the coordinate transform + single‐point plotting.
-        By extracting the scalar out of the 1‐element arrays, we
-        avoid any surprises in how PlotDataItem interprets the x,y shapes.
-        """
-        # transform into plot coordinates
-        x_arr, y_arr = self._prepare_xy(
-            np.array([freq]),
-            np.array([zr]),
-            np.array([zi])
-        )
-        # pull out the scalar floats
-        x = float(x_arr[0])
-        y = float(y_arr[0])
 
-        pen   = pg.mkPen(color, width=2)
-        brush = color if filled else None
-
-        return self.plot(
-            [x], [y],              # pass single‐element lists
-            pen=None,
-            symbol=symbol,
-            symbolSize=12,
-            symbolPen=pen,
-            symbolBrush=brush
-        )
     # -----------------------------------------------------------------------
     #  Private Methods
     # -----------------------------------------------------------------------
@@ -399,11 +384,9 @@ class PhaseGraph(ParentGraph):
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
         
-        # self.getPlotItem().getViewBox().enableAutoRange(enable=False, x=True, y=False)
-        
         self.setYRange(-1, 2, padding=0.0)
         self.setXRange(-1, 6, padding=0.0)
-#        self.getViewBox().invertX(True)
+        self.getViewBox().invertX(True)
         
 #        x_ticks = [(i, str(i)) for i in range(-1, 7)]
 #        y_ticks = [(i, str(i)) for i in range(-1, 3)]
@@ -420,25 +403,59 @@ class PhaseGraph(ParentGraph):
             # override the parent method so it does nothing
             return
         
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        if symbol == 'x':
-            x_vals, _ = self._prepare_xy(
-                np.array([freq]), np.array([zr]), np.array([zi])
-            )
-            x0 = x_vals[0]
-            y_min, y_max = self.getViewBox().viewRange()[1]
-            return self.plot(
-                [x0, x0], [y_min, y_max],
-                pen=mkPen(color, width=2),
-                symbol=None
-            )
-        else:
-            return super()._draw_special_marker(
-                freq, zr, zi,
-                symbol, color, filled
-            )
+    def update_special_frequencies(self, freq_array, z_real_array, z_imag_array):
+        # 1) remove prior items
+        for item in self._special_items:
+            self.removeItem(item)
+        self._special_items = []
+
+        symbols = ['x', 'd', 's']
+        colors  = ['r', 'g', 'b']
+
+        # 2) loop and dispatch
+        for i, (freq, zr, zi) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
+            group_index  = i // 3
+            symbol_index = group_index % len(symbols)
+            color_index  = i % len(colors)
+
+            symbol = symbols[symbol_index]
+            color  = colors[color_index]
+
+            if symbol == 'd':
+                # Diamond: fall back to point marker
+                x, y = self._prepare_xy(
+                    np.array([freq]),
+                    np.array([zr]),
+                    np.array([zi])
+                )
+                pw = self.plot(
+                    x, y,
+                    pen=None,
+                    symbol='d',
+                    symbolSize=12,
+                    symbolPen=mkPen(color, width=2),
+                    symbolBrush=color
+                )
+            else:
+                # Cross or square → vertical line at the data x-position
+                x_vals, _ = self._prepare_xy(
+                    np.array([freq]),
+                    np.array([zr]),
+                    np.array([zi])
+                )
+                line = InfiniteLine(
+                    pos=x_vals[0],
+                    angle=90,
+                    pen=mkPen(color, width=2)
+                )
+                self.addItem(line)
+                pw = line
+
+            self._special_items.append(pw)
         
-                    
+        
+
+
 class BodeGraph(ParentGraph):
     def __init__(self):
         super().__init__()
@@ -446,10 +463,8 @@ class BodeGraph(ParentGraph):
         self.setTitle("Impedance Magnitude Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
-        
-        self.setYRange(3, 7, padding=0.00)
-        #self.setXRange(-1.5, 6, padding=0.05)
-        self.setXRange(-1, 6, padding=0.0)
+        self.setYRange(3, 7, padding=0.08)
+        self.setXRange(-1.5, 6, padding=0.05)
         self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, z_real, z_imag):
@@ -457,27 +472,58 @@ class BodeGraph(ParentGraph):
         mag = np.sqrt(z_real**2 + z_imag**2)
         mag_db = np.log10(mag)  # or 20*np.log10(mag) if you really want dB
         return freq_log, mag_db
+    
+    def update_special_frequencies(self, freq_array, z_real_array, z_imag_array):
+        # 1) remove prior items
+        for item in self._special_items:
+            self.removeItem(item)
+        self._special_items = []
 
-    def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
-        if symbol == 'x':
-            x_vals, _ = self._prepare_xy(
-                np.array([freq]), np.array([zr]), np.array([zi])
-            )
-            x0 = x_vals[0]
-            y_min, y_max = self.getViewBox().viewRange()[1]
-            return self.plot(
-                [x0, x0], [y_min, y_max],
-                pen=mkPen(color, width=2),
-                symbol=None
-            )
-        else:
-            # **CORRECT super call** – keep the same order
-            return super()._draw_special_marker(
-                freq, zr, zi,
-                symbol, color, filled
-            )
-    
-    
+        symbols = ['x', 'd', 's']
+        colors  = ['r', 'g', 'b']
+
+        # 2) loop and dispatch
+        for i, (freq, zr, zi) in enumerate(zip(freq_array, z_real_array, z_imag_array)):
+            group_index  = i // 3
+            symbol_index = group_index % len(symbols)
+            color_index  = i % len(colors)
+
+            symbol = symbols[symbol_index]
+            color  = colors[color_index]
+
+            if symbol == 'd':
+                # Diamond: fall back to point marker
+                x, y = self._prepare_xy(
+                    np.array([freq]),
+                    np.array([zr]),
+                    np.array([zi])
+                )
+                pw = self.plot(
+                    x, y,
+                    pen=None,
+                    symbol='d',
+                    symbolSize=12,
+                    symbolPen=mkPen(color, width=2),
+                    symbolBrush=color
+                )
+            else:
+                # Cross or square → vertical line at the data x-position
+                x_vals, _ = self._prepare_xy(
+                    np.array([freq]),
+                    np.array([zr]),
+                    np.array([zi])
+                )
+                line = InfiniteLine(
+                    pos=x_vals[0],
+                    angle=90,
+                    pen=mkPen(color, width=2)
+                )
+                self.addItem(line)
+                pw = line
+
+            self._special_items.append(pw)
+
+
 class ColeColeGraph(ParentGraph):
     """
     Plots real(Z) vs. -imag(Z), plus a secondary manual line.
