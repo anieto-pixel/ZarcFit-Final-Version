@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFontMetrics
 
 # Updated import for custom sliders.
-from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+from .CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
 
 
 class WidgetSliders(QWidget):

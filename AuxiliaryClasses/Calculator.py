@@ -9,9 +9,9 @@ from scipy.optimize import Bounds
 from scipy.interpolate import PchipInterpolator
 
 from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
-from ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
-from TimeDomainBuilder import TimeDomainBuilder
-from FitBuilder import FitBuilder
+from .ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
+from .TimeDomainBuilder import TimeDomainBuilder
+from .FitBuilder import FitBuilder
 
 # Bounds are scaled. Need to add padding for 0 values, handle Qei,
 # and implement a way of making Rinf negative.
@@ -284,7 +284,3 @@ class Calculator(QObject):
         self._fit_variables['Fhigh'] = freq_array[0]
         self._fit_variables['Flow'] = freq_array[-1]
 
-
-###############################################################################
-#   Test    
-###############################################################################

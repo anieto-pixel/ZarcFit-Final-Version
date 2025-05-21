@@ -3,7 +3,7 @@ import configparser
 from typing import Optional
 
 # Import slider classes. Replace with the actual module if needed.
-from CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
+from .CustomSliders import EPowerSliderWithTicks, DoubleSliderWithTicks
 
 
 class ConfigImporter:

@@ -9,7 +9,7 @@ import scipy.signal as sig
 from scipy.interpolate import interp1d
 from scipy.interpolate import PchipInterpolator
 from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
-from ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
+from .ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
 
     
 ###############################################################################

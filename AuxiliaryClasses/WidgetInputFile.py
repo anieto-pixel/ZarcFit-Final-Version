@@ -17,8 +17,8 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import pyqtSignal, Qt, QPoint
 from PyQt5.QtGui import QFontMetrics
-from ConfigImporter import ConfigImporter
-from CustomListSliders import ListSlider
+from .ConfigImporter import ConfigImporter
+from .CustomListSliders import ListSlider
 
 
 #this is a file type. SHould I define a proper class?

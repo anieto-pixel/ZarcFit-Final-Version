@@ -7,7 +7,7 @@ Created on Wed Mar  5 14:08:21 2025
 import numpy as np
 import scipy.optimize as opt
 from PyQt5.QtCore import QCoreApplication, QObject, pyqtSignal
-from ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
+from .ModelCircuits import ModelCircuitParent, ModelCircuitParallel, ModelCircuitSeries
 
 ###############################################################################
 # Fit_class 

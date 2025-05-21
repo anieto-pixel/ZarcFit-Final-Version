@@ -14,10 +14,7 @@ import numpy as np
 
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt, QTimer, QEvent
-from PyQt5.QtGui import (
-    QKeySequence, QMouseEvent, QFont, QFontMetrics, QFontMetrics,
-    QPalette, QColor
-    )
+from PyQt5.QtGui import (QKeySequence, QMouseEvent, QFont, QFontMetrics, QPalette, QColor)
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QShortcut, QSizePolicy, QSplitter,
     QWidget, QHBoxLayout, QVBoxLayout,  QPushButton, QLabel
@@ -94,14 +91,8 @@ class MainWidget(QWidget):
         layout.addWidget(self.toggle_model_button_wrapping)
         layout.setContentsMargins(0, 0, 0, 0)
         
-#        h = self.widget_output_file.sizeHint().height()
-#        self.toggle_model_button_wrapping.setFixedHeight(h)
-        
         container = QWidget()
         container.setLayout(layout)     
-        
-#        self.widget_output_file.setStyleSheet("background-color: #D3D3D3;")
-#        self.toggle_model_button_wrapping.setStyleSheet("background-color: #0078D7;")
         
         return container
 
@@ -182,7 +173,7 @@ class MainWidget(QWidget):
             self.config.slider_configurations, self.config.slider_default_values,
             font = self.config.general_font, small_font = self.config.small_font
             )
-        self.widget_buttons = WidgetButtonsRow(font = self.config.general_font)
+        self.widget_buttons = WidgetButtonsRow(font = self.config.small_font)
         self.widget_at_bottom = WidgetTextBar(self.config.secondary_variables_to_display,
                                               font = self.config.general_font
                                               )
@@ -556,18 +547,28 @@ if __name__ == "__main__":
     import ctypes
     if platform.system()=='Windows' and int(platform.release()) >= 8:   
         ctypes.windll.shcore.SetProcessDpiAwareness(True)
+        
+    def resource_path(relative_path):
+        """ Get absolute path to resource, works for dev and for PyInstaller """
+        try:
+            base_path = sys._MEIPASS  # PyInstaller sets this when running as a bundled app
+        except AttributeError:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
+        
+        
 #---Allowing proper display in different resolutions-----------------------   
     
     app = QApplication(sys.argv)
 #    app.setAttribute(Qt.AA_Use96Dpi) #VER ESTO
     
-    config_file = "config.ini"
+    config_file = resource_path("config.ini")
 
     # MainWindow container
     window = QMainWindow()
     main_widget = MainWidget(config_file)
     window.setCentralWidget(main_widget)
-    window.setWindowTitle("ZarcFit 5.")
+    window.setWindowTitle("ZarcFit 5.6")
     
     window.setGeometry(0, 0, 1500, 900)  # Set the initial size and position (x=0, y=0, width=800, height=600)
 
