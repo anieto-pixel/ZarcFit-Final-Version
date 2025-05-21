@@ -61,6 +61,7 @@ class ParentGraph(pg.PlotWidget):
         self.fill_region = None
         self._dynamic_plot = None
         self._static_plot = None
+        self._autoscale_padding = 0.1
 
         # Create plot items once, do not recreate them on every refresh
         self._create_plot_items()
@@ -293,7 +294,7 @@ class ParentGraph(pg.PlotWidget):
             self.plotItem.getViewBox().setRange(
                 xRange=(x_min, x_max),
                 yRange=(y_min, y_max),
-                padding=0.1
+                padding= self._autoscale_padding
             )
             self._auto_range_in_progress = False
 
@@ -395,20 +396,11 @@ class ParentGraph(pg.PlotWidget):
 class PhaseGraph(ParentGraph):
     def __init__(self):
         super().__init__()
+        self._autoscale_padding = 0.0
         self.setTitle("Phase (Log Scale of Degrees)")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "log10(|Phase|)")
-        
-        # self.getPlotItem().getViewBox().enableAutoRange(enable=False, x=True, y=False)
-        
-        self.setYRange(-1, 2, padding=0.0)
-        self.setXRange(-1, 6, padding=0.0)
-#        self.getViewBox().invertX(True)
-        
-#        x_ticks = [(i, str(i)) for i in range(-1, 7)]
-#        y_ticks = [(i, str(i)) for i in range(-1, 3)]
-#        self.getAxis('bottom').setTicks([ x_ticks ])
-#        self.getAxis('left'  ).setTicks([ y_ticks ])
+        self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, z_real, z_imag):
         freq_log = np.log10(freq)
@@ -417,9 +409,32 @@ class PhaseGraph(ParentGraph):
         return freq_log, phase_log
     
     def _apply_auto_scale(self):
-            # override the parent method so it does nothing
-            return
-        
+        """
+        Auto-scales the view based on the static (base) plot data,
+        but clamps the X range to [-1, 6] to ensure edge ticks are visible.
+        """
+        # Clamp x-range to fixed hard bounds
+        x_min =-1.2
+        x_max = 6.08
+        y_min =-1.2
+        y_max = 2.4
+    
+        self._auto_range_in_progress = True
+        self.plotItem.getViewBox().setRange(
+        xRange=(x_min, x_max),
+        yRange=(y_min, y_max),
+            padding=self._autoscale_padding
+        )
+        self._auto_range_in_progress = False
+    
+        # Force edge ticks to be shown
+        self.getPlotItem().getAxis('bottom').setTicks([
+            [(i, str(i)) for i in range(int(x_min), int(x_max+1))]
+        ])
+        self.getPlotItem().getAxis('left').setTicks([
+            [(i, str(i)) for i in range(int(y_min), int(y_max+1))]
+        ])
+      
     def _draw_special_marker(self, freq, zr, zi, symbol, color, filled):
         if symbol == 'x':
             x_vals, _ = self._prepare_xy(
@@ -443,13 +458,12 @@ class BodeGraph(ParentGraph):
     def __init__(self):
         super().__init__()
         self.setMouseTracking(True)
+        
+        self._autoscale_padding = 0.0 
         self.setTitle("Impedance Magnitude Graph")
         self.setLabel('bottom', "log10(Freq[Hz])")
         self.setLabel('left', "Log10 Magnitude [dB]")
         
-        self.setYRange(3, 7, padding=0.00)
-        #self.setXRange(-1.5, 6, padding=0.05)
-        self.setXRange(-1, 6, padding=0.0)
         self.getViewBox().invertX(True)
 
     def _prepare_xy(self, freq, z_real, z_imag):
@@ -477,6 +491,33 @@ class BodeGraph(ParentGraph):
                 symbol, color, filled
             )
     
+    def _apply_auto_scale(self):
+        """
+        Auto-scales the view based on the static (base) plot data,
+        but clamps the X range to [-1, 6] to ensure edge ticks are visible.
+        """
+        # Clamp x-range to fixed hard bounds
+        x_min =-1.2
+        x_max = 6.08
+        y_min = 2.8
+        y_max = 7.4
+    
+        self._auto_range_in_progress = True
+        self.plotItem.getViewBox().setRange(
+        xRange=(x_min, x_max),
+        yRange=(y_min, y_max),
+            padding=self._autoscale_padding
+        )
+        self._auto_range_in_progress = False
+    
+        # Force edge ticks to be shown
+        self.getPlotItem().getAxis('bottom').setTicks([
+            [(i, str(i)) for i in range(int(x_min), int(x_max+1))]
+        ])
+        self.getPlotItem().getAxis('left').setTicks([
+            [(i, str(i)) for i in range(int(y_min), int(y_max+1))]
+        ])
+
     
 class ColeColeGraph(ParentGraph):
     """
@@ -498,6 +539,7 @@ class ColeColeGraph(ParentGraph):
         super().__init__()
         
         # Titles and extra visual elements
+        # self._autoscale_padding = 0.1 #uncoment if the padding desired differs from the 0.1 parent default
         self.getPlotItem().setAspectLocked(True, 1)
         self.setTitle("Cole-Cole Graph")
         self.setLabel('bottom', "Z' [Ohms]")
@@ -583,7 +625,7 @@ class ColeColeGraph(ParentGraph):
             self.plotItem.getViewBox().setRange(
                 xRange=(x_min, x_max),
                 yRange=(y_min, y_max),
-                padding=0.05
+                padding= self._autoscale_padding
             )
             self._auto_range_in_progress = False
 
