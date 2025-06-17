@@ -382,7 +382,7 @@ class MainWidget(QWidget):
         self.config.set_input_file_type(self.widget_input_file.get_file_type_name())
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
         
-        self.widget_at_bottom.clear_text_box()
+        #self.widget_at_bottom.clear_text_box()
 
     def _handle_recover_file_values(self):
         """Recovers file values from output. Updates sliders position."""

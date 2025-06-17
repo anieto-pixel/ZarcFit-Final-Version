@@ -40,7 +40,7 @@ class WidgetTextBar(QWidget):
 
     def clear_text_box(self):
         self._comment_edit.clear()
-        self._comment_edit.setText(self.default_text)
+        #self._comment_edit.setText(self.default_text)
         self._user_comment = ""
 
     # --------------------------
