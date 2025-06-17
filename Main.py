@@ -67,7 +67,7 @@ class MainWidget(QWidget):
         self.splitter.addWidget(bottom_area)
         
         # Set initial sizes (these will be updated dynamically on resize).
-        self.splitter.setSizes([300, 300])
+ #       self.splitter.setSizes([1, 1])
         self.splitter.setStretchFactor(0, 1)  # Middle area expands
         self.splitter.setStretchFactor(1, 0)  # Bottom area remains fixed initially
         self.splitter.setHandleWidth(10)
