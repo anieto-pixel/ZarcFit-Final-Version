@@ -369,19 +369,26 @@ class MainWidget(QWidget):
         """
         Updates graphs, model, frequency slider, and configuration with new file data.
         """
+        if (freq is None or Z_real is None or Z_imag is None or
+            len(freq) == 0 or len(Z_real) == 0 or len(Z_imag) == 0):
+            
+            self.widget_graphs.reset_default_values()
+            print("MainWidget: Received empty or invalid data. Skipping update.")
+            return
+        
         self.file_data.update(freq=freq, Z_real=Z_real, Z_imag=Z_imag)
         self.widget_graphs.update_front_graphs(freq, Z_real, Z_imag)
-        
+            
         freqs_uniform, t, volt = self.calculator.transform_to_time_domain()
         self.widget_graphs.update_timedomain_graph(freqs_uniform, t, volt)
-        
+            
         self.calculator.initialize_expdata(self.file_data)
         self.freq_slider.set_list(freq)
         self._update_sliders_data()
-        
+            
         self.config.set_input_file_type(self.widget_input_file.get_file_type_name())
         self.config.set_input_file(self.widget_input_file.get_current_file_path())
-        
+            
         #self.widget_at_bottom.clear_text_box()
 
     def _handle_recover_file_values(self):

@@ -78,6 +78,10 @@ class ParentGraph(pg.PlotWidget):
     # -----------------------------------------------------------------------
     #  Public Methods
     # -----------------------------------------------------------------------
+    def reset_default_values(self):
+        self._init_data()
+        self._refresh_graph()
+        
     def filter_frequency_range(self, f_min, f_max):
         """
         Filters base and manual data to only show points in [f_min, f_max].
@@ -1002,6 +1006,12 @@ class WidgetGraphs(QWidget):
     #---------------------------------------------
     #   Public Methods
     #---------------------------------------------
+    def reset_default_values(self):
+        self._big_graph.reset_default_values()
+        self._small_graph_1.reset_default_values()
+        self._small_graph_2.reset_default_values()
+        self._tab_graph.reset_default_values()
+    
     def update_front_graphs(self, freq, z_real, z_imag):
         self._big_graph.update_parameters_base(freq, z_real, z_imag)
         self._small_graph_1.update_parameters_base(freq, z_real, z_imag)
@@ -1084,6 +1094,11 @@ class TestWidget(QWidget):
 
             slider_layout.addWidget(label)
             slider_layout.addWidget(slider)
+
+        # 2.5) Add reset button
+        self.reset_button = QPushButton("Reset Defaults")
+        self.reset_button.clicked.connect(self._handle_reset_defaults)
+        slider_layout.addWidget(self.reset_button)
 
         # 3) Put everything in the main layout
         main_layout = QHBoxLayout()
@@ -1171,6 +1186,15 @@ class TestWidget(QWidget):
         self.graphs._big_graph.update_parameters_secondary_manual(
             freq2, z_real2, z_imag2
         )
+
+    def _handle_reset_defaults(self):
+        self.graphs.reset_default_values()
+        # Reset sliders to their initial values
+        self.sliders["param1"].setValue(20)
+        self.sliders["param2"].setValue(10)
+        self.sliders["param3"].setValue(5)
+        # Ensure the blue/pink lines are also redrawn to match
+        self._update_blue_line()
 
 ###############################################################################
 #  MAIN
