@@ -81,6 +81,9 @@ class TimeDomainBuilder(QObject):
         freq_even = freq_even[::prune]
               
         z_interp = self._interpolate_points_for_time_domain(freq_even, experiment_data)
+        
+        
+        #returns the 
         t, volt_down, volt_up=self._fourier_transform(z_interp, dt)   
         
         index = np.searchsorted(t, self.T//2)
