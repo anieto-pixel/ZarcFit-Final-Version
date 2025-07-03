@@ -53,13 +53,21 @@ class TimeDomainBuilder(QObject):
 
         z_complex = model_circuit.run_rock(params, freq_even)
         z_complex[0] = z_complex[0].real
-        t, volt_down, volt_up=self._fourier_transform(z_complex, dt)       
+        
+        t, volt_down, volt_up=self._fourier_transform_pulse(z_complex, dt)
+        
+        ################ experimental portion.  Check IFFT
+        # freq_even_stepresponse=freq_even*2j*np.pi
+        # z_complex_stepresponse = z_complex / freq_even_stepresponse
+        # t, volt_down, volt_up=self._fourier_transform_response(z_complex_stepresponse, dt) 
+        ########################
         
         self._integration_variables(t, volt_down)
         
         index = np.searchsorted(t, self.T//2)
         return freq_even[:index+1], t[:index+1], volt_down[:index+1], volt_up[:index+1]
 
+    #This method is not used since it was not fully satisfactory. However it was preserved jsut in case
     def transform_to_time_domain(self,experiment_data):
         """
         Transform experimental data to the time domain. 
@@ -84,7 +92,7 @@ class TimeDomainBuilder(QObject):
         
         
         #returns the 
-        t, volt_down, volt_up=self._fourier_transform(z_interp, dt)   
+        t, volt_down, volt_up=self._fourier_transform_pulse(z_interp, dt)   
         
         index = np.searchsorted(t, self.T//2)
         return freq_even[:index+1], t[:index+1], volt_down[:index+1] 
@@ -151,7 +159,19 @@ class TimeDomainBuilder(QObject):
         return z_real_interp + 1j * z_imag_interp
           """      
         
-    def _fourier_transform(self, z_complex: np.ndarray, dt: float):
+    def _fourier_transform_response(self, z_complex_stepresponse: np.ndarray, dt: float):
+        """
+        Build the single-sided array for IRFFT and perform a real IFFT.
+        """
+        #b, a = sig.butter(2, 0.45) 
+        z_inversefft = np.fft.irfft(z_complex_stepresponse)       #to transform the impedance data from the freq domain to the time domain.
+                   #largest value is 0.28       
+        #z_inversefft = sig.filtfilt(b, a, z_inversefft)   #Applies filter
+        t = np.arange(len(z_inversefft)) * dt  # constructs time based on N and dt
+        
+        return t, z_inversefft, z_inversefft
+            
+    def _fourier_transform_pulse(self, z_complex: np.ndarray, dt: float):
         """
         Build the single-sided array for IRFFT and perform a real IFFT.
         """       
